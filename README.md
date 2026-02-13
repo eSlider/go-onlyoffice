@@ -1,5 +1,11 @@
 # go-onlyoffice
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/eslider/go-onlyoffice.svg)](https://pkg.go.dev/github.com/eslider/go-onlyoffice)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Go](https://img.shields.io/badge/Go-1.22+-00ADD8.svg)](https://go.dev)
+[![Latest Release](https://img.shields.io/github/v/tag/eSlider/go-onlyoffice?sort=semver&label=release)](https://github.com/eSlider/go-onlyoffice/releases)
+[![GitHub Stars](https://img.shields.io/github/stars/eSlider/go-onlyoffice?style=social)](https://github.com/eSlider/go-onlyoffice/stargazers)
+
 Go client library for the [OnlyOffice](https://www.onlyoffice.com/) Project Management API — manage projects, tasks, subtasks, milestones, and users programmatically.
 
 Pairs with [go-gitea-helpers](https://github.com/eSlider/go-gitea-helpers) to bridge developer issue trackers with CRM-grade project management for Gantt charts, resource planning, and executive reporting.
