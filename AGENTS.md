@@ -11,7 +11,11 @@ Canonical Go client for OnlyOffice Workspace (Projects + Calendar + CRM) and the
   - `http.go` — transport + DRY response decoders (`ResponseArray`/`ResponseObject`/`postFormObject`/`putFormObject`/`deleteObject`).
   - `projects.go`, `tasks.go`, `users.go`, `calendar.go`, `crm.go`, `files.go` — typed / untyped domain methods.
   - Pure stdlib + `google/go-querystring`; no UI, no dotenv.
-- **CLI — `cmd/oo/` as `package main`.** Cobra wrapper that loads `.env` via `godotenv` at startup. Split by domain: `main.go`, `common.go`, `calendar.go`, `tasks.go`, `crm.go`, `apps.go`. CLI-only deps (`spf13/cobra`, `joho/godotenv`) stay out of the library.
+- **CLI — `cmd/oo/` as `package main`.** Cobra wrapper that loads `.env` via `godotenv` at startup. **Subject-based command tree** mirroring [`tea`](https://gitea.com/gitea/tea):
+  - `main.go` — entry point (docstring lists the command tree).
+  - `common.go` — `rootCmd`, `newOO`, `printTable`/`printObject`, `--output table|json` flag.
+  - `calendar.go`, `projects.go`, `tasks.go`, `users.go`, `contacts.go`, `opportunities.go`, `cases.go`, `crm_tasks.go`, `apps.go` — one file per subject, each registers its subject `cobra.Command` in `init()` and attaches verb subcommands (`list`/`get`/`create`/`update`/`delete`/…).
+  - CLI-only deps (`spf13/cobra`, `joho/godotenv`) stay out of the library.
 - **Applications sync — `cmd/oo/applications/`.** README→CRM bridge, CV-specific; kept under `cmd/oo/` so it's clear it's internal to the binary, not a library feature.
 
 ## Rules
@@ -20,6 +24,8 @@ Canonical Go client for OnlyOffice Workspace (Projects + Calendar + CRM) and the
 - New endpoints go into the library first; CLI commands are thin wrappers.
 - Prefer `ResponseObject` / `postFormObject` / `putFormObject` / `deleteObject` over hand-rolled `json.Unmarshal(responseField(...))` blocks — they exist for DRY, use them.
 - Domain split is by file, **not** by subpackage. Don't introduce `internal/` or `pkg/*` subpackages inside the library — it flattens the `*Client` call surface for a reason.
+- CLI commands follow **subject → verb** structure (`oo <subject> <verb>`), never `oo <verb>-<subject>`. Add new commands to the existing subject file if one fits; create a new `cmd/oo/<subject>.go` for a genuinely new domain.
+- Every table output goes through `printTable(headers, rows)`; every single-object through `printObject(v)`. Do not `fmt.Println` rows ad-hoc or the `--output json` flag breaks for that command.
 - No secrets in the repo; use `.env` (gitignored). Commit `.env.example` only.
 - Follow SemVer on tags; this repo is tagged at GitHub under `git@github.com:eSlider/go-onlyoffice.git`.
 

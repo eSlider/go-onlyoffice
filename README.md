@@ -537,21 +537,53 @@ client.AddSubtask(ctx, "4242", "Prepare CV")
 
 ### oo (bundled command)
 
-A ready-to-use Cobra CLI wrapping the library lives under `cmd/oo`:
+A ready-to-use [Cobra](https://github.com/spf13/cobra) CLI wrapping the
+library lives under `cmd/oo`. The command tree is **subject-based**, mirroring
+the [`tea`](https://gitea.com/gitea/tea) CLI:
 
 ```bash
 go install github.com/eslider/go-onlyoffice/cmd/oo@latest
-oo cal-events
-oo task-list --all --verbose
-oo subtask-add 4242 "Prepare CV"
-oo applications-sync --path ./applications/2026 --apply
+
+# Global: every list-style command takes -o table|json (default: table)
+oo whoami
+oo users list
+oo calendar events --start 2026-04-24 --end 2026-05-01
+oo projects list
+oo projects get 33
+oo tasks list --all --verbose
+oo tasks subtask add 4242 "Prepare CV"
+oo persons create --first Jane --last Doe --email jane@example.com
+oo companies create --name "Acme GmbH" --website https://acme.com
+oo opportunities list
+oo opportunities stages
+oo cases list
+oo crm-tasks categories
+oo applications sync --path ./applications/2026 --apply
 ```
 
-The CLI reads `.env` from CWD (godotenv is a CLI-only concern — the library
-itself never loads dotfiles). Run `oo --help` for the command reference.
+| Subject | Verbs |
+|---|---|
+| `calendar` | `list`, `events`, `add`, `delete` |
+| `projects` | `list`, `get`, `milestones`, `create`, `update`, `delete` |
+| `tasks` | `list`, `get`, `create`, `update`, `delete`, `subtask add` |
+| `users` | `list`, `self` (alias: `oo whoami`) |
+| `contacts` | `list`, `get`, `delete`, `info-add` |
+| `persons` | `list` (filtered), `create`, `delete` |
+| `companies` | `list` (filtered), `create`, `delete` |
+| `opportunities` | `list`, `get`, `create`, `delete`, `stages`, `member-add` |
+| `cases` | `list`, `create`, `delete`, `member-add` |
+| `crm-tasks` | `list`, `create`, `delete`, `categories` |
+| `applications` | `sync` |
 
-> **0.4.0 migration note:** the binary was previously named `oo-cli` and
-> lived at `cmd/oo-cli`. The command set and flags are unchanged.
+The CLI reads `.env` from CWD (godotenv is a CLI-only concern — the library
+itself never loads dotfiles). Run `oo --help` or `oo <subject> --help` for
+the full command reference.
+
+> **0.5.0 migration note:** the command tree was flattened per-subject. Old
+> flat names (`oo cal-events`, `oo task-list`, `oo crm-contacts`,
+> `oo applications-sync`, …) were replaced by subject-based equivalents
+> (`oo calendar events`, `oo tasks list`, `oo contacts list`,
+> `oo applications sync`). Flags on leaf commands are unchanged.
 
 ## Environment Variables
 
