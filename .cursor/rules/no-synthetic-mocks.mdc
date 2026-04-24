@@ -1,0 +1,38 @@
+---
+description: No synthetic OnlyOffice/Gitea mocks; prefer real integration tests
+globs:
+  - "**/*_test.go"
+alwaysApply: false
+---
+# Testing policy — no synthetic vendor mockups
+
+When authoring tests under `github.com/eslider/go-onlyoffice`, do **not**
+build `httptest.NewServer` fixtures that emulate OnlyOffice, Gitea, or any
+other third-party API. Simulated vendor responses drift from reality, give
+false green signals, and hide protocol changes.
+
+## What to do instead
+
+1. **Unit tests** — pure Go, no network. Use them for parsers, encoders,
+   struct conversions, pure helpers. No `httptest` that fakes the vendor.
+2. **Integration tests** — `//go:build integration` tag in a `*_integration_test.go`
+   file. Read credentials from env:
+   - `ONLYOFFICE_URL` / `ONLYOFFICE_HOST`
+   - `ONLYOFFICE_USER` / `ONLYOFFICE_NAME`
+   - `ONLYOFFICE_PASS` / `ONLYOFFICE_PASSWORD`
+   Call `t.Skip("ONLYOFFICE_URL not set")` when credentials are absent so the
+   regular `go test ./...` stays green in CI.
+3. **Run integration**: `go test -tags=integration ./...`.
+4. **Every new endpoint** ships with an integration test in the same PR.
+
+## Narrow exception
+
+`httptest.NewServer` is OK when verifying the **caller's own** HTTP
+behaviour (e.g. a user's handler or middleware we are wrapping). It is **not**
+OK when the test server is pretending to be OnlyOffice or Gitea.
+
+## Migrating existing tests
+
+If you find a test that handles routes like `/api/2.0/...` and returns canned
+JSON, convert it to an integration test (or delete it if the behaviour is
+already covered by integration).
