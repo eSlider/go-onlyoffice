@@ -6,12 +6,26 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func cmdCalList() *cobra.Command {
+var calendarCmd = &cobra.Command{
+	Use:     "calendar",
+	Aliases: []string{"cal"},
+	Short:   "Calendars and events",
+}
+
+func init() {
+	rootCmd.AddCommand(calendarCmd)
+	calendarCmd.AddCommand(calListCmd())
+	calendarCmd.AddCommand(calEventsCmd())
+	calendarCmd.AddCommand(calAddCmd())
+	calendarCmd.AddCommand(calDeleteCmd())
+}
+
+func calListCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "cal-list",
-		Short: "List calendars (default date span)",
+		Use:   "list",
+		Short: "List calendars",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := newOO()
+			c, err := newOO(cmd)
 			if err != nil {
 				return err
 			}
@@ -19,19 +33,19 @@ func cmdCalList() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			printJSON(out)
+			printTable([]string{"objectId", "title", "textColor", "backgroundColor", "isEditable"}, out)
 			return nil
 		},
 	}
 }
 
-func cmdCalEvents() *cobra.Command {
+func calEventsCmd() *cobra.Command {
 	var start, end string
 	cmd := &cobra.Command{
-		Use:   "cal-events",
-		Short: "List calendar data for period (default: next 7 days)",
+		Use:   "events",
+		Short: "List calendar events for a date range (default: next 7 days)",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := newOO()
+			c, err := newOO(cmd)
 			if err != nil {
 				return err
 			}
@@ -43,7 +57,7 @@ func cmdCalEvents() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			printJSON(out)
+			printTable([]string{"objectId", "title", "start", "end", "allDayLong"}, out)
 			return nil
 		},
 	}
@@ -52,15 +66,15 @@ func cmdCalEvents() *cobra.Command {
 	return cmd
 }
 
-func cmdCalAdd() *cobra.Command {
+func calAddCmd() *cobra.Command {
 	var cal, desc string
 	var allDay bool
 	cmd := &cobra.Command{
-		Use:   "cal-add TITLE START END",
-		Short: "Add calendar event",
+		Use:   "add TITLE START END",
+		Short: "Add a calendar event",
 		Args:  cobra.ExactArgs(3),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := newOO()
+			c, err := newOO(cmd)
 			if err != nil {
 				return err
 			}
@@ -68,23 +82,24 @@ func cmdCalAdd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			printJSON(ev)
+			printObject(ev)
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&cal, "calendar", "", "calendar id (default from env)")
-	cmd.Flags().StringVar(&desc, "description", "", "")
-	cmd.Flags().BoolVar(&allDay, "all-day", false, "")
+	cmd.Flags().StringVar(&cal, "calendar", "", "calendar id (default from env OO_CALENDAR_ID)")
+	cmd.Flags().StringVar(&desc, "description", "", "event description")
+	cmd.Flags().BoolVar(&allDay, "all-day", false, "mark as all-day event")
 	return cmd
 }
 
-func cmdCalDel() *cobra.Command {
+func calDeleteCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "cal-delete EVENT_ID [EVENT_ID...]",
-		Short: "Delete calendar events",
-		Args:  cobra.MinimumNArgs(1),
+		Use:     "delete EVENT_ID [EVENT_ID...]",
+		Aliases: []string{"rm"},
+		Short:   "Delete one or more calendar events",
+		Args:    cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := newOO()
+			c, err := newOO(cmd)
 			if err != nil {
 				return err
 			}
@@ -93,7 +108,7 @@ func cmdCalDel() *cobra.Command {
 				if err != nil {
 					return err
 				}
-				printJSON(out)
+				printObject(out)
 			}
 			return nil
 		},

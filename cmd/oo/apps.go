@@ -7,19 +7,30 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func cmdAppsSync() *cobra.Command {
+var applicationsCmd = &cobra.Command{
+	Use:     "applications",
+	Aliases: []string{"apps"},
+	Short:   "Job-application workflow (CV tree → CRM)",
+}
+
+func init() {
+	rootCmd.AddCommand(applicationsCmd)
+	applicationsCmd.AddCommand(applicationsSyncCmd())
+}
+
+func applicationsSyncCmd() *cobra.Command {
 	var apply, verbose bool
 	var base string
 	cmd := &cobra.Command{
-		Use:   "applications-sync",
-		Short: "Sync applications/*/README.md into CRM",
+		Use:   "sync",
+		Short: "Sync applications/*/README.md into CRM (dry-run by default)",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := newOO()
+			c, err := newOO(cmd)
 			if err != nil {
 				return err
 			}
 			if base == "" {
-				return fmt.Errorf("use --path to applications year dir (e.g. .../applications/2026)")
+				return fmt.Errorf("--path is required (points at applications year dir, e.g. .../applications/2026)")
 			}
 			paths, err := applications.Discover(base)
 			if err != nil {
