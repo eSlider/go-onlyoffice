@@ -535,21 +535,23 @@ company, _ := client.FindCompany(ctx, "ACME")
 client.AddSubtask(ctx, "4242", "Prepare CV")
 ```
 
-### oo-cli (bundled command)
+### oo (bundled command)
 
-A ready-to-use Cobra CLI wrapping the library lives under `cmd/oo-cli`:
+A ready-to-use Cobra CLI wrapping the library lives under `cmd/oo`:
 
 ```bash
-go install github.com/eslider/go-onlyoffice/cmd/oo-cli@latest
-oo-cli cal-events
-oo-cli task-list --all --verbose
-oo-cli subtask-add 4242 "Prepare CV"
-oo-cli applications-sync --path ./applications/2026 --apply
+go install github.com/eslider/go-onlyoffice/cmd/oo@latest
+oo cal-events
+oo task-list --all --verbose
+oo subtask-add 4242 "Prepare CV"
+oo applications-sync --path ./applications/2026 --apply
 ```
 
 The CLI reads `.env` from CWD (godotenv is a CLI-only concern — the library
-itself never loads dotfiles). See [`cmd/oo-cli/README.md`](cmd/oo-cli/) for
-the command reference.
+itself never loads dotfiles). Run `oo --help` for the command reference.
+
+> **0.4.0 migration note:** the binary was previously named `oo-cli` and
+> lived at `cmd/oo-cli`. The command set and flags are unchanged.
 
 ## Environment Variables
 
@@ -569,8 +571,7 @@ the command reference.
 | [calendar](examples/calendar/) | List calendars and events, create a new event |
 | [crm](examples/crm/) | List contacts and opportunities, add company/deal/history note |
 | [subtasks](examples/subtasks/) | Create a parent task and attach subtasks |
-| [applications](examples/applications/) | Job application folder tree → OnlyOffice CRM (library-level usage of the internal applications package) |
-| [`cmd/oo-cli`](cmd/oo-cli/) | Full-featured CLI using all modules |
+| [`cmd/oo`](cmd/oo/) | Full-featured CLI using all modules |
 
 ## Related Libraries
 

@@ -5,6 +5,7 @@
 go.work
 go.work.sum
 
-# Build artifacts (compiled top-level binary only; do NOT match cmd/oo-cli source tree)
+# Build artifacts (top-level compiled binaries; cmd/oo/ source tree is tracked)
+/oo
 /oo-cli
 /bin/
