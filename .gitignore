@@ -1,0 +1,10 @@
+# Local environment
+.env
+
+# Go workspace (for local multi-module dev; see inventar ASR-0008)
+go.work
+go.work.sum
+
+# Build artifacts (compiled top-level binary only; do NOT match cmd/oo-cli source tree)
+/oo-cli
+/bin/
