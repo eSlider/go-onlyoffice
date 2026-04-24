@@ -3,8 +3,8 @@
 // Command tree is subject-based (mirrors the library split and the `tea` CLI):
 //
 //	oo calendar      list | events | add | delete
-//	oo projects      list | get | milestones | create | update | delete
-//	oo tasks         list | get | create | update | delete | subtask add
+//	oo projects      list | get | milestones | create | update | delete | files (list|upload|download|rename|delete)
+//	oo tasks         list | get | create | update | delete | subtask add | files (list|upload|detach)
 //	oo users         list | self            (alias: oo whoami)
 //	oo contacts      list | get | delete | info-add
 //	oo persons       list | create | delete
