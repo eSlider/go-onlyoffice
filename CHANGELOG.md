@@ -6,6 +6,64 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-04-24
+
+### Changed — CLI **BREAKING**
+
+- **Subject-based command tree** (`tea`-style). The flat `oo verb-noun`
+  layout is replaced with `oo <subject> <verb>`:
+
+  | Old | New |
+  |---|---|
+  | `oo cal-list` | `oo calendar list` |
+  | `oo cal-events` | `oo calendar events` |
+  | `oo cal-add` / `cal-delete` | `oo calendar add` / `calendar delete` |
+  | `oo task-list` | `oo tasks list` |
+  | `oo task-add` | `oo tasks create` |
+  | `oo task-update` | `oo tasks update` (deletion moved to `oo tasks delete`) |
+  | `oo subtask-add` | `oo tasks subtask add` |
+  | `oo crm-contacts` | `oo contacts list` (plus filtered `oo persons list` / `oo companies list`) |
+  | `oo crm-add-contact --company …` | `oo companies create --name …` |
+  | `oo crm-add-contact --person-first …` | `oo persons create --first …` |
+  | `oo crm-deals` | `oo opportunities list` |
+  | `oo crm-deals --stages` | `oo opportunities stages` |
+  | `oo crm-add-deal` | `oo opportunities create` |
+  | `oo crm-cases` | `oo cases list` |
+  | `oo applications-sync` | `oo applications sync` |
+
+- **New subjects**: `oo projects {list,get,milestones,create,update,delete}`,
+  `oo users {list,self}` (plus top-level `oo whoami`), `oo crm-tasks
+  {list,create,delete,categories}`, `oo cases {create,delete,member-add}`,
+  `oo contacts {get,info-add}`.
+
+- **Global `--output/-o` flag**: all list-like commands now support
+  `--output table` (default; tabwriter-aligned, truncated to 80 chars
+  per cell) and `--output json`. Nested `bidCurrency` flattened to its
+  `abbreviation` in the table view.
+
+- **Module aliases**: `oo calendar|cal`, `oo projects|prj`, `oo tasks|task`,
+  `oo persons|person`, `oo companies|company`, `oo opportunities|deals|deal`,
+  `oo cases|case`, `oo applications|apps`. `delete|rm` on every leaf that
+  removes things.
+
+### Added
+
+- `cmd/oo/common.go` — shared `printTable(headers, rows)` and
+  `printObject(v)` helpers that dispatch on the `--output` flag.
+- `cmd/oo/users.go` — exposes `oo users list`, `oo users self`, `oo whoami`
+  via the library's `GetUsers` + `SelfUserID`.
+- `cmd/oo/projects.go` — full CRUD for projects backed by `CreateProject`,
+  `UpdateProject`, `DeleteProject`, `GetProjectByID`, `GetProjectMilestones`.
+- `cmd/oo/crm_tasks.go` — dedicated `oo crm-tasks` subject (distinct from
+  project `oo tasks`).
+- `cmd/oo/contacts.go` — unified contacts/persons/companies with shared
+  list/filter implementation.
+
+### Changed — library (minor)
+
+- `newOO` in `cmd/oo/common.go` now calls `AuthenticateContext(cmd.Context())`
+  so CLI aborts propagate to the auth request.
+
 ## [0.4.0] - 2026-04-24
 
 ### Changed — project structure
