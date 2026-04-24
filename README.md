@@ -566,6 +566,10 @@ the command reference.
 | Example | Description |
 |---|---|
 | [basic](examples/basic/) | List projects and users |
+| [calendar](examples/calendar/) | List calendars and events, create a new event |
+| [crm](examples/crm/) | List contacts and opportunities, add company/deal/history note |
+| [subtasks](examples/subtasks/) | Create a parent task and attach subtasks |
+| [applications](examples/applications/) | Job application folder tree → OnlyOffice CRM (library-level usage of the internal applications package) |
 | [`cmd/oo-cli`](cmd/oo-cli/) | Full-featured CLI using all modules |
 
 ## Related Libraries
