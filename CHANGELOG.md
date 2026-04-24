@@ -6,6 +6,41 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-04-24
+
+### Added — library
+
+- **Project & task Documents API** in [`files.go`](files.go):
+  - `FileEntry`, `FolderEntry`, `ProjectFilesResponse` types.
+  - `GetProjectFiles`, `GetTaskFiles`, `GetFile`.
+  - `UploadProjectFile` — `POST /api/2.0/files/{folderId}/upload` into the
+    project's `projectFolder` (resolved via `GetProjectByID` or first folder
+    from `GetProjectFiles`).
+  - `AttachFilesToTask` — `POST .../project/task/{id}/files` with form
+    `files=<id>` (OnlyOffice expects **existing** file ids, not multipart).
+  - `UploadTaskFile` — uploads via `UploadProjectFile` using the task's
+    `projectOwner.id`, then attaches.
+  - `DetachTaskFile` — `DELETE .../files?fileid=`.
+  - `RenameFile` — `PUT /api/2.0/files/file/{id}.json` with JSON body.
+  - `DeleteFiles` — `PUT /api/2.0/files/fileops/delete.json` with `fileIds`.
+  - `DownloadFile` — `GetFile` then `GET` on `viewUrl` with `Authorization`.
+  - Helpers: `FileEntryNumericID`, `FileEntryTitle`, `SafeLocalFileName`.
+- **`putJSON`** on `*Client` in [`http.go`](http.go) for JSON PUT bodies.
+
+### Added — CLI
+
+- `oo projects files list|upload|download|rename|delete` — see
+  [`cmd/oo/projects_files.go`](cmd/oo/projects_files.go); `list` supports
+  `--folders`.
+- `oo tasks files list|upload|detach` — see [`cmd/oo/tasks_files.go`](cmd/oo/tasks_files.go).
+
+### Added — tests
+
+- [`files_integration_test.go`](files_integration_test.go) — live roundtrip
+  against OnlyOffice (same credential rules as `client_test.go`).
+- [`files_test.go`](files_test.go) + `testdata/*.json` — envelope decode unit
+  tests (no network).
+
 ## [0.5.0] - 2026-04-24
 
 ### Changed — CLI **BREAKING**

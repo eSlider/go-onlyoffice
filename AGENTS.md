@@ -9,12 +9,12 @@ Canonical Go client for OnlyOffice Workspace (Projects + Calendar + CRM) and the
   - `request.go` — `Request`, `Query`, `Time`, `Token`, `MetaResponse`, `Permissions`.
   - `auth.go` — `Authenticate`, `AuthenticateContext`, `InvalidateToken`, `Auth`, token lifecycle.
   - `http.go` — transport + DRY response decoders (`ResponseArray`/`ResponseObject`/`postFormObject`/`putFormObject`/`deleteObject`).
-  - `projects.go`, `tasks.go`, `users.go`, `calendar.go`, `crm.go`, `files.go` — typed / untyped domain methods.
+  - `projects.go`, `tasks.go`, `users.go`, `calendar.go`, `crm.go`, `files.go` — typed / untyped domain methods. **`files.go`** — CRM opportunity upload plus **project/task Documents** (`GetProjectFiles`, `UploadProjectFile`, `GetTaskFiles`, `AttachFilesToTask`, `UploadTaskFile`, `DetachTaskFile`, `GetFile`, `RenameFile`, `DeleteFiles`, `DownloadFile`).
   - Pure stdlib + `google/go-querystring`; no UI, no dotenv.
 - **CLI — `cmd/oo/` as `package main`.** Cobra wrapper that loads `.env` via `godotenv` at startup. **Subject-based command tree** mirroring [`tea`](https://gitea.com/gitea/tea):
   - `main.go` — entry point (docstring lists the command tree).
   - `common.go` — `rootCmd`, `newOO`, `printTable`/`printObject`, `--output table|json` flag.
-  - `calendar.go`, `projects.go`, `tasks.go`, `users.go`, `contacts.go`, `opportunities.go`, `cases.go`, `crm_tasks.go`, `apps.go` — one file per subject, each registers its subject `cobra.Command` in `init()` and attaches verb subcommands (`list`/`get`/`create`/`update`/`delete`/…).
+  - `calendar.go`, `projects.go`, `projects_files.go`, `tasks.go`, `tasks_files.go`, `users.go`, `contacts.go`, `opportunities.go`, `cases.go`, `crm_tasks.go`, `apps.go` — one file per subject (or per subject facet), each registers in `init()`.
   - CLI-only deps (`spf13/cobra`, `joho/godotenv`) stay out of the library.
 - **Applications sync — `cmd/oo/applications/`.** README→CRM bridge, CV-specific; kept under `cmd/oo/` so it's clear it's internal to the binary, not a library feature.
 

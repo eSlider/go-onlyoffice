@@ -1,0 +1,25 @@
+{
+  "count": 1,
+  "status": 0,
+  "statusCode": 200,
+  "response": {
+    "folders": [
+      {
+        "id": 10,
+        "title": "Subfolder",
+        "filesCount": 0,
+        "foldersCount": 0
+      }
+    ],
+    "files": [
+      {
+        "id": 100,
+        "title": "readme.txt",
+        "fileExst": ".txt",
+        "contentLength": "12",
+        "fileType": 2,
+        "viewUrl": "/Products/Files/DocEditor.aspx?fileid=100"
+      }
+    ]
+  }
+}
