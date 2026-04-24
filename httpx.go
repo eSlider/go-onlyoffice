@@ -45,7 +45,62 @@ func (c *Client) authHeader() (string, error) {
 // Authenticate validates credentials and primes the token. Library users may
 // call this eagerly to surface auth errors at startup; otherwise the token is
 // fetched lazily on the first request.
+//
+// Prefer AuthenticateContext in long-running jobs — it honours cancellation.
 func (c *Client) Authenticate() error { return c.ensureToken() }
+
+// AuthenticateContext is the context-aware variant of Authenticate. If the
+// cached token is still valid it returns immediately; otherwise it performs a
+// POST to /api/2.0/authentication.json that is cancellable via ctx.
+//
+// This is the recommended entry point for long-running syncs (cron, watchers)
+// because it guarantees that a stalled auth call will not block the caller
+// past its deadline.
+func (c *Client) AuthenticateContext(ctx context.Context) error {
+	if c.token != nil && !time.Time(c.token.Expires).Before(time.Now()) {
+		return nil
+	}
+	body, err := json.Marshal(c.credentials)
+	if err != nil {
+		return fmt.Errorf("marshal credentials: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL()+"/api/2.0/authentication.json", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("auth request: %w", err)
+	}
+	defer resp.Body.Close()
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("auth: %d %s", resp.StatusCode, truncate(string(raw), 400))
+	}
+	var env struct {
+		Response *Token `json:"response"`
+	}
+	if err := json.Unmarshal(raw, &env); err != nil {
+		return fmt.Errorf("auth decode: %w", err)
+	}
+	if env.Response == nil || env.Response.Value == "" {
+		return fmt.Errorf("auth: empty token in response")
+	}
+	c.token = env.Response
+	return nil
+}
+
+// InvalidateToken clears the cached authentication token. The next request
+// (or call to Authenticate / AuthenticateContext) will re-authenticate.
+//
+// Use this to recover from a mid-sync 401 when the server has revoked or
+// rotated the session while the Expires timestamp still looks fresh locally.
+func (c *Client) InvalidateToken() { c.token = nil }
 
 // baseURL returns the configured base URL without trailing slash.
 func (c *Client) baseURL() string {

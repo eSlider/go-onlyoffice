@@ -6,6 +6,22 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-04-24
+
+### Added
+
+- `AuthenticateContext(ctx)` — context-aware auth that honours cancellation and
+  deadlines. Preferred entry point for long-running syncs (cron, watchers).
+- `InvalidateToken()` — clears the cached token to force re-auth on the next
+  request. Use this to recover from a mid-sync 401 when the server has revoked
+  the session while the local `Expires` timestamp still looks fresh.
+
+### Notes
+
+- Plain `Authenticate()` is unchanged and remains a convenience wrapper around
+  `AuthenticateContext(context.Background())`.
+- No breaking changes; a patch release.
+
 ## [0.3.0] - 2026-04-24
 
 ### Added

@@ -192,3 +192,79 @@ func TestResponseFieldMissing(t *testing.T) {
 		t.Fatal("expected error on missing field")
 	}
 }
+
+func TestAuthenticateContextUsesCacheWhenFresh(t *testing.T) {
+	var authHits int
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/2.0/authentication.json", func(w http.ResponseWriter, r *http.Request) {
+		authHits++
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"response":{"token":"FRESH_TOKEN","expires":"2099-01-01T00:00:00.0000000-00:00"}}`)
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	c := NewClient(Credentials{Url: srv.URL, User: "u", Password: "p"})
+
+	if err := c.AuthenticateContext(context.Background()); err != nil {
+		t.Fatalf("first AuthenticateContext: %v", err)
+	}
+	if authHits != 1 {
+		t.Errorf("expected 1 auth hit after first call, got %d", authHits)
+	}
+	if c.token == nil || c.token.Value != "FRESH_TOKEN" {
+		t.Errorf("token not cached: %+v", c.token)
+	}
+	if err := c.AuthenticateContext(context.Background()); err != nil {
+		t.Fatalf("second AuthenticateContext: %v", err)
+	}
+	if authHits != 1 {
+		t.Errorf("cache bypassed: expected 1 auth hit, got %d", authHits)
+	}
+}
+
+func TestInvalidateTokenForcesReauth(t *testing.T) {
+	var authHits int
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/2.0/authentication.json", func(w http.ResponseWriter, r *http.Request) {
+		authHits++
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"response":{"token":"T","expires":"2099-01-01T00:00:00.0000000-00:00"}}`)
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	c := NewClient(Credentials{Url: srv.URL, User: "u", Password: "p"})
+
+	if err := c.AuthenticateContext(context.Background()); err != nil {
+		t.Fatalf("auth: %v", err)
+	}
+	c.InvalidateToken()
+	if c.token != nil {
+		t.Fatalf("token still cached after Invalidate: %+v", c.token)
+	}
+	if err := c.AuthenticateContext(context.Background()); err != nil {
+		t.Fatalf("re-auth: %v", err)
+	}
+	if authHits != 2 {
+		t.Errorf("expected 2 auth hits after invalidate, got %d", authHits)
+	}
+}
+
+func TestAuthenticateContextRespectsCancellation(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/2.0/authentication.json", func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-r.Context().Done():
+			return
+		case <-time.After(2 * time.Second):
+			_, _ = io.WriteString(w, `{"response":{"token":"T","expires":"2099-01-01T00:00:00.0000000-00:00"}}`)
+		}
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	c := NewClient(Credentials{Url: srv.URL, User: "u", Password: "p"})
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	if err := c.AuthenticateContext(ctx); err == nil {
+		t.Fatal("expected error on context timeout")
+	}
+}
