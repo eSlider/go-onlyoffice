@@ -1,17 +1,25 @@
 # AGENTS — go-onlyoffice
 
-Canonical Go client for OnlyOffice Workspace (Projects + Calendar + CRM) and the `oo-cli` command.
+Canonical Go client for OnlyOffice Workspace (Projects + Calendar + CRM) and the `oo` command.
 
 ## Topology
 
-- **Library (root package `onlyoffice`)** — `onlyoffice.go`, `httpx.go`, `calendar.go`, `crm.go`, `tasks_extra.go`, `files.go`. Pure stdlib + `google/go-querystring`; no UI, no dotenv.
-- **CLI (`cmd/oo-cli` + `internal/cli`)** — Cobra wrapper that loads `.env` via `godotenv` at startup. CLI-only deps (`spf13/cobra`, `joho/godotenv`) must stay out of the library surface.
-- **Applications sync (`internal/applications`)** — README/CRM bridge, consumes the library.
+- **Library — flat package `onlyoffice` at repo root.** Split by *domain file*, not by subpackage, so every call site reads `c.XxxYyy()` against a single `*Client`. Files:
+  - `client.go` — `Client`, `Credentials`, `Defaults`, env helpers, `NewClient`.
+  - `request.go` — `Request`, `Query`, `Time`, `Token`, `MetaResponse`, `Permissions`.
+  - `auth.go` — `Authenticate`, `AuthenticateContext`, `InvalidateToken`, `Auth`, token lifecycle.
+  - `http.go` — transport + DRY response decoders (`ResponseArray`/`ResponseObject`/`postFormObject`/`putFormObject`/`deleteObject`).
+  - `projects.go`, `tasks.go`, `users.go`, `calendar.go`, `crm.go`, `files.go` — typed / untyped domain methods.
+  - Pure stdlib + `google/go-querystring`; no UI, no dotenv.
+- **CLI — `cmd/oo/` as `package main`.** Cobra wrapper that loads `.env` via `godotenv` at startup. Split by domain: `main.go`, `common.go`, `calendar.go`, `tasks.go`, `crm.go`, `apps.go`. CLI-only deps (`spf13/cobra`, `joho/godotenv`) stay out of the library.
+- **Applications sync — `cmd/oo/applications/`.** README→CRM bridge, CV-specific; kept under `cmd/oo/` so it's clear it's internal to the binary, not a library feature.
 
 ## Rules
 
 - Library must never call `godotenv.Load()` — the CLI does that.
 - New endpoints go into the library first; CLI commands are thin wrappers.
+- Prefer `ResponseObject` / `postFormObject` / `putFormObject` / `deleteObject` over hand-rolled `json.Unmarshal(responseField(...))` blocks — they exist for DRY, use them.
+- Domain split is by file, **not** by subpackage. Don't introduce `internal/` or `pkg/*` subpackages inside the library — it flattens the `*Client` call surface for a reason.
 - No secrets in the repo; use `.env` (gitignored). Commit `.env.example` only.
 - Follow SemVer on tags; this repo is tagged at GitHub under `git@github.com:eSlider/go-onlyoffice.git`.
 

@@ -2,7 +2,7 @@ package onlyoffice
 
 // Minimal CRM helpers: contacts, opportunities, cases, tasks, and history notes.
 // These expose untyped maps for flexibility — they are primarily consumed by
-// cmd/oo-cli and the applications-sync workflow.
+// cmd/oo and the applications-sync workflow.
 
 import (
 	"context"
@@ -16,8 +16,8 @@ import (
 // ListContacts returns a page of CRM contacts and the total count.
 func (c *Client) ListContacts(ctx context.Context, count, startIndex int, search string) ([]map[string]any, int, error) {
 	q := url.Values{}
-	q.Set("count", fmt.Sprintf("%d", count))
-	q.Set("startIndex", fmt.Sprintf("%d", startIndex))
+	q.Set("count", strconv.Itoa(count))
+	q.Set("startIndex", strconv.Itoa(startIndex))
 	if search != "" {
 		q.Set("filterValue", search)
 	}
@@ -41,19 +41,7 @@ func (c *Client) ListContacts(ctx context.Context, count, startIndex int, search
 
 // GetContact returns a single contact by id.
 func (c *Client) GetContact(ctx context.Context, contactID string) (map[string]any, error) {
-	raw, err := c.getJSON(ctx, fmt.Sprintf("/api/2.0/crm/contact/%s.json", url.PathEscape(contactID)))
-	if err != nil {
-		return nil, err
-	}
-	resp, err := responseField(raw, "response")
-	if err != nil {
-		return nil, err
-	}
-	var out map[string]any
-	if err := json.Unmarshal(resp, &out); err != nil {
-		return nil, err
-	}
-	return out, nil
+	return c.ResponseObject(ctx, fmt.Sprintf("/api/2.0/crm/contact/%s.json", url.PathEscape(contactID)))
 }
 
 // FindCompany searches for a company contact with an exact (case-insensitive)
@@ -78,13 +66,14 @@ func (c *Client) FindPerson(ctx context.Context, first, last string) (map[string
 	if err != nil {
 		return nil, err
 	}
+	first = strings.ToLower(first)
+	last = strings.ToLower(last)
 	for _, p := range items {
 		if isCompany(p) {
 			continue
 		}
-		fn := strings.ToLower(fmt.Sprint(p["firstName"]))
-		ln := strings.ToLower(fmt.Sprint(p["lastName"]))
-		if fn == strings.ToLower(first) && ln == strings.ToLower(last) {
+		if strings.ToLower(fmt.Sprint(p["firstName"])) == first &&
+			strings.ToLower(fmt.Sprint(p["lastName"])) == last {
 			return p, nil
 		}
 	}
@@ -100,19 +89,7 @@ func isCompany(m map[string]any) bool {
 func (c *Client) CreateCompany(ctx context.Context, name string) (map[string]any, error) {
 	fields := url.Values{}
 	fields.Set("companyName", name)
-	raw, err := c.postForm(ctx, "/api/2.0/crm/contact/company.json", fields)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := responseField(raw, "response")
-	if err != nil {
-		return nil, err
-	}
-	var out map[string]any
-	if err := json.Unmarshal(resp, &out); err != nil {
-		return nil, err
-	}
-	return out, nil
+	return c.postFormObject(ctx, "/api/2.0/crm/contact/company.json", fields)
 }
 
 // CreatePerson creates a person contact; companyID == 0 means unlinked.
@@ -129,19 +106,7 @@ func (c *Client) CreatePerson(ctx context.Context, first, last string, companyID
 	if about != "" {
 		fields.Set("about", about)
 	}
-	raw, err := c.postForm(ctx, "/api/2.0/crm/contact/person.json", fields)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := responseField(raw, "response")
-	if err != nil {
-		return nil, err
-	}
-	var out map[string]any
-	if err := json.Unmarshal(resp, &out); err != nil {
-		return nil, err
-	}
-	return out, nil
+	return c.postFormObject(ctx, "/api/2.0/crm/contact/person.json", fields)
 }
 
 // AddContactInfo attaches an email/website/phone/etc. to a contact.
@@ -153,40 +118,20 @@ func (c *Client) AddContactInfo(ctx context.Context, contactID, infoType, dataVa
 	fields.Set("infoType", infoType)
 	fields.Set("data", dataValue)
 	fields.Set("category", category)
-	fields.Set("isPrimary", fmt.Sprintf("%t", isPrimary))
-	raw, err := c.postForm(ctx, fmt.Sprintf("/api/2.0/crm/contact/%s/data.json", url.PathEscape(contactID)), fields)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := responseField(raw, "response")
-	if err != nil {
-		return nil, err
-	}
-	var out map[string]any
-	_ = json.Unmarshal(resp, &out)
-	return out, nil
+	fields.Set("isPrimary", strconv.FormatBool(isPrimary))
+	return c.postFormObject(ctx, fmt.Sprintf("/api/2.0/crm/contact/%s/data.json", url.PathEscape(contactID)), fields)
 }
 
 // DeleteContact removes a CRM contact by id.
 func (c *Client) DeleteContact(ctx context.Context, contactID string) (map[string]any, error) {
-	raw, err := c.deleteReq(ctx, fmt.Sprintf("/api/2.0/crm/contact/%s.json", url.PathEscape(contactID)))
-	if err != nil {
-		return nil, err
-	}
-	resp, err := responseField(raw, "response")
-	if err != nil {
-		return nil, err
-	}
-	var out map[string]any
-	_ = json.Unmarshal(resp, &out)
-	return out, nil
+	return c.deleteObject(ctx, fmt.Sprintf("/api/2.0/crm/contact/%s.json", url.PathEscape(contactID)))
 }
 
 // ListOpportunities returns a page of deals/opportunities and the total count.
 func (c *Client) ListOpportunities(ctx context.Context, count, startIndex int) ([]map[string]any, int, error) {
 	q := url.Values{}
-	q.Set("count", fmt.Sprintf("%d", count))
-	q.Set("startIndex", fmt.Sprintf("%d", startIndex))
+	q.Set("count", strconv.Itoa(count))
+	q.Set("startIndex", strconv.Itoa(startIndex))
 	raw, err := c.getJSON(ctx, "/api/2.0/crm/opportunity/filter.json?"+q.Encode())
 	if err != nil {
 		return nil, 0, err
@@ -203,19 +148,7 @@ func (c *Client) ListOpportunities(ctx context.Context, count, startIndex int) (
 
 // GetOpportunity returns a single opportunity (deal) by id.
 func (c *Client) GetOpportunity(ctx context.Context, id string) (map[string]any, error) {
-	raw, err := c.getJSON(ctx, fmt.Sprintf("/api/2.0/crm/opportunity/%s.json", url.PathEscape(id)))
-	if err != nil {
-		return nil, err
-	}
-	resp, err := responseField(raw, "response")
-	if err != nil {
-		return nil, err
-	}
-	var out map[string]any
-	if err := json.Unmarshal(resp, &out); err != nil {
-		return nil, err
-	}
-	return out, nil
+	return c.ResponseObject(ctx, fmt.Sprintf("/api/2.0/crm/opportunity/%s.json", url.PathEscape(id)))
 }
 
 // CreateOpportunity creates a new deal. An empty responsibleID falls back to
@@ -237,39 +170,19 @@ func (c *Client) CreateOpportunity(ctx context.Context, title string, stageID in
 	fields.Set("responsibleId", responsibleID)
 	fields.Set("bidCurrencyAbbr", bidCurrency)
 	if bidValue != 0 {
-		fields.Set("bidValue", fmt.Sprintf("%g", bidValue))
+		fields.Set("bidValue", strconv.FormatFloat(bidValue, 'g', -1, 64))
 	}
 	if description != "" {
 		fields.Set("description", description)
 	}
-	raw, err := c.postForm(ctx, "/api/2.0/crm/opportunity.json", fields)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := responseField(raw, "response")
-	if err != nil {
-		return nil, err
-	}
-	var out map[string]any
-	if err := json.Unmarshal(resp, &out); err != nil {
-		return nil, err
-	}
-	return out, nil
+	return c.postFormObject(ctx, "/api/2.0/crm/opportunity.json", fields)
 }
 
 // AddOpportunityMember links a contact to an opportunity.
 func (c *Client) AddOpportunityMember(ctx context.Context, oppID, contactID string) (map[string]any, error) {
-	raw, err := c.postForm(ctx, fmt.Sprintf("/api/2.0/crm/opportunity/%s/contact/%s.json", url.PathEscape(oppID), url.PathEscape(contactID)), url.Values{})
-	if err != nil {
-		return nil, err
-	}
-	resp, err := responseField(raw, "response")
-	if err != nil {
-		return nil, err
-	}
-	var out map[string]any
-	_ = json.Unmarshal(resp, &out)
-	return out, nil
+	return c.postFormObject(ctx,
+		fmt.Sprintf("/api/2.0/crm/opportunity/%s/contact/%s.json", url.PathEscape(oppID), url.PathEscape(contactID)),
+		url.Values{})
 }
 
 // ListDealStages returns the configured opportunity stages.
@@ -279,24 +192,14 @@ func (c *Client) ListDealStages(ctx context.Context) ([]map[string]any, error) {
 
 // DeleteOpportunity removes a deal by id.
 func (c *Client) DeleteOpportunity(ctx context.Context, id string) (map[string]any, error) {
-	raw, err := c.deleteReq(ctx, fmt.Sprintf("/api/2.0/crm/opportunity/%s.json", url.PathEscape(id)))
-	if err != nil {
-		return nil, err
-	}
-	resp, err := responseField(raw, "response")
-	if err != nil {
-		return nil, err
-	}
-	var out map[string]any
-	_ = json.Unmarshal(resp, &out)
-	return out, nil
+	return c.deleteObject(ctx, fmt.Sprintf("/api/2.0/crm/opportunity/%s.json", url.PathEscape(id)))
 }
 
 // ListCases returns a page of CRM cases and the total count.
 func (c *Client) ListCases(ctx context.Context, count, startIndex int) ([]map[string]any, int, error) {
 	q := url.Values{}
-	q.Set("count", fmt.Sprintf("%d", count))
-	q.Set("startIndex", fmt.Sprintf("%d", startIndex))
+	q.Set("count", strconv.Itoa(count))
+	q.Set("startIndex", strconv.Itoa(startIndex))
 	raw, err := c.getJSON(ctx, "/api/2.0/crm/case/filter.json?"+q.Encode())
 	if err != nil {
 		return nil, 0, err
@@ -315,56 +218,26 @@ func (c *Client) ListCases(ctx context.Context, count, startIndex int) ([]map[st
 func (c *Client) CreateCase(ctx context.Context, title string) (map[string]any, error) {
 	fields := url.Values{}
 	fields.Set("title", title)
-	raw, err := c.postForm(ctx, "/api/2.0/crm/case.json", fields)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := responseField(raw, "response")
-	if err != nil {
-		return nil, err
-	}
-	var out map[string]any
-	if err := json.Unmarshal(resp, &out); err != nil {
-		return nil, err
-	}
-	return out, nil
+	return c.postFormObject(ctx, "/api/2.0/crm/case.json", fields)
 }
 
 // AddCaseMember links a contact to a CRM case.
 func (c *Client) AddCaseMember(ctx context.Context, caseID, contactID string) (map[string]any, error) {
-	raw, err := c.postForm(ctx, fmt.Sprintf("/api/2.0/crm/case/%s/contact/%s.json", url.PathEscape(caseID), url.PathEscape(contactID)), url.Values{})
-	if err != nil {
-		return nil, err
-	}
-	resp, err := responseField(raw, "response")
-	if err != nil {
-		return nil, err
-	}
-	var out map[string]any
-	_ = json.Unmarshal(resp, &out)
-	return out, nil
+	return c.postFormObject(ctx,
+		fmt.Sprintf("/api/2.0/crm/case/%s/contact/%s.json", url.PathEscape(caseID), url.PathEscape(contactID)),
+		url.Values{})
 }
 
 // DeleteCase removes a case by id.
 func (c *Client) DeleteCase(ctx context.Context, id string) (map[string]any, error) {
-	raw, err := c.deleteReq(ctx, fmt.Sprintf("/api/2.0/crm/case/%s.json", url.PathEscape(id)))
-	if err != nil {
-		return nil, err
-	}
-	resp, err := responseField(raw, "response")
-	if err != nil {
-		return nil, err
-	}
-	var out map[string]any
-	_ = json.Unmarshal(resp, &out)
-	return out, nil
+	return c.deleteObject(ctx, fmt.Sprintf("/api/2.0/crm/case/%s.json", url.PathEscape(id)))
 }
 
 // ListCRMTasks returns a page of CRM tasks (separate from Project tasks).
 func (c *Client) ListCRMTasks(ctx context.Context, count, startIndex int) ([]map[string]any, int, error) {
 	q := url.Values{}
-	q.Set("count", fmt.Sprintf("%d", count))
-	q.Set("startIndex", fmt.Sprintf("%d", startIndex))
+	q.Set("count", strconv.Itoa(count))
+	q.Set("startIndex", strconv.Itoa(startIndex))
 	raw, err := c.getJSON(ctx, "/api/2.0/crm/task/filter.json?"+q.Encode())
 	if err != nil {
 		return nil, 0, err
@@ -397,34 +270,12 @@ func (c *Client) CreateCRMTask(ctx context.Context, title, deadline string, cate
 	if description != "" {
 		fields.Set("description", description)
 	}
-	raw, err := c.postForm(ctx, "/api/2.0/crm/task.json", fields)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := responseField(raw, "response")
-	if err != nil {
-		return nil, err
-	}
-	var out map[string]any
-	if err := json.Unmarshal(resp, &out); err != nil {
-		return nil, err
-	}
-	return out, nil
+	return c.postFormObject(ctx, "/api/2.0/crm/task.json", fields)
 }
 
 // DeleteCRMTask removes a CRM task by id.
 func (c *Client) DeleteCRMTask(ctx context.Context, id string) (map[string]any, error) {
-	raw, err := c.deleteReq(ctx, fmt.Sprintf("/api/2.0/crm/task/%s.json", url.PathEscape(id)))
-	if err != nil {
-		return nil, err
-	}
-	resp, err := responseField(raw, "response")
-	if err != nil {
-		return nil, err
-	}
-	var out map[string]any
-	_ = json.Unmarshal(resp, &out)
-	return out, nil
+	return c.deleteObject(ctx, fmt.Sprintf("/api/2.0/crm/task/%s.json", url.PathEscape(id)))
 }
 
 // ListTaskCategories returns CRM task categories.
@@ -447,17 +298,7 @@ func (c *Client) AddHistoryNote(ctx context.Context, entityType string, entityID
 	fields.Set("entityId", strconv.Itoa(entityID))
 	fields.Set("content", content)
 	fields.Set("categoryId", strconv.Itoa(categoryID))
-	raw, err := c.postForm(ctx, "/api/2.0/crm/history.json", fields)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := responseField(raw, "response")
-	if err != nil {
-		return nil, err
-	}
-	var out map[string]any
-	_ = json.Unmarshal(resp, &out)
-	return out, nil
+	return c.postFormObject(ctx, "/api/2.0/crm/history.json", fields)
 }
 
 func (c *Client) historyNoteCategoryID(ctx context.Context) (int, error) {

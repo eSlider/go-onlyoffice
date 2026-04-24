@@ -6,6 +6,68 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-04-24
+
+### Changed — project structure
+
+- **Library files reorganised by domain** (mechanical split; zero API surface
+  change). The former monolithic `onlyoffice.go` (687 LOC) is now split into:
+  - `client.go` — `Client`, `Credentials`, `Defaults`, env helpers, `NewClient`.
+  - `request.go` — `Request`, `Query`, `Time`, `Token`, `MetaResponse`,
+    `Permissions`, `requestBodyReader`.
+  - `auth.go` — `Authenticate`, `AuthenticateContext`, `InvalidateToken`,
+    `Auth`, `ensureToken`, `authHeader`, `tokenValid`.
+  - `http.go` — transport helpers and DRY response decoders
+    (`ResponseArray`, `ResponseObject`, `postFormObject`, `putFormObject`,
+    `deleteObject`, `unmarshalResponseObject`).
+  - `projects.go` — `Project`, `Projects`, `Milestone`, `ProjectOwner` +
+    `GetProjects` / `CreateProject` / `UpdateProject` / `DeleteProject` /
+    `GetProjectByID` / `GetProjectMilestones`.
+  - `tasks.go` — `Task`, `ProjectTaskStatus`, `TaskPriority`,
+    `ProjectGetTasksRequest` et al. **plus** the form-encoded helpers
+    formerly in `tasks_extra.go` (`ListTasks`, `AddTask`, `AddSubtask`,
+    `UpdateTaskStatus`, `DeleteTask`, `GetTaskByID`).
+  - `users.go` — `User`, `Contact`, `Group`, `GetUsers`, `SelfUserID`.
+  - `calendar.go`, `crm.go`, `files.go` — unchanged in scope, refactored
+    through the new DRY helpers.
+  - `httpx.go` → **renamed** `http.go`.
+  - `onlyoffice.go` and `tasks_extra.go` — **deleted** (content redistributed).
+
+### Changed — CLI **BREAKING**
+
+- **Binary renamed `oo-cli` → `oo`.** Install with
+  `go install github.com/eslider/go-onlyoffice/cmd/oo@latest`.
+- **Package path `cmd/oo-cli` → `cmd/oo`.** The old path is removed.
+- **`internal/cli` is gone.** Cobra commands now live directly under
+  `cmd/oo/` as `package main`, split by domain: `calendar.go`, `crm.go`,
+  `tasks.go`, `apps.go`, `common.go`. Rationale: cobra wiring is a CLI-only
+  concern and does not belong inside a `pkg-level internal/`.
+- **`internal/applications` → `cmd/oo/applications/`.** This is a
+  CV-specific CRM workflow — not a general OnlyOffice feature — and is only
+  consumed by the `oo` CLI. Keeping it under `cmd/oo/` prevents accidental
+  external adoption and makes the coupling explicit.
+- **`examples/applications/` removed.** It imported an internal package,
+  which was a policy smell. Remaining examples (`basic`, `calendar`, `crm`,
+  `subtasks`) use only the exported library surface.
+
+### Added
+
+- `(*Client).ResponseObject` — GET-and-decode-object counterpart to the
+  existing `ResponseArray`.
+- `(*Client).postFormObject` / `putFormObject` / `deleteObject` — eliminate
+  the ~15 identical "form request → `responseField` → `json.Unmarshal`"
+  blocks previously duplicated across `crm.go` / `tasks_extra.go` /
+  `calendar.go` / `files.go`.
+
+### Migration
+
+External library consumers: **no changes required**. The module path
+(`github.com/eslider/go-onlyoffice`), the `onlyoffice` package name, and
+every exported symbol are unchanged.
+
+CLI users: replace `oo-cli` with `oo` in scripts and CI. The command set
+and flags are identical.
+
 ## [0.3.2] - 2026-04-24
 
 ### Fixed
