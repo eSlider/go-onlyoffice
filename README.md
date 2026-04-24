@@ -510,19 +510,63 @@ type Task struct {
 | `Time` | `time.Time` wrapper with OnlyOffice JSON format |
 | `Task.GetGiteaIssueLink()` | Extract Gitea URL from task description |
 
+### Calendar, CRM, Subtasks, File upload (v0.2+)
+
+Since v0.2 the library also exposes OnlyOffice Workspace surfaces beyond
+Projects: Calendar events, CRM (Contacts, Companies, Opportunities, Cases,
+Tasks, History notes) and opportunity file uploads. These helpers return
+untyped `map[string]any` for flexibility; callers that need typed structs
+should use the typed Project/Task API above.
+
+```go
+client := onlyoffice.NewClient(onlyoffice.GetEnvironmentCredentials())
+client.SetDefaults(onlyoffice.GetEnvironmentDefaults()) // optional
+ctx := context.Background()
+
+// Calendar
+events, _ := client.ListEvents(ctx, "2025-01-01", "2025-12-31")
+client.AddEvent(ctx, "", "Interview", "2025-06-10T10:00:00Z", "2025-06-10T11:00:00Z", "", false)
+
+// CRM
+deals, total, _ := client.ListOpportunities(ctx, 50, 0)
+company, _ := client.FindCompany(ctx, "ACME")
+
+// Subtasks (form-encoded)
+client.AddSubtask(ctx, "4242", "Prepare CV")
+```
+
+### oo-cli (bundled command)
+
+A ready-to-use Cobra CLI wrapping the library lives under `cmd/oo-cli`:
+
+```bash
+go install github.com/eslider/go-onlyoffice/cmd/oo-cli@latest
+oo-cli cal-events
+oo-cli task-list --all --verbose
+oo-cli subtask-add 4242 "Prepare CV"
+oo-cli applications-sync --path ./applications/2026 --apply
+```
+
+The CLI reads `.env` from CWD (godotenv is a CLI-only concern — the library
+itself never loads dotfiles). See [`cmd/oo-cli/README.md`](cmd/oo-cli/) for
+the command reference.
+
 ## Environment Variables
 
 | Variable | Description |
 |---|---|
-| `ONLYOFFICE_URL` | OnlyOffice instance URL |
-| `ONLYOFFICE_USER` | Login email or username |
-| `ONLYOFFICE_PASS` | Password |
+| `ONLYOFFICE_URL` (or `ONLYOFFICE_HOST`) | OnlyOffice instance URL |
+| `ONLYOFFICE_USER` (or `ONLYOFFICE_NAME`) | Login email or username |
+| `ONLYOFFICE_PASS` (or `ONLYOFFICE_PASSWORD`) | Password |
+| `ONLYOFFICE_CALENDAR_ID` | Default calendar id used when omitted (default `1`) |
+| `ONLYOFFICE_PROJECT_ID` | Default project id used when omitted (default `33`) |
 
 ## Examples
 
 | Example | Description |
 |---|---|
 | [basic](examples/basic/) | List projects and users |
+| [`cmd/oo-cli`](cmd/oo-cli/) | Full-featured CLI using all modules |
 
 ## Related Libraries
 
