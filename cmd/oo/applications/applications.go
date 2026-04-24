@@ -1,5 +1,10 @@
 // Package applications syncs job application README trees into OnlyOffice CRM
 // (ported from cv/bin/office/sync-applications.py).
+//
+// This package lives under cmd/oo because it is a CV-specific workflow — not
+// a general OnlyOffice feature — and is only consumed by the `oo` CLI.
+// Keeping it in the binary tree prevents accidental adoption by external
+// library consumers and makes the coupling explicit.
 package applications
 
 import (

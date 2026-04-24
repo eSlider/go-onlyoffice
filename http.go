@@ -1,8 +1,10 @@
 package onlyoffice
 
-// Lightweight JSON/form/multipart helpers complementing the typed Query()
-// abstraction in onlyoffice.go. These are used by the Calendar, CRM, and
-// subtask helpers that talk to non-JSON endpoints (form-encoded or multipart).
+// Transport-layer helpers used by the untyped domain methods (CRM, calendar,
+// tasks, files). Authentication lives in auth.go; the typed Request/Query
+// abstraction lives in request.go. These helpers deliberately share the
+// `*Client` state with the typed path so token refresh, base URL, and
+// self-id caching are handled once.
 
 import (
 	"bytes"
@@ -16,91 +18,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 )
-
-// ensureToken refreshes the authentication token when missing or expired.
-// Mirrors the logic inline in Query() but is safe to call from helpers that
-// bypass the typed Request abstraction.
-func (c *Client) ensureToken() error {
-	if c.token != nil && !time.Time(c.token.Expires).Before(time.Now()) {
-		return nil
-	}
-	tok, err := c.Auth(c.credentials)
-	if err != nil {
-		return err
-	}
-	c.token = tok
-	return nil
-}
-
-// authHeader returns the value for the Authorization header, ensuring a token.
-func (c *Client) authHeader() (string, error) {
-	if err := c.ensureToken(); err != nil {
-		return "", err
-	}
-	return c.token.Value, nil
-}
-
-// Authenticate validates credentials and primes the token. Library users may
-// call this eagerly to surface auth errors at startup; otherwise the token is
-// fetched lazily on the first request.
-//
-// Prefer AuthenticateContext in long-running jobs — it honours cancellation.
-func (c *Client) Authenticate() error { return c.ensureToken() }
-
-// AuthenticateContext is the context-aware variant of Authenticate. If the
-// cached token is still valid it returns immediately; otherwise it performs a
-// POST to /api/2.0/authentication.json that is cancellable via ctx.
-//
-// This is the recommended entry point for long-running syncs (cron, watchers)
-// because it guarantees that a stalled auth call will not block the caller
-// past its deadline.
-func (c *Client) AuthenticateContext(ctx context.Context) error {
-	if c.token != nil && !time.Time(c.token.Expires).Before(time.Now()) {
-		return nil
-	}
-	body, err := json.Marshal(c.credentials)
-	if err != nil {
-		return fmt.Errorf("marshal credentials: %w", err)
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL()+"/api/2.0/authentication.json", bytes.NewReader(body))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return fmt.Errorf("auth request: %w", err)
-	}
-	defer resp.Body.Close()
-	raw, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	if resp.StatusCode >= 400 {
-		return fmt.Errorf("auth: %d %s", resp.StatusCode, truncate(string(raw), 400))
-	}
-	var env struct {
-		Response *Token `json:"response"`
-	}
-	if err := json.Unmarshal(raw, &env); err != nil {
-		return fmt.Errorf("auth decode: %w", err)
-	}
-	if env.Response == nil || env.Response.Value == "" {
-		return fmt.Errorf("auth: empty token in response")
-	}
-	c.token = env.Response
-	return nil
-}
-
-// InvalidateToken clears the cached authentication token. The next request
-// (or call to Authenticate / AuthenticateContext) will re-authenticate.
-//
-// Use this to recover from a mid-sync 401 when the server has revoked or
-// rotated the session while the Expires timestamp still looks fresh locally.
-func (c *Client) InvalidateToken() { c.token = nil }
 
 // baseURL returns the configured base URL without trailing slash.
 func (c *Client) baseURL() string {
@@ -149,6 +67,66 @@ func (c *Client) ResponseArray(ctx context.Context, path string) ([]map[string]a
 		return nil, err
 	}
 	return list, nil
+}
+
+// ResponseObject executes a GET and decodes the "response" field into a map.
+// Returns (nil, nil) when the field is JSON null or absent. Companion to
+// ResponseArray — factored out to eliminate the ~15 identical decode blocks
+// in crm.go / tasks.go / calendar.go.
+func (c *Client) ResponseObject(ctx context.Context, path string) (map[string]any, error) {
+	raw, err := c.getJSON(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	return unmarshalResponseObject(raw)
+}
+
+// postFormObject issues an authenticated POST (form-encoded) and decodes the
+// "response" field into a map.
+func (c *Client) postFormObject(ctx context.Context, path string, fields url.Values) (map[string]any, error) {
+	raw, err := c.postForm(ctx, path, fields)
+	if err != nil {
+		return nil, err
+	}
+	return unmarshalResponseObject(raw)
+}
+
+// putFormObject issues an authenticated PUT (form-encoded) and decodes the
+// "response" field into a map.
+func (c *Client) putFormObject(ctx context.Context, path string, fields url.Values) (map[string]any, error) {
+	raw, err := c.putForm(ctx, path, fields)
+	if err != nil {
+		return nil, err
+	}
+	return unmarshalResponseObject(raw)
+}
+
+// deleteObject issues an authenticated DELETE and decodes the "response"
+// field into a map.
+func (c *Client) deleteObject(ctx context.Context, path string) (map[string]any, error) {
+	raw, err := c.deleteReq(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	return unmarshalResponseObject(raw)
+}
+
+// unmarshalResponseObject extracts the "response" field from a raw OnlyOffice
+// envelope and decodes it into map[string]any. Returns (nil, nil) for a null
+// response and (nil, err) when the field is missing or malformed.
+func unmarshalResponseObject(raw json.RawMessage) (map[string]any, error) {
+	resp, err := responseField(raw, "response")
+	if err != nil {
+		return nil, err
+	}
+	if len(resp) == 0 || string(resp) == "null" {
+		return nil, nil
+	}
+	var out map[string]any
+	if err := json.Unmarshal(resp, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // getJSON issues an authenticated GET and returns the raw response body.
@@ -240,27 +218,6 @@ func (c *Client) deleteReq(ctx context.Context, path string) (json.RawMessage, e
 		return nil, fmt.Errorf("DELETE %s: %d %s", path, resp.StatusCode, truncate(string(raw), 400))
 	}
 	return raw, nil
-}
-
-// SelfUserID returns the ID of the authenticated user (people/@self), cached.
-func (c *Client) SelfUserID(ctx context.Context) (string, error) {
-	if c.selfID != "" {
-		return c.selfID, nil
-	}
-	raw, err := c.getJSON(ctx, "/api/2.0/people/@self.json")
-	if err != nil {
-		return "", err
-	}
-	var env struct {
-		Response struct {
-			ID string `json:"id"`
-		} `json:"response"`
-	}
-	if err := json.Unmarshal(raw, &env); err != nil {
-		return "", err
-	}
-	c.selfID = env.Response.ID
-	return c.selfID, nil
 }
 
 // uploadMultipart posts a single file to path under the given form field name.

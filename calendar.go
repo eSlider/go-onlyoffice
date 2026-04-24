@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"strconv"
 )
 
 // ListCalendars returns calendars/events for the given date span (YYYY-MM-DD).
@@ -29,6 +30,9 @@ func (c *Client) ListEvents(ctx context.Context, start, end string) ([]map[strin
 // AddEvent creates a simple one-shot calendar event. When calendarID is empty
 // the configured default (SetDefaults or GetEnvironmentDefaults) is used.
 // Start/end timestamps are forwarded verbatim (OnlyOffice accepts ISO 8601).
+//
+// The underlying API returns an array wrapper — this helper unwraps the first
+// element for convenience.
 func (c *Client) AddEvent(ctx context.Context, calendarID, title, start, end, description string, allDay bool) (map[string]any, error) {
 	if calendarID == "" {
 		calendarID = c.defaults.CalendarID
@@ -43,7 +47,7 @@ func (c *Client) AddEvent(ctx context.Context, calendarID, title, start, end, de
 	fields.Set("endDate", end)
 	fields.Set("repeatType", "")
 	fields.Set("alertType", "0")
-	fields.Set("isAllDayLong", fmt.Sprintf("%t", allDay))
+	fields.Set("isAllDayLong", strconv.FormatBool(allDay))
 	raw, err := c.postForm(ctx, fmt.Sprintf("/api/2.0/calendar/%s/event.json", url.PathEscape(calendarID)), fields)
 	if err != nil {
 		return nil, err
@@ -64,15 +68,5 @@ func (c *Client) AddEvent(ctx context.Context, calendarID, title, start, end, de
 
 // DeleteEvent removes a single calendar event by its event ID.
 func (c *Client) DeleteEvent(ctx context.Context, eventID string) (map[string]any, error) {
-	raw, err := c.deleteReq(ctx, fmt.Sprintf("/api/2.0/calendar/events/%s.json", url.PathEscape(eventID)))
-	if err != nil {
-		return nil, err
-	}
-	resp, err := responseField(raw, "response")
-	if err != nil {
-		return nil, err
-	}
-	var out map[string]any
-	_ = json.Unmarshal(resp, &out)
-	return out, nil
+	return c.deleteObject(ctx, fmt.Sprintf("/api/2.0/calendar/events/%s.json", url.PathEscape(eventID)))
 }
