@@ -559,13 +559,23 @@ oo opportunities stages
 oo cases list
 oo crm-tasks categories
 oo applications sync --path ./applications/2026 --apply
+
+# Project Documents (files module)
+oo projects files list 33
+oo projects files upload 33 ./notes.md
+oo projects files download 12345 --to ./copy.md
+oo projects files rename 12345 notes-v2.md
+oo projects files delete 12345
+oo tasks files list 208
+oo tasks files upload 208 ./cv.pdf
+oo tasks files detach 208 12345
 ```
 
 | Subject | Verbs |
 |---|---|
 | `calendar` | `list`, `events`, `add`, `delete` |
-| `projects` | `list`, `get`, `milestones`, `create`, `update`, `delete` |
-| `tasks` | `list`, `get`, `create`, `update`, `delete`, `subtask add` |
+| `projects` | `list`, `get`, `milestones`, `create`, `update`, `delete`, **`files`** (`list`, `upload`, `download`, `rename`, `delete`) |
+| `tasks` | `list`, `get`, `create`, `update`, `delete`, `subtask add`, **`files`** (`list`, `upload`, `detach`) |
 | `users` | `list`, `self` (alias: `oo whoami`) |
 | `contacts` | `list`, `get`, `delete`, `info-add` |
 | `persons` | `list` (filtered), `create`, `delete` |

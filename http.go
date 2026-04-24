@@ -220,6 +220,49 @@ func (c *Client) deleteReq(ctx context.Context, path string) (json.RawMessage, e
 	return raw, nil
 }
 
+// putJSON issues an authenticated PUT with application/json body.
+func (c *Client) putJSON(ctx context.Context, path string, body any) (json.RawMessage, error) {
+	auth, err := c.authHeader()
+	if err != nil {
+		return nil, err
+	}
+	var rdr io.Reader
+	switch b := body.(type) {
+	case nil:
+		rdr = strings.NewReader("{}")
+	case []byte:
+		rdr = bytes.NewReader(b)
+	case string:
+		rdr = strings.NewReader(b)
+	default:
+		buf, err := json.Marshal(b)
+		if err != nil {
+			return nil, err
+		}
+		rdr = bytes.NewReader(buf)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.baseURL()+path, rdr)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", auth)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("PUT JSON %s: %d %s", path, resp.StatusCode, truncate(string(raw), 400))
+	}
+	return raw, nil
+}
+
 // uploadMultipart posts a single file to path under the given form field name.
 func (c *Client) uploadMultipart(ctx context.Context, path, fieldName, filePath string) (json.RawMessage, error) {
 	auth, err := c.authHeader()
