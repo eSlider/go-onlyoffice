@@ -22,14 +22,61 @@ func NewClient(c Credentials) *Client {
 	}
 }
 
-// GetEnvironmentCredentials when using environment variables
-func GetEnvironmentCredentials() Credentials {
-	return Credentials{
-		Url:      os.Getenv("ONLYOFFICE_URL"),
-		User:     os.Getenv("ONLYOFFICE_USER"),
-		Password: os.Getenv("ONLYOFFICE_PASS"),
-	}
+// Defaults holds optional fallbacks used by package-level helpers when callers
+// pass an empty identifier (calendar or project). Set via (*Client).SetDefaults.
+type Defaults struct {
+	CalendarID string
+	ProjectID  string
+}
 
+// SetDefaults configures optional identifiers used as fallbacks by methods such
+// as AddEvent (when calendarID == "") or AddTask (when projectID == "").
+func (c *Client) SetDefaults(d Defaults) { c.defaults = d }
+
+// firstNonEmpty returns the first non-empty trimmed value, or "" if none found.
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if s := strings.TrimSpace(v); s != "" {
+			return s
+		}
+	}
+	return ""
+}
+
+// GetEnvironmentCredentials reads OnlyOffice credentials from environment.
+//
+// Primary variables (documented):
+//   - ONLYOFFICE_URL
+//   - ONLYOFFICE_USER
+//   - ONLYOFFICE_PASS
+//
+// Additional aliases accepted for interoperability with sibling tools:
+//   - ONLYOFFICE_HOST        (alias for ONLYOFFICE_URL)
+//   - ONLYOFFICE_NAME        (alias for ONLYOFFICE_USER)
+//   - ONLYOFFICE_PASSWORD    (alias for ONLYOFFICE_PASS)
+func GetEnvironmentCredentials() Credentials {
+	url := firstNonEmpty(os.Getenv("ONLYOFFICE_URL"), os.Getenv("ONLYOFFICE_HOST"))
+	url = strings.TrimRight(url, "/")
+	return Credentials{
+		Url:      url,
+		User:     firstNonEmpty(os.Getenv("ONLYOFFICE_USER"), os.Getenv("ONLYOFFICE_NAME")),
+		Password: firstNonEmpty(os.Getenv("ONLYOFFICE_PASS"), os.Getenv("ONLYOFFICE_PASSWORD")),
+	}
+}
+
+// GetEnvironmentDefaults reads optional library defaults from environment:
+//
+//   - ONLYOFFICE_CALENDAR_ID (default: "1")
+//   - ONLYOFFICE_PROJECT_ID  (alias: ONLYOFFICE_CALENDAR_PROJECT_ID; default: "33")
+func GetEnvironmentDefaults() Defaults {
+	return Defaults{
+		CalendarID: firstNonEmpty(os.Getenv("ONLYOFFICE_CALENDAR_ID"), "1"),
+		ProjectID: firstNonEmpty(
+			os.Getenv("ONLYOFFICE_PROJECT_ID"),
+			os.Getenv("ONLYOFFICE_CALENDAR_PROJECT_ID"),
+			"33",
+		),
+	}
 }
 
 // Credentials of OnlyOffice User
@@ -53,6 +100,10 @@ type Client struct {
 	client      *http.Client // HTTP client
 	credentials *Credentials // OnlyOffice credentials
 	token       *Token       // Authentication token
+
+	defaults  Defaults // optional fallbacks for calendar/project IDs
+	selfID    string   // cached /api/2.0/people/@self id
+	noteCatID int      // cached CRM history category id for "note"
 }
 
 // MetaResponse Response
