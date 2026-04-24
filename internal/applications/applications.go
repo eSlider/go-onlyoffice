@@ -24,19 +24,19 @@ type RecruiterInfo struct {
 }
 
 type Data struct {
-	Path         string
-	Folder       string
-	Position     string
-	Company      string
-	Location     string
-	Salary       string
-	SalaryValue  float64
-	Contract     string
-	Source       string
-	Link         string
-	Recruiter    RecruiterInfo
-	Summary      string
-	Documents    []string
+	Path        string
+	Folder      string
+	Position    string
+	Company     string
+	Location    string
+	Salary      string
+	SalaryValue float64
+	Contract    string
+	Source      string
+	Link        string
+	Recruiter   RecruiterInfo
+	Summary     string
+	Documents   []string
 }
 
 func Discover(base string) ([]string, error) {
@@ -212,7 +212,9 @@ func buildSummary(app Data, text string) string {
 	if m := regexp.MustCompile(`(?i)## Application Status\s*\n((?:[-*\[\]xX ].+\n?)+)`).FindStringSubmatch(text); len(m) > 1 {
 		lines = append(lines, "", "Status:", strings.TrimSpace(m[1]))
 	}
-	if m := regexp.MustCompile(`(?i)## (?:Fit Assessment|Match|Candidate Fit)\s*\n([\s\S]+?)(?=\n## |\z)`).FindStringSubmatch(text); len(m) > 1 {
+	// RE2 does not support lookahead; consume the trailing delimiter (\n## or EOS)
+	// with a non-capturing alternation — the captured group 1 stops right before it.
+	if m := regexp.MustCompile(`(?i)## (?:Fit Assessment|Match|Candidate Fit)\s*\n([\s\S]+?)(?:\n## |$)`).FindStringSubmatch(text); len(m) > 1 {
 		ft := strings.TrimSpace(m[1])
 		if len(ft) > 500 {
 			ft = ft[:500] + "..."

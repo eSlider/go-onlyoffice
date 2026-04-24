@@ -6,6 +6,38 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-04-24
+
+### Fixed
+
+- `Project.String()` no longer interprets the title as a format string
+  (`fmt.Sprintf(*p.Title)`) and is now nil-safe on a zero-value `Project`.
+- `internal/applications.buildSummary` no longer panics at regex compile time
+  on Go 1.23+ — the previous `(?= ...)` lookahead is replaced with an RE2-safe
+  non-capturing trailing delimiter.
+
+### Changed
+
+- `Client.Query` now routes token acquisition through the shared
+  `ensureToken` path instead of duplicating the auth-expiry check inline.
+- Request body marshalling is consolidated into an unexported
+  `requestBodyReader` helper (DRY; no change to the public surface).
+- The `Request.Debug` field is preserved for backwards compatibility but no
+  longer changes behaviour — both branches used to unmarshal into the same
+  target value. We'll remove the field in a future major release.
+
+### Tests
+
+- Deleted `httptest.NewServer` fixtures that emulated OnlyOffice protocol
+  endpoints. Replaced them with:
+  - pure-Go unit tests in `unit_test.go` (no network);
+  - real integration tests in `client_test.go` guarded by
+    `//go:build integration`. Run with
+    `go test -tags=integration ./...`. Tests skip cleanly when
+    `ONLYOFFICE_URL/USER/PASS` (or aliases) are absent.
+- New policy documented in `AGENTS.md` and
+  `.cursor/rules/no-synthetic-mocks.mdc`.
+
 ## [0.3.1] - 2026-04-24
 
 ### Added

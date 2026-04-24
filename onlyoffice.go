@@ -3,15 +3,17 @@ package onlyoffice
 // OnlyOffice client package
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/google/go-querystring/query"
 	"io"
 	"net/http"
 	"os"
-	regexp "regexp"
+	"regexp"
 	"strings"
 	"time"
+
+	"github.com/google/go-querystring/query"
 )
 
 // NewClient API
@@ -295,7 +297,10 @@ type ProjectOwner struct {
 
 // String for Project to return title
 func (p Project) String() string {
-	return fmt.Sprintf(*p.Title)
+	if p.Title == nil {
+		return ""
+	}
+	return *p.Title
 }
 
 // Token OnlyOffice
@@ -353,16 +358,16 @@ func (r Request) GetMethod() string {
 
 // Query the OnlyOffice API
 //   - If request.Method is not set then it will default to GET
-//   - If request.Code is not nil then it will be marshaled to JSON
-//   - If request.Token is nil then it will get a token
+//   - If request.Body is not nil then it will be marshaled to JSON (unless already []byte/string)
+//   - If request.Token is nil then it will get (or reuse) a cached token
 //   - If request.Token is not nil then it will be used as Authorization header
 //   - If request.NoAuth is true then it will skip automatic authentication
-func (c *Client) Query(request Request, result interface{}) (err error) {
-	var url = fmt.Sprintf("%s%s", c.credentials.Url, request.Uri)
-	var rdr io.Reader = nil
-	var jsonRequestBody string
+//
+// The Debug field is preserved for backwards compatibility; it no longer
+// changes behaviour — both branches used to unmarshal into the same target.
+func (c *Client) Query(request Request, result interface{}) error {
+	url := c.credentials.Url + request.Uri
 
-	// Add query parameters if available
 	if request.Params != nil {
 		v, err := query.Values(request.Params)
 		if err != nil {
@@ -371,78 +376,62 @@ func (c *Client) Query(request Request, result interface{}) (err error) {
 		url = fmt.Sprintf("%s?%s", url, v.Encode())
 	}
 
-	// Create request
-	if request.Body != nil {
-		// Check request body if type is not []byte or string the marshal it to JSON
-		switch request.Body.(type) {
-		case []byte:
-			jsonRequestBody = string(request.Body.([]byte))
-			rdr = strings.NewReader(string(request.Body.([]byte)))
-		case string:
-			jsonRequestBody = request.Body.(string)
-			rdr = strings.NewReader(request.Body.(string))
-		default:
-			// Marshal to JSON
-			b, err := json.Marshal(request.Body)
-			if err != nil {
-				return fmt.Errorf("failed to marshal request body: %v", err)
-			}
-			jsonRequestBody = string(b)
-			rdr = strings.NewReader(string(b))
-		}
+	rdr, err := requestBodyReader(request.Body)
+	if err != nil {
+		return err
 	}
 
 	req, err := http.NewRequest(request.GetMethod(), url, rdr)
 	if err != nil {
 		return err
 	}
-
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Pragma", "no-cache")
 
-	// Get token if not set?
 	if !request.NoAuth {
-		// Get token if not set or expired
-		if c.token == nil || time.Time(c.token.Expires).Before(time.Now()) {
-			c.token, err = c.Auth(c.credentials)
-			if err != nil {
-				return fmt.Errorf("failed to authenticate: %v", err)
-			}
+		if err := c.ensureToken(); err != nil {
+			return fmt.Errorf("failed to authenticate: %w", err)
 		}
 	}
-
-	// Set token if available
-	if request.Token != nil {
+	switch {
+	case request.Token != nil:
 		req.Header.Set("Authorization", *request.Token)
-	} else {
-		// Set token from a client if available
-		if c.token != nil {
-			req.Header.Set("Authorization", c.token.Value)
-		}
+	case c.token != nil:
+		req.Header.Set("Authorization", c.token.Value)
 	}
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to send request: %v", err)
+		return fmt.Errorf("failed to send request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if result == nil {
 		return nil
 	}
-	if request.Debug {
-		// Rewind reader
-		_ = jsonRequestBody
-		var buf = new(strings.Builder)
-		io.Copy(buf, resp.Body)
-		js := buf.String()
-		return json.Unmarshal([]byte(js), result)
-	} else {
-		// Unmarshal response using reader
-		return json.NewDecoder(resp.Body).Decode(result)
-	}
+	return json.NewDecoder(resp.Body).Decode(result)
+}
 
+// requestBodyReader normalises Query() body input into an io.Reader.
+// []byte and string are passed through verbatim; everything else is marshalled
+// to JSON. Returns (nil, nil) for a nil body.
+func requestBodyReader(body any) (io.Reader, error) {
+	if body == nil {
+		return nil, nil
+	}
+	switch b := body.(type) {
+	case []byte:
+		return bytes.NewReader(b), nil
+	case string:
+		return strings.NewReader(b), nil
+	default:
+		j, err := json.Marshal(body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal request body: %w", err)
+		}
+		return bytes.NewReader(j), nil
+	}
 }
 
 // Auth to authenticate by getting a token using credentials
@@ -489,7 +478,7 @@ func (c *Client) GetProjects() (list Projects, err error) {
 func (c *Client) GetProjectMilestones(project *Project) ([]*Milestone, error) {
 	var list []*Milestone
 
-	err := c.Query(Request{Uri: fmt.Sprintf(`/api/2.0/project/%d/milestone`, *project.ID), Debug: false},
+	err := c.Query(Request{Uri: fmt.Sprintf(`/api/2.0/project/%d/milestone`, *project.ID)},
 		&struct {
 			MetaResponse `json:",inline"`
 			//Response     *[]*Milestone
@@ -656,9 +645,7 @@ func (c *Client) UpdateProjectTask(req ProjectTaskUpdateRequest) (task *Task, er
 			Uri:    fmt.Sprintf("/api/2.0/project/task/%d.json", req.ID),
 			Method: "PUT",
 			Body:   req,
-			Debug:  true,
 		}, &struct {
-			//MetaResponse `json:",inline"`
 			Response *Task `json:"response"`
 		}{task})
 }
@@ -692,10 +679,8 @@ func (c *Client) GetTasks(req ProjectGetTasksRequest) (tasks []*Task, err error)
 		Request{
 			Uri:    "/api/2.0/project/task/filter.json",
 			Params: req,
-			Debug:  true,
 		},
 		&struct {
-			//MetaResponse `json:",inline"`
 			Response *[]*Task `json:"response"`
 		}{&tasks})
 }
