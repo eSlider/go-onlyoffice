@@ -6,6 +6,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed — CLI
+
+- `oo` now loads OnlyOffice credentials only from `.env` in the current
+  working directory.
+- Produktor.io shorthand env names are accepted by the CLI dotenv loader:
+  `OO_URL` → `ONLYOFFICE_URL`, `OO_USER` → `ONLYOFFICE_USER`, and
+  `OO_PASS` → `ONLYOFFICE_PASS`. Canonical `ONLYOFFICE_*` values still win
+  when already set in the process environment.
+
 ## [0.6.0] - 2026-04-24
 
 ### Added — library
