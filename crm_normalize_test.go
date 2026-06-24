@@ -42,6 +42,37 @@ func TestFixDealTitle(t *testing.T) {
 	}
 }
 
+func TestStripSloganSuffix(t *testing.T) {
+	tests := []struct {
+		in, want string
+	}{
+		{"Affirm — Fraud Engineering", "Affirm"},
+		{"Affirm - Fraud Engineering", "Affirm"},
+		{"Affirm – Fraud Engineering", "Affirm"},
+		{"Affirm", "Affirm"},
+		{"— leading", "— leading"},
+	}
+	for _, tc := range tests {
+		if got := StripSloganSuffix(tc.in); got != tc.want {
+			t.Errorf("StripSloganSuffix(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
+
+func TestCompanyGroupingKey(t *testing.T) {
+	a := CompanyGroupingKey("Affirm")
+	b := CompanyGroupingKey("Affirm — Fraud Engineering")
+	if a != b {
+		t.Fatalf("%q != %q", a, b)
+	}
+}
+
+func TestOpportunityTitlesMatchSlogan(t *testing.T) {
+	if !OpportunityTitlesMatch("Dev @ Affirm — Fraud Engineering", "Dev @ Affirm") {
+		t.Fatal("expected match")
+	}
+}
+
 func TestStripCompanySuffix(t *testing.T) {
 	if got := StripCompanySuffix("Dev @ Acme"); got != "Dev" {
 		t.Fatalf("got %q", got)

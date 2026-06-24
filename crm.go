@@ -47,7 +47,7 @@ func (c *Client) GetContact(ctx context.Context, contactID string) (map[string]a
 // FindCompany searches for a company contact with an exact (case-insensitive)
 // displayName match. Returns nil when not found.
 func (c *Client) FindCompany(ctx context.Context, name string) (map[string]any, error) {
-	needle := strings.ToLower(strings.TrimSpace(name))
+	needle := CompanyGroupingKey(name)
 	const page = 50
 	for start := 0; ; start += page {
 		items, total, err := c.ListContacts(ctx, page, start, name)
@@ -55,7 +55,10 @@ func (c *Client) FindCompany(ctx context.Context, name string) (map[string]any, 
 			return nil, err
 		}
 		for _, co := range items {
-			if isCompany(co) && strings.ToLower(fmt.Sprint(co["displayName"])) == needle {
+			if !isCompany(co) {
+				continue
+			}
+			if CompanyGroupingKey(fmt.Sprint(co["displayName"])) == needle {
 				return co, nil
 			}
 		}

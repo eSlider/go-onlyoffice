@@ -38,7 +38,7 @@ func GroupCompaniesByName(items []map[string]any) map[string][]map[string]any {
 		if !isCompany(row) {
 			continue
 		}
-		key := NormalizeCompanyName(rowDisplayName(row))
+		key := CompanyGroupingKey(rowDisplayName(row))
 		if key == "" {
 			continue
 		}
@@ -65,10 +65,21 @@ func GroupPersonsByKey(items []map[string]any) map[string][]map[string]any {
 
 // DealTitleKey returns the grouping key for an opportunity title.
 func DealTitleKey(title string, ignoreCompanySuffix bool) string {
+	title = strings.TrimSpace(title)
 	if ignoreCompanySuffix {
 		return NormalizeOpportunityTitle(StripCompanySuffix(title))
 	}
-	return NormalizeOpportunityTitle(title)
+	if i := strings.LastIndex(title, " @ "); i >= 0 {
+		pos := strings.TrimSpace(title[:i])
+		co := StripSloganSuffix(strings.TrimSpace(title[i+len(" @ "):]))
+		if pos == "" && co != "" {
+			return NormalizeCompanyName(co)
+		}
+		if pos != "" && co != "" {
+			return collapseKey(pos + " @ " + co)
+		}
+	}
+	return NormalizeCompanyName(StripSloganSuffix(title))
 }
 
 // GroupOpportunitiesByTitle buckets deals by title key.
