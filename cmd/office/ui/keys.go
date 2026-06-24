@@ -11,7 +11,9 @@ const (
 	ActionMoveDown
 	ActionToggleSelect
 	ActionOpenPreview
+	ActionOpenActions
 	ActionNextPane
+	ActionPrevPane
 	ActionRefresh
 	ActionQuit
 	ActionOpenVex
@@ -24,6 +26,8 @@ func KeyAction(key string, pane model.FocusPane) Action {
 		return ActionQuit
 	case "tab":
 		return ActionNextPane
+	case "shift+tab", "backtab":
+		return ActionPrevPane
 	case "r":
 		return ActionRefresh
 	case "up", "k":
@@ -33,6 +37,10 @@ func KeyAction(key string, pane model.FocusPane) Action {
 	case " ":
 		if pane == model.FocusList {
 			return ActionToggleSelect
+		}
+	case "a":
+		if pane == model.FocusList {
+			return ActionOpenActions
 		}
 	case "enter":
 		if pane == model.FocusList {

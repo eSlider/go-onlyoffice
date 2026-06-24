@@ -50,6 +50,18 @@ const (
 	FocusPreview
 )
 
+// PrevFocusPane cycles preview → list → menu → preview.
+func PrevFocusPane(p FocusPane) FocusPane {
+	switch p {
+	case FocusMenu:
+		return FocusPreview
+	case FocusList:
+		return FocusMenu
+	default:
+		return FocusList
+	}
+}
+
 // NextFocusPane cycles menu → list → preview → menu.
 func NextFocusPane(p FocusPane) FocusPane {
 	switch p {
