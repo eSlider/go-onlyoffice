@@ -32,13 +32,13 @@ func init() {
 // execute runs the root command. Exported only to main.go in the same package.
 func execute() error { return rootCmd.Execute() }
 
-// newOO loads env (incl. .env in CWD) and returns an authenticated client.
+// newOO loads env (only .env in CWD) and returns an authenticated client.
 // godotenv is a CLI-only concern; the library itself never loads dotfiles.
 func newOO(cmd *cobra.Command) (*onlyoffice.Client, error) {
-	_ = godotenv.Load()
+	loadOOEnv()
 	creds := onlyoffice.GetEnvironmentCredentials()
 	if creds.Url == "" || creds.User == "" || creds.Password == "" {
-		return nil, fmt.Errorf("need ONLYOFFICE_URL (or ONLYOFFICE_HOST), user (ONLYOFFICE_USER or ONLYOFFICE_NAME), password (ONLYOFFICE_PASS or ONLYOFFICE_PASSWORD)")
+		return nil, fmt.Errorf("need ONLYOFFICE_URL (or ONLYOFFICE_HOST/OO_URL), user (ONLYOFFICE_USER or ONLYOFFICE_NAME/OO_USER), password (ONLYOFFICE_PASS or ONLYOFFICE_PASSWORD/OO_PASS)")
 	}
 	c := onlyoffice.NewClient(creds)
 	c.SetDefaults(onlyoffice.GetEnvironmentDefaults())
@@ -46,6 +46,26 @@ func newOO(cmd *cobra.Command) (*onlyoffice.Client, error) {
 		return nil, err
 	}
 	return c, nil
+}
+
+func loadOOEnv() {
+	_ = godotenv.Load(".env")
+	applyOOEnvAliases()
+}
+
+func applyOOEnvAliases() {
+	setEnvIfEmpty("ONLYOFFICE_URL", "OO_URL")
+	setEnvIfEmpty("ONLYOFFICE_USER", "OO_USER")
+	setEnvIfEmpty("ONLYOFFICE_PASS", "OO_PASS")
+}
+
+func setEnvIfEmpty(dst, src string) {
+	if strings.TrimSpace(os.Getenv(dst)) != "" {
+		return
+	}
+	if v := strings.TrimSpace(os.Getenv(src)); v != "" {
+		_ = os.Setenv(dst, v)
+	}
 }
 
 // printJSON dumps any value as indented JSON.

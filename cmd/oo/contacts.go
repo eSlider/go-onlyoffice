@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
+	onlyoffice "github.com/eslider/go-onlyoffice"
 	"github.com/spf13/cobra"
 )
 
@@ -39,16 +40,20 @@ func init() {
 	contactsCmd.AddCommand(contactsGetCmd())
 	contactsCmd.AddCommand(contactsDeleteCmd())
 	contactsCmd.AddCommand(contactsInfoAddCmd())
+	contactsCmd.AddCommand(contactsDedupeInfoCmd())
 
 	only := true
 	personsCmd.AddCommand(contactsListCmd(&only)) // persons only
 	personsCmd.AddCommand(personsCreateCmd())
 	personsCmd.AddCommand(contactsDeleteCmd())
+	personsCmd.AddCommand(personsDedupeCmd())
 
 	onlyCo := false
 	companiesCmd.AddCommand(contactsListCmd(&onlyCo)) // companies only
 	companiesCmd.AddCommand(companiesCreateCmd())
 	companiesCmd.AddCommand(contactsDeleteCmd())
+	companiesCmd.AddCommand(companiesDedupeCmd())
+	companiesCmd.AddCommand(companiesDedupePersonsCmd())
 }
 
 // contactsListCmd returns a `list` subcommand.
@@ -245,4 +250,64 @@ func companiesCreateCmd() *cobra.Command {
 	cmd.Flags().StringVar(&email, "email", "", "primary email (adds ContactInfo)")
 	cmd.Flags().StringVar(&website, "website", "", "website url (adds ContactInfo)")
 	return cmd
+}
+
+func companiesDedupeCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "dedupe",
+		Short: "Merge duplicate companies by normalized name",
+		RunE: dedupeRunE(func(cmd *cobra.Command, c *onlyoffice.Client) error {
+			res, err := onlyoffice.DedupeCompanies(cmd.Context(), c)
+			if err != nil {
+				return err
+			}
+			printObject(res)
+			return nil
+		}),
+	}
+}
+
+func companiesDedupePersonsCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "dedupe-persons",
+		Short: "Merge duplicate persons under each company",
+		RunE: dedupeRunE(func(cmd *cobra.Command, c *onlyoffice.Client) error {
+			res, err := onlyoffice.DedupeCompanyPersons(cmd.Context(), c)
+			if err != nil {
+				return err
+			}
+			printObject(res)
+			return nil
+		}),
+	}
+}
+
+func personsDedupeCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "dedupe",
+		Short: "Merge duplicate persons by normalized first+last name",
+		RunE: dedupeRunE(func(cmd *cobra.Command, c *onlyoffice.Client) error {
+			res, err := onlyoffice.DedupePersons(cmd.Context(), c)
+			if err != nil {
+				return err
+			}
+			printObject(res)
+			return nil
+		}),
+	}
+}
+
+func contactsDedupeInfoCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "dedupe-info",
+		Short: "Remove duplicate contact info rows (email, phone, …)",
+		RunE: dedupeRunE(func(cmd *cobra.Command, c *onlyoffice.Client) error {
+			res, err := onlyoffice.DedupeContactInfo(cmd.Context(), c)
+			if err != nil {
+				return err
+			}
+			printObject(res)
+			return nil
+		}),
+	}
 }

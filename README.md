@@ -580,14 +580,23 @@ oo tasks files detach 208 12345
 | `contacts` | `list`, `get`, `delete`, `info-add` |
 | `persons` | `list` (filtered), `create`, `delete` |
 | `companies` | `list` (filtered), `create`, `delete` |
-| `opportunities` | `list`, `get`, `create`, `delete`, `stages`, `member-add` |
+| `contacts` | `list`, `get`, `delete`, `info-add`, `dedupe-info` |
+| `persons` | `list`, `create`, `delete`, `dedupe` |
+| `companies` | `list`, `create`, `delete`, `dedupe`, `dedupe-persons` |
+| `opportunities` | `list`, `get`, `create`, `delete`, `stages`, `member-add`, `dedupe`, `dedupe-members`, `fix-titles` |
+| `crm` | `cleanup` |
 | `cases` | `list`, `create`, `delete`, `member-add` |
 | `crm-tasks` | `list`, `create`, `delete`, `categories` |
 | `applications` | `sync` |
 
-The CLI reads `.env` from CWD (godotenv is a CLI-only concern — the library
-itself never loads dotfiles). Run `oo --help` or `oo <subject> --help` for
-the full command reference.
+The CLI reads only `.env` from the current working directory (godotenv is a
+CLI-only concern — the library itself never loads dotfiles).
+
+Canonical `ONLYOFFICE_*` variables win over aliases. For produktor.io operator
+files, `OO_URL` / `OO_USER` / `OO_PASS` are accepted as CLI-only aliases for
+`ONLYOFFICE_URL` / `ONLYOFFICE_USER` / `ONLYOFFICE_PASS`.
+
+Run `oo --help` or `oo <subject> --help` for the full command reference.
 
 > **0.5.0 migration note:** the command tree was flattened per-subject. Old
 > flat names (`oo cal-events`, `oo task-list`, `oo crm-contacts`,
@@ -604,6 +613,7 @@ the full command reference.
 | `ONLYOFFICE_PASS` (or `ONLYOFFICE_PASSWORD`) | Password |
 | `ONLYOFFICE_CALENDAR_ID` | Default calendar id used when omitted (default `1`) |
 | `ONLYOFFICE_PROJECT_ID` | Default project id used when omitted (default `33`) |
+| `OO_URL`, `OO_USER`, `OO_PASS` | CLI-only produktor.io aliases mapped to `ONLYOFFICE_URL`, `ONLYOFFICE_USER`, `ONLYOFFICE_PASS` |
 
 ## Examples
 

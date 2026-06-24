@@ -6,6 +6,34 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — library
+
+- **CRM dedupe & cleanup** — `crm_normalize.go`, `crm_dedupe_plan.go`, `crm_dedupe.go`:
+  merge duplicate companies/persons/deals by normalized name; remove duplicate
+  contact-info rows and opportunity members (including same `displayName` with
+  different ids); fix malformed deal titles (` @ Company` → `Company`).
+  `MergeContacts`, `UpdateOpportunityTitle`, `ListAllContacts`,
+  `ListAllOpportunities`, `DeleteContactInfo`, `RemoveOpportunityMember`,
+  `IsOpportunityMember`, `HasContactInfo`, `CleanupCRM`.
+- [`crm_integration_test.go`](crm_integration_test.go) — live merge, rename,
+  dedupe smoke tests.
+
+### Added — CLI
+
+- `oo companies dedupe|dedupe-persons`, `oo persons dedupe`, `oo contacts dedupe-info`,
+  `oo opportunities dedupe|dedupe-members|fix-titles`, `oo crm cleanup`.
+
+### Changed — CLI
+
+- `oo applications sync` — empty position uses company-only deal title; skips
+  duplicate opportunity members; paginated find-or-create lookups.
+- `oo` now loads OnlyOffice credentials only from `.env` in the current
+  working directory.
+- Produktor.io shorthand env names are accepted by the CLI dotenv loader:
+  `OO_URL` → `ONLYOFFICE_URL`, `OO_USER` → `ONLYOFFICE_USER`, and
+  `OO_PASS` → `ONLYOFFICE_PASS`. Canonical `ONLYOFFICE_*` values still win
+  when already set in the process environment.
+
 ## [0.6.0] - 2026-04-24
 
 ### Added — library

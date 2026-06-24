@@ -220,6 +220,15 @@ func (c *Client) deleteReq(ctx context.Context, path string) (json.RawMessage, e
 	return raw, nil
 }
 
+// putJSONObject issues an authenticated PUT with JSON body and decodes response.
+func (c *Client) putJSONObject(ctx context.Context, path string, body any) (map[string]any, error) {
+	raw, err := c.putJSON(ctx, path, body)
+	if err != nil {
+		return nil, err
+	}
+	return unmarshalResponseObject(raw)
+}
+
 // putJSON issues an authenticated PUT with application/json body.
 func (c *Client) putJSON(ctx context.Context, path string, body any) (json.RawMessage, error) {
 	auth, err := c.authHeader()
