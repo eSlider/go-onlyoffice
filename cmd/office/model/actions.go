@@ -5,6 +5,7 @@ type ActionID string
 
 const (
 	ActionView     ActionID = "view"
+	ActionSave     ActionID = "save"
 	ActionDelete   ActionID = "delete"
 	ActionRefresh  ActionID = "refresh"
 	ActionDownload ActionID = "download"
@@ -17,48 +18,47 @@ type ItemAction struct {
 	Danger bool
 }
 
-// ActionsFor returns available operations for an item kind.
+// ActionsFor returns available operations for an item kind (detail pane action bar).
 func ActionsFor(kind Kind) []ItemAction {
 	switch kind {
 	case KindProject:
 		return []ItemAction{
-			{ID: ActionView, Label: "View details"},
-			{ID: ActionDelete, Label: "Delete project", Danger: true},
+			{ID: ActionSave, Label: "Save"},
+			{ID: ActionDelete, Label: "Delete", Danger: true},
 		}
-	case KindTask, KindCRMTask:
+	case KindTask:
 		return []ItemAction{
-			{ID: ActionView, Label: "View details"},
+			{ID: ActionSave, Label: "Save"},
 			{ID: ActionDelete, Label: "Delete task", Danger: true},
+		}
+	case KindCRMTask:
+		return []ItemAction{
+			{ID: ActionDelete, Label: "Delete", Danger: true},
 		}
 	case KindContact:
 		return []ItemAction{
-			{ID: ActionView, Label: "View details"},
 			{ID: ActionDelete, Label: "Delete contact", Danger: true},
 		}
 	case KindOpportunity:
 		return []ItemAction{
-			{ID: ActionView, Label: "View details"},
 			{ID: ActionDelete, Label: "Delete deal", Danger: true},
 		}
 	case KindCase:
 		return []ItemAction{
-			{ID: ActionView, Label: "View details"},
 			{ID: ActionDelete, Label: "Delete case", Danger: true},
 		}
 	case KindMail:
 		return []ItemAction{
-			{ID: ActionView, Label: "Read message"},
 			{ID: ActionDelete, Label: "Delete message", Danger: true},
 		}
 	case KindFile:
 		return []ItemAction{
-			{ID: ActionView, Label: "Preview file"},
 			{ID: ActionDownload, Label: "Download"},
 			{ID: ActionDelete, Label: "Delete file", Danger: true},
 		}
 	case KindEvent, KindCalendar, KindUser:
-		return []ItemAction{{ID: ActionView, Label: "View details"}}
+		return nil
 	default:
-		return []ItemAction{{ID: ActionView, Label: "View details"}}
+		return nil
 	}
 }

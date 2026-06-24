@@ -40,7 +40,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-06-24
+
 ### Added — `office` TUI
+
+- **Alt+1 / Alt+2 / Alt+3** — show/hide left (nav), middle (table), and right (detail) panes.
+- Visible panes share **100% terminal width** evenly; pane content fills its column.
+- Tab focus skips hidden panes.
+
+### Changed — `office` TUI
+
+- Split detail pane: form/document top (~72%), CRUD action bar bottom.
+- Middle pane: multi-column table with sort, selection, and full-width columns.
+- Project list columns: ID, Title, Tasks (open/closed), Documents, Users.
+- Row selection auto-loads detail; files show document preview, entities show forms.
+
+## [Unreleased — archived]
+
+### Added — `office` TUI (0.4.0)
 
 - **`cmd/office`** — Bubble Tea terminal UI mirroring OnlyOffice Workspace:
   three-pane layout (module tree, multi-select list, markdown preview).

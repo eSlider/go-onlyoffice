@@ -244,13 +244,24 @@ func (l *Loader) listProjects(ctx context.Context) ([]model.Item, error) {
 		if p.Title != nil {
 			title = *p.Title
 		}
-		status := ""
-		if p.Status != nil {
-			status = fmt.Sprint(*p.Status)
+		raw := map[string]any{
+			"id":    id,
+			"title": title,
+		}
+		if p.TaskCount != nil {
+			raw["taskCount"] = *p.TaskCount
+		}
+		if p.TaskCountTotal != nil {
+			raw["taskCountTotal"] = *p.TaskCountTotal
+		}
+		if p.DocumentsCount != nil {
+			raw["documentsCount"] = *p.DocumentsCount
+		}
+		if p.ParticipantCount != nil {
+			raw["participantCount"] = *p.ParticipantCount
 		}
 		items[i] = model.Item{
-			ID: id, Title: title, Subtitle: status, Kind: model.KindProject,
-			Raw: map[string]any{"id": id, "title": title, "status": status},
+			ID: id, Title: title, Kind: model.KindProject, Raw: raw,
 		}
 	}
 	return items, nil
