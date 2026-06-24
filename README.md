@@ -3,6 +3,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/eslider/go-onlyoffice.svg)](https://pkg.go.dev/github.com/eslider/go-onlyoffice)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Go](https://img.shields.io/badge/Go-1.22+-00ADD8.svg)](https://go.dev)
+[![Tests](https://github.com/eSlider/go-onlyoffice/actions/workflows/test.yml/badge.svg)](https://github.com/eSlider/go-onlyoffice/actions/workflows/test.yml)
 [![Latest Release](https://img.shields.io/github/v/tag/eSlider/go-onlyoffice?sort=semver&label=release)](https://github.com/eSlider/go-onlyoffice/releases)
 [![GitHub Stars](https://img.shields.io/github/stars/eSlider/go-onlyoffice?style=social)](https://github.com/eSlider/go-onlyoffice/stargazers)
 
@@ -630,6 +631,20 @@ oo mails delete 5664
 ```
 
 Folder names: `inbox`, `sent`, `drafts`, `trash`, `spam` (or numeric id).
+
+### CI / releases
+
+GitHub Actions (pattern from [`eSlider/go-config`](https://github.com/eSlider/go-config)):
+
+| Workflow | Trigger | Purpose |
+|---|---|---|
+| `test.yml` | push / PR | `go vet`, unit tests, build `oo` |
+| `release-please.yml` | push to `main` | semver PR from conventional commits |
+| `release.yml` | tag `v*` | GoReleaser cross-platform `oo` binaries |
+
+Repo setting required once: **Settings → Actions → General → Allow GitHub Actions to create and approve pull requests**.
+
+Merge the release-please PR to tag a version; GoReleaser publishes assets to [GitHub Releases](https://github.com/eSlider/go-onlyoffice/releases).
 
 ## Examples
 
