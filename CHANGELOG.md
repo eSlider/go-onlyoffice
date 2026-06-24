@@ -4,6 +4,18 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0](https://github.com/eSlider/go-onlyoffice/compare/v0.5.0...v0.6.0) (2026-06-24)
+
+
+### Features
+
+* **office:** table detail panes and Alt+1/2/3 layout toggles ([934af21](https://github.com/eSlider/go-onlyoffice/commit/934af21bc93a54df9f40aacb4d89468b00d7562e))
+
+
+### Documentation
+
+* CHANGELOG for office v0.5.1 release ([2985070](https://github.com/eSlider/go-onlyoffice/commit/29850701f8c9ab0c6d6427f63eaa189a1c558140))
+
 ## [0.5.0](https://github.com/eSlider/go-onlyoffice/compare/v0.4.0...v0.5.0) (2026-06-24)
 
 
