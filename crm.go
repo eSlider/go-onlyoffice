@@ -47,14 +47,20 @@ func (c *Client) GetContact(ctx context.Context, contactID string) (map[string]a
 // FindCompany searches for a company contact with an exact (case-insensitive)
 // displayName match. Returns nil when not found.
 func (c *Client) FindCompany(ctx context.Context, name string) (map[string]any, error) {
-	items, _, err := c.ListContacts(ctx, 50, 0, name)
-	if err != nil {
-		return nil, err
-	}
 	needle := strings.ToLower(strings.TrimSpace(name))
-	for _, co := range items {
-		if isCompany(co) && strings.ToLower(fmt.Sprint(co["displayName"])) == needle {
-			return co, nil
+	const page = 50
+	for start := 0; ; start += page {
+		items, total, err := c.ListContacts(ctx, page, start, name)
+		if err != nil {
+			return nil, err
+		}
+		for _, co := range items {
+			if isCompany(co) && strings.ToLower(fmt.Sprint(co["displayName"])) == needle {
+				return co, nil
+			}
+		}
+		if start+page >= total || len(items) == 0 {
+			break
 		}
 	}
 	return nil, nil
@@ -62,19 +68,25 @@ func (c *Client) FindCompany(ctx context.Context, name string) (map[string]any, 
 
 // FindPerson searches for a person by first+last (case-insensitive).
 func (c *Client) FindPerson(ctx context.Context, first, last string) (map[string]any, error) {
-	items, _, err := c.ListContacts(ctx, 50, 0, first+" "+last)
-	if err != nil {
-		return nil, err
-	}
-	first = strings.ToLower(first)
-	last = strings.ToLower(last)
-	for _, p := range items {
-		if isCompany(p) {
-			continue
+	firstNeedle := strings.ToLower(strings.TrimSpace(first))
+	lastNeedle := strings.ToLower(strings.TrimSpace(last))
+	const page = 50
+	for start := 0; ; start += page {
+		items, total, err := c.ListContacts(ctx, page, start, first+" "+last)
+		if err != nil {
+			return nil, err
 		}
-		if strings.ToLower(fmt.Sprint(p["firstName"])) == first &&
-			strings.ToLower(fmt.Sprint(p["lastName"])) == last {
-			return p, nil
+		for _, p := range items {
+			if isCompany(p) {
+				continue
+			}
+			if strings.ToLower(fmt.Sprint(p["firstName"])) == firstNeedle &&
+				strings.ToLower(fmt.Sprint(p["lastName"])) == lastNeedle {
+				return p, nil
+			}
+		}
+		if start+page >= total || len(items) == 0 {
+			break
 		}
 	}
 	return nil, nil
@@ -125,6 +137,88 @@ func (c *Client) AddContactInfo(ctx context.Context, contactID, infoType, dataVa
 // DeleteContact removes a CRM contact by id.
 func (c *Client) DeleteContact(ctx context.Context, contactID string) (map[string]any, error) {
 	return c.deleteObject(ctx, fmt.Sprintf("/api/2.0/crm/contact/%s.json", url.PathEscape(contactID)))
+}
+
+// ListAllContacts paginates through every CRM contact.
+func (c *Client) ListAllContacts(ctx context.Context) ([]map[string]any, error) {
+	const page = 100
+	var all []map[string]any
+	for start := 0; ; start += page {
+		chunk, total, err := c.ListContacts(ctx, page, start, "")
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, chunk...)
+		if start+page >= total || len(chunk) == 0 {
+			break
+		}
+	}
+	return all, nil
+}
+
+// MergeContacts merges secondary into primary (secondary is removed).
+func (c *Client) MergeContacts(ctx context.Context, primaryID, secondaryID string) (map[string]any, error) {
+	fields := url.Values{}
+	fields.Set("fromContactId", secondaryID)
+	fields.Set("toContactId", primaryID)
+	out, err := c.putFormObject(ctx, "/api/2.0/crm/contact/merge.json", fields)
+	if err == nil {
+		return out, nil
+	}
+	// Some instances expect JSON body with alternate field names.
+	body := map[string]any{
+		"fromContactId": secondaryID,
+		"toContactId":   primaryID,
+	}
+	return c.putJSONObject(ctx, "/api/2.0/crm/contact/merge.json", body)
+}
+
+// ListCompanyPersons returns persons linked to a company.
+func (c *Client) ListCompanyPersons(ctx context.Context, companyID string) ([]map[string]any, error) {
+	return c.ResponseArray(ctx, fmt.Sprintf("/api/2.0/crm/contact/company/%s/person.json", url.PathEscape(companyID)))
+}
+
+// DeleteContactInfo removes one info row from a contact.
+func (c *Client) DeleteContactInfo(ctx context.Context, contactID, dataID string) (map[string]any, error) {
+	return c.deleteObject(ctx, fmt.Sprintf("/api/2.0/crm/contact/%s/data/%s.json", url.PathEscape(contactID), url.PathEscape(dataID)))
+}
+
+// ContactInfoRows returns commonData/info rows from a contact map.
+func ContactInfoRows(contact map[string]any) []map[string]any {
+	for _, key := range []string{"commonData", "data", "contactData"} {
+		if rows, ok := contact[key].([]any); ok {
+			return mapsFromAnySlice(rows)
+		}
+		if rows, ok := contact[key].([]map[string]any); ok {
+			return rows
+		}
+	}
+	return nil
+}
+
+// HasContactInfo reports whether a contact already has the given type+value.
+func HasContactInfo(contact map[string]any, infoType, value string) bool {
+	key := ContactInfoKey(infoType, value)
+	for _, row := range ContactInfoRows(contact) {
+		v := fmt.Sprint(row["data"])
+		if v == "" || v == "<nil>" {
+			v = fmt.Sprint(row["value"])
+		}
+		if ContactInfoKey(fmt.Sprint(row["infoType"]), v) == key {
+			return true
+		}
+	}
+	return false
+}
+
+func mapsFromAnySlice(rows []any) []map[string]any {
+	out := make([]map[string]any, 0, len(rows))
+	for _, row := range rows {
+		if m, ok := row.(map[string]any); ok {
+			out = append(out, m)
+		}
+	}
+	return out
 }
 
 // ListOpportunities returns a page of deals/opportunities and the total count.
@@ -193,6 +287,147 @@ func (c *Client) ListDealStages(ctx context.Context) ([]map[string]any, error) {
 // DeleteOpportunity removes a deal by id.
 func (c *Client) DeleteOpportunity(ctx context.Context, id string) (map[string]any, error) {
 	return c.deleteObject(ctx, fmt.Sprintf("/api/2.0/crm/opportunity/%s.json", url.PathEscape(id)))
+}
+
+// ListAllOpportunities paginates through every opportunity.
+func (c *Client) ListAllOpportunities(ctx context.Context) ([]map[string]any, error) {
+	const page = 100
+	var all []map[string]any
+	for start := 0; ; start += page {
+		chunk, total, err := c.ListOpportunities(ctx, page, start)
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, chunk...)
+		if start+page >= total || len(chunk) == 0 {
+			break
+		}
+	}
+	return all, nil
+}
+
+// OpportunityMembers extracts the members slice from a GetOpportunity response.
+func OpportunityMembers(opp map[string]any) []map[string]any {
+	raw, ok := opp["members"].([]any)
+	if !ok {
+		if rows, ok := opp["members"].([]map[string]any); ok {
+			return rows
+		}
+		return nil
+	}
+	return mapsFromAnySlice(raw)
+}
+
+// ListOpportunityMembers returns contacts linked to an opportunity.
+func (c *Client) ListOpportunityMembers(ctx context.Context, oppID string) ([]map[string]any, error) {
+	opp, err := c.GetOpportunity(ctx, oppID)
+	if err != nil {
+		return nil, err
+	}
+	if members := OpportunityMembers(opp); len(members) > 0 {
+		return members, nil
+	}
+	return c.ResponseArray(ctx, fmt.Sprintf("/api/2.0/crm/opportunity/%s/contact.json", url.PathEscape(oppID)))
+}
+
+// RemoveOpportunityMember detaches a contact from an opportunity.
+func (c *Client) RemoveOpportunityMember(ctx context.Context, oppID, contactID string) (map[string]any, error) {
+	return c.deleteObject(ctx, fmt.Sprintf("/api/2.0/crm/opportunity/%s/contact/%s.json", url.PathEscape(oppID), url.PathEscape(contactID)))
+}
+
+// IsOpportunityMember reports whether contactID is already on the opportunity.
+func (c *Client) IsOpportunityMember(ctx context.Context, oppID, contactID string) (bool, error) {
+	members, err := c.ListOpportunityMembers(ctx, oppID)
+	if err != nil {
+		return false, err
+	}
+	want := flexInt(contactID)
+	for _, m := range members {
+		if flexInt(m["id"]) == want {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// UpdateOpportunityTitle renames a deal; loads full record and PUTs it back.
+func (c *Client) UpdateOpportunityTitle(ctx context.Context, id, newTitle string) (map[string]any, error) {
+	opp, err := c.GetOpportunity(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	body := opportunityUpdateBody(opp, newTitle)
+	return c.putJSONObject(ctx, fmt.Sprintf("/api/2.0/crm/opportunity/%s.json", url.PathEscape(id)), body)
+}
+
+func opportunityUpdateBody(opp map[string]any, title string) map[string]any {
+	body := map[string]any{
+		"opportunityid": flexInt(opp["id"]),
+		"title":         title,
+		"description":   stringField(opp, "description"),
+		"isPrivate":     boolField(opp, "isPrivate"),
+		"isNotify":      false,
+	}
+	if stage, ok := opp["stage"].(map[string]any); ok {
+		body["stageid"] = flexInt(stage["id"])
+	}
+	if resp, ok := opp["responsible"].(map[string]any); ok {
+		body["responsibleid"] = fmt.Sprint(resp["id"])
+	}
+	if cur, ok := opp["bidCurrency"].(map[string]any); ok {
+		body["bidCurrencyAbbr"] = stringField(cur, "abbreviation")
+	} else {
+		body["bidCurrencyAbbr"] = "EUR"
+	}
+	body["bidValue"] = floatField(opp, "bidValue")
+	body["bidType"] = 0
+	body["perPeriodValue"] = 0
+	body["successProbability"] = 1
+	var memberIDs []int64
+	seen := make(map[int64]bool)
+	for _, m := range OpportunityMembers(opp) {
+		id := flexInt(m["id"])
+		if id == 0 || seen[id] {
+			continue
+		}
+		seen[id] = true
+		memberIDs = append(memberIDs, id)
+	}
+	if len(memberIDs) > 0 {
+		body["members"] = memberIDs
+		body["contactid"] = memberIDs[0]
+	}
+	if al, ok := opp["accessList"].([]any); ok && len(al) > 0 {
+		body["accessList"] = al
+	} else {
+		body["accessList"] = []any{}
+	}
+	return body
+}
+
+func stringField(m map[string]any, key string) string {
+	v := fmt.Sprint(m[key])
+	if v == "<nil>" {
+		return ""
+	}
+	return v
+}
+
+func boolField(m map[string]any, key string) bool {
+	v, _ := m[key].(bool)
+	return v
+}
+
+func floatField(m map[string]any, key string) float64 {
+	switch x := m[key].(type) {
+	case float64:
+		return x
+	case int:
+		return float64(x)
+	default:
+		f, _ := strconv.ParseFloat(fmt.Sprint(x), 64)
+		return f
+	}
 }
 
 // ListCases returns a page of CRM cases and the total count.

@@ -6,12 +6,13 @@
 //	oo projects      list | get | milestones | create | update | delete | files (list|upload|download|rename|delete)
 //	oo tasks         list | get | create | update | delete | subtask add | files (list|upload|detach)
 //	oo users         list | self            (alias: oo whoami)
-//	oo contacts      list | get | delete | info-add
-//	oo persons       list | create | delete
-//	oo companies     list | create | delete
-//	oo opportunities list | get | create | delete | stages | member-add
+//	oo contacts      list | get | delete | info-add | dedupe-info
+//	oo persons       list | create | delete | dedupe
+//	oo companies     list | create | delete | dedupe | dedupe-persons
+//	oo opportunities list | get | create | delete | stages | member-add | dedupe | dedupe-members | fix-titles
 //	oo cases         list | create | delete | member-add
 //	oo crm-tasks     list | create | delete | categories
+//	oo crm           cleanup
 //	oo applications  sync
 //
 // Every list supports `--output/-o json|table` (table is the default).
