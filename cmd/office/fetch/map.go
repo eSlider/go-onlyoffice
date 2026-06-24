@@ -36,6 +36,9 @@ func ItemsFromMaps(rows []map[string]any, kind model.Kind, fields FieldMap) []mo
 		if title == "" {
 			title = str(row, "name")
 		}
+		if title == "" {
+			title = "(untitled)"
+		}
 		raw := row
 		out[i] = model.Item{
 			ID:       idStr(row, fields.IDKey),

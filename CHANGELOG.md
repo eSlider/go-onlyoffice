@@ -40,8 +40,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Install: `go install github.com/eslider/go-onlyoffice/cmd/office@latest`.
 - **`cmd/internal/bootstrap`** — shared env loading and client auth for `oo`
   and `office`.
-- Unit tests for preview formatters, menu/selection model, fetch mappers, and
-  key routing; integration tests under `cmd/office/fetch/` (`-tags=integration`).
+- Integration tests under `cmd/office/fetch/` and `cmd/office/preview/`
+  (`-tags=integration`) hit the live OnlyOffice API — no fixture maps or
+  httptest vendor mocks. Unit tests remain for pure UI/formatting helpers only.
 
 ### Added — library
 
