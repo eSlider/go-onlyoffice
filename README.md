@@ -585,6 +585,7 @@ oo tasks files detach 208 12345
 | `companies` | `list`, `create`, `delete`, `dedupe`, `dedupe-persons` |
 | `opportunities` | `list`, `get`, `create`, `delete`, `stages`, `member-add`, `dedupe`, `dedupe-members`, `fix-titles` |
 | `crm` | `cleanup` |
+| `mails` | `accounts`, `folders`, `list`, `get`, `delete` |
 | `cases` | `list`, `create`, `delete`, `member-add` |
 | `crm-tasks` | `list`, `create`, `delete`, `categories` |
 | `applications` | `sync` |
@@ -614,6 +615,21 @@ Run `oo --help` or `oo <subject> --help` for the full command reference.
 | `ONLYOFFICE_CALENDAR_ID` | Default calendar id used when omitted (default `1`) |
 | `ONLYOFFICE_PROJECT_ID` | Default project id used when omitted (default `33`) |
 | `OO_URL`, `OO_USER`, `OO_PASS` | CLI-only produktor.io aliases mapped to `ONLYOFFICE_URL`, `ONLYOFFICE_USER`, `ONLYOFFICE_PASS` |
+
+### Workspace mail (`oo mails`)
+
+Uses the same OnlyOffice credentials as other `oo` commands. Talks to the
+built-in Mail addon (`/addons/mail`) via `/api/2.0/mail/*`:
+
+```bash
+oo mails accounts
+oo mails folders
+oo mails list --folder inbox --limit 20
+oo mails get 5664
+oo mails delete 5664
+```
+
+Folder names: `inbox`, `sent`, `drafts`, `trash`, `spam` (or numeric id).
 
 ## Examples
 
