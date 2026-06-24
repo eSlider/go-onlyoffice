@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
+	onlyoffice "github.com/eslider/go-onlyoffice"
 	"github.com/spf13/cobra"
 )
 
@@ -21,6 +22,9 @@ func init() {
 	opportunitiesCmd.AddCommand(oppDeleteCmd())
 	opportunitiesCmd.AddCommand(oppStagesCmd())
 	opportunitiesCmd.AddCommand(oppMemberAddCmd())
+	opportunitiesCmd.AddCommand(oppDedupeCmd())
+	opportunitiesCmd.AddCommand(oppDedupeMembersCmd())
+	opportunitiesCmd.AddCommand(oppFixTitlesCmd())
 }
 
 func oppListCmd() *cobra.Command {
@@ -173,5 +177,53 @@ func oppMemberAddCmd() *cobra.Command {
 			printObject(out)
 			return nil
 		},
+	}
+}
+
+func oppDedupeCmd() *cobra.Command {
+	var ignoreCompanySuffix bool
+	cmd := &cobra.Command{
+		Use:   "dedupe",
+		Short: "Merge duplicate opportunities by title",
+		RunE: dedupeRunE(func(cmd *cobra.Command, c *onlyoffice.Client) error {
+			res, err := onlyoffice.DedupeOpportunities(cmd.Context(), c, ignoreCompanySuffix)
+			if err != nil {
+				return err
+			}
+			printObject(res)
+			return nil
+		}),
+	}
+	cmd.Flags().BoolVar(&ignoreCompanySuffix, "ignore-company-suffix", false, "group by position only")
+	return cmd
+}
+
+func oppDedupeMembersCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "dedupe-members",
+		Short: "Remove duplicate contacts on each deal (by id and display name)",
+		RunE: dedupeRunE(func(cmd *cobra.Command, c *onlyoffice.Client) error {
+			res, err := onlyoffice.DedupeOpportunityMembers(cmd.Context(), c)
+			if err != nil {
+				return err
+			}
+			printObject(res)
+			return nil
+		}),
+	}
+}
+
+func oppFixTitlesCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "fix-titles",
+		Short: "Fix malformed deal titles (leading @, spacing)",
+		RunE: dedupeRunE(func(cmd *cobra.Command, c *onlyoffice.Client) error {
+			res, err := onlyoffice.FixOpportunityTitles(cmd.Context(), c)
+			if err != nil {
+				return err
+			}
+			printObject(res)
+			return nil
+		}),
 	}
 }

@@ -254,10 +254,7 @@ func Sync(ctx context.Context, client *onlyoffice.Client, apps []Data, dryRun, v
 	deadline := time.Now().Add(14 * 24 * time.Hour).Format("2006-01-02T15:04:05")
 	const stageInitial = 1
 	for _, app := range apps {
-		dealTitle := app.Position
-		if app.Company != "" {
-			dealTitle = app.Position + " @ " + app.Company
-		}
+		dealTitle := onlyoffice.DealTitleForApplication(app.Position, app.Company)
 		fmt.Println(strings.Repeat("─", 60))
 		fmt.Println(" ", app.Folder)
 		fmt.Println(" ", dealTitle)
@@ -344,10 +341,16 @@ func Sync(ctx context.Context, client *onlyoffice.Client, apps []Data, dryRun, v
 		st.Deals++
 		if !dryRun && dealID != 0 {
 			if companyID != 0 {
-				_, _ = client.AddOpportunityMember(ctx, strconv.Itoa(dealID), strconv.Itoa(companyID))
+				cid := strconv.Itoa(companyID)
+				if ok, _ := client.IsOpportunityMember(ctx, strconv.Itoa(dealID), cid); !ok {
+					_, _ = client.AddOpportunityMember(ctx, strconv.Itoa(dealID), cid)
+				}
 			}
 			if personID != 0 {
-				_, _ = client.AddOpportunityMember(ctx, strconv.Itoa(dealID), strconv.Itoa(personID))
+				pid := strconv.Itoa(personID)
+				if ok, _ := client.IsOpportunityMember(ctx, strconv.Itoa(dealID), pid); !ok {
+					_, _ = client.AddOpportunityMember(ctx, strconv.Itoa(dealID), pid)
+				}
 			}
 		}
 		if app.Summary != "" {
@@ -395,18 +398,20 @@ func Sync(ctx context.Context, client *onlyoffice.Client, apps []Data, dryRun, v
 }
 
 func findExistingOpp(ctx context.Context, c *onlyoffice.Client, title string) map[string]interface{} {
-	deals, total, _ := c.ListOpportunities(ctx, 100, 0)
-	for _, d := range deals {
-		if strings.TrimSpace(fmt.Sprint(d["title"])) == strings.TrimSpace(title) {
-			return d
+	needle := strings.TrimSpace(title)
+	const page = 100
+	for start := 0; ; start += page {
+		deals, total, err := c.ListOpportunities(ctx, page, start)
+		if err != nil {
+			return nil
 		}
-	}
-	if total > 100 {
-		deals2, _, _ := c.ListOpportunities(ctx, 100, 100)
-		for _, d := range deals2 {
-			if strings.TrimSpace(fmt.Sprint(d["title"])) == strings.TrimSpace(title) {
+		for _, d := range deals {
+			if strings.TrimSpace(fmt.Sprint(d["title"])) == needle {
 				return d
 			}
+		}
+		if start+page >= total || len(deals) == 0 {
+			break
 		}
 	}
 	return nil
