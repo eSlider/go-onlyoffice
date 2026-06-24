@@ -29,6 +29,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `oo companies dedupe|dedupe-persons`, `oo persons dedupe`, `oo contacts dedupe-info`,
   `oo opportunities dedupe|dedupe-members|fix-titles`, `oo crm cleanup`.
 
+### Added — CI/CD
+
+- GitHub Actions: `test.yml` (vet, unit tests, `oo` build), `release-please.yml`
+  (semver from conventional commits), `release.yml` (GoReleaser binaries for `oo`).
+
 ### Changed — CLI
 
 - `oo applications sync` — empty position uses company-only deal title; skips
