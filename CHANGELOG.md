@@ -6,6 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — `office` TUI
+
+- **`cmd/office`** — Bubble Tea terminal UI mirroring OnlyOffice Workspace:
+  three-pane layout (module tree, multi-select list, markdown preview).
+  Install: `go install github.com/eslider/go-onlyoffice/cmd/office@latest`.
+- **`cmd/internal/bootstrap`** — shared env loading and client auth for `oo`
+  and `office`.
+- Unit tests for preview formatters, menu/selection model, fetch mappers, and
+  key routing; integration tests under `cmd/office/fetch/` (`-tags=integration`).
+
 ### Added — library
 
 - **CRM dedupe & cleanup** — `crm_normalize.go`, `crm_dedupe_plan.go`, `crm_dedupe.go`:
@@ -36,6 +46,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed — CLI
 
+- README: expanded **oo CLI use cases** (CRM cleanup, applications sync, mail, contacts).
 - `oo applications sync` — empty position uses company-only deal title; skips
   duplicate opportunity members; paginated find-or-create lookups.
 - `oo` now loads OnlyOffice credentials only from `.env` in the current
