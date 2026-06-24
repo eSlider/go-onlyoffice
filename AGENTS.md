@@ -16,6 +16,8 @@ Canonical Go client for OnlyOffice Workspace (Projects + Calendar + CRM) and the
   - `common.go` — `rootCmd`, `newOO`, `printTable`/`printObject`, `--output table|json` flag.
   - `calendar.go`, `projects.go`, `projects_files.go`, `tasks.go`, `tasks_files.go`, `users.go`, `contacts.go`, `opportunities.go`, `cases.go`, `crm_tasks.go`, `apps.go` — one file per subject (or per subject facet), each registers in `init()`.
   - CLI-only deps (`spf13/cobra`, `joho/godotenv`) stay out of the library.
+- **TUI — `cmd/office/` as `package main`.** Bubble Tea three-pane browser (module tree, selectable list, markdown preview). Reuses `cmd/internal/bootstrap` for env/auth and the root `onlyoffice` library for all API calls. UI logic in `cmd/office/ui/`; preview/formatting in `cmd/office/preview/`; list loaders in `cmd/office/fetch/`.
+- **Shared bootstrap — `cmd/internal/bootstrap/`.** `LoadEnv()` + `NewClient(ctx)` extracted from `oo`; both binaries import it.
 - **Applications sync — `cmd/oo/applications/`.** README→CRM bridge, CV-specific; kept under `cmd/oo/` so it's clear it's internal to the binary, not a library feature.
 
 ## Rules
