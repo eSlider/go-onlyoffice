@@ -52,6 +52,30 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-06-24
+
+### Added — `office` TUI
+
+- **Pane layout** — default **10% / 60% / 30%** split (nav / list / detail); drag vertical borders to resize; **Alt+1/2/3** still toggles panes.
+- **Filter mode** (`f`) — live filter on nav + list; right pane is the search query; **Esc** clears.
+- **Mail preview** — HTML bodies rendered colorized in the terminal (glamour); read-only scrollable document pane.
+- **Mail infinite scroll** — loads the next page automatically when the cursor nears the end of the list.
+- **Scrollbars** — vertical scrollbar on nav, list body, and detail preview when content exceeds the viewport.
+- **Calendar** — unified calendars + events leaf with **Type** column and date range (−7d … +30d).
+- **Tasks** — humanized status labels and relative deadlines in the list.
+- **Projects** — open/closed row colors; status toggle in the detail form; **Save** sends `responsibleId` and status via `UpdateProjectStatus`.
+
+### Changed — `office` TUI
+
+- Flattened navigation: **Projects**, **Tasks**, **By project**, **Calendar**, **CRM**, **Mail**, **Users** (removed Browse; Calendar no longer splits Calendars/Events).
+- Middle pane truncates overflowing cells with `…`; full text on the cursor or Space-selected row.
+- Detail form tab order: Title → Description → Status → Save → Delete.
+- **j/k** scrolls mail/file preview and read-only detail forms; mouse wheel scrolls detail when hovering the content area.
+
+### Added — library
+
+- `UpdateProjectStatus` — `PUT /api/2.0/project/{id}/status` for open/closed lifecycle.
+
 ## [0.5.1] — 2026-06-24
 
 ### Added — `office` TUI

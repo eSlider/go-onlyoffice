@@ -11,7 +11,7 @@ func TestBuildProjectColumns(t *testing.T) {
 		},
 	}}
 	cols := BuildColumns(SubjectProjects, items)
-	want := []string{"_sel", "id", "title", "tasks", "documents", "users"}
+	want := []string{"_sel", "id", "status", "title", "tasks", "documents", "users"}
 	if len(cols) != len(want) {
 		t.Fatalf("got %d columns, want %d", len(cols), len(want))
 	}
@@ -21,9 +21,20 @@ func TestBuildProjectColumns(t *testing.T) {
 		}
 	}
 	for _, c := range cols {
-		if c.Key == "status" || c.Key == "subtitle" {
+		if c.Key == "subtitle" {
 			t.Fatalf("unexpected column %q", c.Key)
 		}
+	}
+}
+
+func TestCellTextProjectStatus(t *testing.T) {
+	open := Item{Kind: KindProject, Raw: map[string]any{"status": 0}}
+	if got := CellText(open, "status"); got != "Open" {
+		t.Fatalf("got %q", got)
+	}
+	closed := Item{Kind: KindProject, Raw: map[string]any{"status": 2}}
+	if got := CellText(closed, "status"); got != "Closed" {
+		t.Fatalf("got %q", got)
 	}
 }
 

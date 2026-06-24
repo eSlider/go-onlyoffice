@@ -14,7 +14,7 @@ type FieldMap struct {
 }
 
 // TaskItemFields is the default field map for project tasks.
-var TaskItemFields = FieldMap{IDKey: "id", TitleKey: "title", SubtitleKey: "status"}
+var TaskItemFields = FieldMap{IDKey: "id", TitleKey: "title"}
 
 // ProjectItemFields is the default field map for projects.
 var ProjectItemFields = FieldMap{IDKey: "id", TitleKey: "title", SubtitleKey: "status"}

@@ -37,6 +37,12 @@ func BuildColumns(subject Subject, items []Item) []TableColumn {
 	if subject == SubjectProjects {
 		return buildProjectColumns(items)
 	}
+	if subject == SubjectTasks {
+		return buildTaskColumns(items)
+	}
+	if subject == SubjectCalendar {
+		return buildCalendarColumns(items)
+	}
 	cols := []TableColumn{
 		{Key: "_sel", Title: "✓", Width: 3},
 		{Key: "id", Title: "ID", Width: 10},
@@ -64,10 +70,43 @@ func BuildColumns(subject Subject, items []Item) []TableColumn {
 	return cols
 }
 
+func buildCalendarColumns(items []Item) []TableColumn {
+	cols := []TableColumn{
+		{Key: "_sel", Title: "✓", Width: 3},
+		{Key: "id", Title: "ID", Width: 10},
+		{Key: "type", Title: "Type", Width: 10},
+		{Key: "title", Title: "Title", Width: 28},
+	}
+	for _, key := range []string{"start", "end"} {
+		if columnHasData(items, key) {
+			cols = append(cols, TableColumn{Key: key, Title: titleLabel(key), Width: defaultWidth(key)})
+		}
+	}
+	sizeColumns(cols, items)
+	return cols
+}
+
+func buildTaskColumns(items []Item) []TableColumn {
+	cols := []TableColumn{
+		{Key: "_sel", Title: "✓", Width: 3},
+		{Key: "id", Title: "ID", Width: 8},
+		{Key: "title", Title: "Title", Width: 28},
+		{Key: "status", Title: "Status", Width: 10},
+	}
+	for _, key := range []string{"deadline", "responsible"} {
+		if columnHasData(items, key) {
+			cols = append(cols, TableColumn{Key: key, Title: titleLabel(key), Width: defaultWidth(key)})
+		}
+	}
+	sizeColumns(cols, items)
+	return cols
+}
+
 func buildProjectColumns(items []Item) []TableColumn {
 	cols := []TableColumn{
 		{Key: "_sel", Title: "✓", Width: 3},
 		{Key: "id", Title: "ID", Width: 8},
+		{Key: "status", Title: "Status", Width: 8},
 		{Key: "title", Title: "Title", Width: 28},
 		{Key: "tasks", Title: "Tasks (open/closed)", Width: 18},
 		{Key: "documents", Title: "Documents", Width: 11},
@@ -89,6 +128,47 @@ func CellText(it Item, key string) string {
 		return it.ID
 	case "title":
 		return it.Title
+	case "type":
+		return CalendarTypeLabel(it)
+	case "start", "end":
+		if it.Raw == nil {
+			return ""
+		}
+		if formatted := FormatCalendarDateTime(it.Raw[key]); formatted != "" {
+			return formatted
+		}
+		return formatAny(it.Raw[key])
+	case "status":
+		switch it.Kind {
+		case KindProject:
+			return ProjectStatusLabel(it.Raw)
+		case KindTask, KindCRMTask:
+			if it.Raw == nil {
+				return ""
+			}
+			return TaskStatusLabel(it.Raw["status"])
+		default:
+			if it.Raw == nil {
+				return ""
+			}
+			return formatAny(it.Raw["status"])
+		}
+	case "deadline":
+		if it.Raw == nil {
+			return ""
+		}
+		if rel := FormatRelativeDeadline(it.Raw["deadline"]); rel != "" {
+			return rel
+		}
+		return formatAny(it.Raw["deadline"])
+	case "responsible":
+		if it.Kind == KindTask || it.Kind == KindCRMTask {
+			return TaskResponsibleLabel(it.Raw)
+		}
+		if it.Raw == nil {
+			return ""
+		}
+		return formatAny(it.Raw["responsible"])
 	case "subtitle":
 		return it.Subtitle
 	case "tasks":
@@ -230,7 +310,7 @@ func defaultWidth(key string) int {
 	case "id", "status", "stage":
 		return 10
 	case "start", "end", "deadline", "date":
-		return 18
+		return 20
 	case "from", "to", "email", "primaryEmail":
 		return 22
 	case "description", "displayName":

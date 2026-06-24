@@ -31,6 +31,12 @@ func TestKeyActionSortAndColumns(t *testing.T) {
 	}
 }
 
+func TestKeyActionFilter(t *testing.T) {
+	if got := ui.KeyAction("f", model.FocusList); got != ui.ActionFilter {
+		t.Fatalf("got %v", got)
+	}
+}
+
 func TestLayoutWidths(t *testing.T) {
 	menu, list, preview := ui.LayoutWidthsLegacy(120)
 	if menu+list+preview != 120 {

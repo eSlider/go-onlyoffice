@@ -42,23 +42,69 @@ func OpportunityMarkdown(m map[string]any) string {
 	return strings.TrimSpace(b.String()) + "\n"
 }
 
-// MailMarkdown formats a mail message for preview.
+// MailMarkdown formats a mail message for terminal preview (HTML body is converted to markdown).
 func MailMarkdown(m map[string]any) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# %s\n\n", str(m, "subject"))
-	fmt.Fprintf(&b, "**From:** %s\n\n", str(m, "from"))
-	if to := str(m, "to"); to != "" {
+	fmt.Fprintf(&b, "**From:** %s\n\n", mailAddressLine(m, "from"))
+	if to := mailAddressLine(m, "to"); to != "" {
 		fmt.Fprintf(&b, "**To:** %s\n\n", to)
 	}
-	body := str(m, "body")
-	if body == "" {
-		body = str(m, "htmlBody")
+	if cc := mailAddressLine(m, "cc"); cc != "" {
+		fmt.Fprintf(&b, "**Cc:** %s\n\n", cc)
 	}
-	body = stripHTML(body)
-	if body != "" {
-		fmt.Fprintf(&b, "## Body\n\n%s\n\n", body)
+	if date := str(m, "date"); date != "" {
+		fmt.Fprintf(&b, "**Date:** %s\n\n", date)
+	}
+	if body := mailBodyMarkdown(m); body != "" {
+		fmt.Fprintf(&b, "---\n\n%s\n", body)
 	}
 	return strings.TrimSpace(b.String()) + "\n"
+}
+
+func mailAddressLine(m map[string]any, key string) string {
+	if v := str(m, key); v != "" {
+		return v
+	}
+	name := str(m, key+"Name")
+	addr := str(m, key+"Address")
+	switch {
+	case name != "" && addr != "":
+		return fmt.Sprintf("%s <%s>", name, addr)
+	case addr != "":
+		return addr
+	default:
+		return name
+	}
+}
+
+func mailBodyMarkdown(m map[string]any) string {
+	htmlBody := strings.TrimSpace(str(m, "htmlBody"))
+	plainBody := strings.TrimSpace(str(m, "body"))
+
+	for _, candidate := range []string{htmlBody, plainBody} {
+		if candidate == "" {
+			continue
+		}
+		if looksLikeHTML(candidate) {
+			if md, err := HTMLToMarkdown(candidate); err == nil {
+				if md = strings.TrimSpace(md); md != "" {
+					return md
+				}
+			}
+		}
+	}
+	if plainBody != "" {
+		return plainBody
+	}
+	if htmlBody != "" {
+		return stripHTML(htmlBody)
+	}
+	return ""
+}
+
+func looksLikeHTML(s string) bool {
+	return strings.Contains(s, "<") && strings.Contains(s, ">") && htmlTagRe.MatchString(s)
 }
 
 // EventMarkdown formats a calendar event for preview.

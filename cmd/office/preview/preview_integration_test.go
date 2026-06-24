@@ -119,7 +119,7 @@ func TestIntegrationPreviewMailFromAPI(t *testing.T) {
 
 func TestIntegrationPreviewEventFromAPI(t *testing.T) {
 	loader, ctx := liveLoader(t)
-	items, err := loader.List(ctx, model.ListSpec{Subject: model.SubjectEvents})
+	items, err := loader.List(ctx, model.ListSpec{Subject: model.SubjectCalendar})
 	if err != nil {
 		t.Fatal(err)
 	}
