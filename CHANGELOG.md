@@ -40,7 +40,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-## [0.5.0] — 2026-06-24
+## [0.5.1] — 2026-06-24
 
 ### Added — `office` TUI
 
@@ -54,59 +54,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Middle pane: multi-column table with sort, selection, and full-width columns.
 - Project list columns: ID, Title, Tasks (open/closed), Documents, Users.
 - Row selection auto-loads detail; files show document preview, entities show forms.
-
-## [Unreleased — archived]
-
-### Added — `office` TUI (0.4.0)
-
-- **`cmd/office`** — Bubble Tea terminal UI mirroring OnlyOffice Workspace:
-  three-pane layout (module tree, multi-select list, markdown preview).
-  Install: `go install github.com/eslider/go-onlyoffice/cmd/office@latest`.
-- **`cmd/internal/bootstrap`** — shared env loading and client auth for `oo`
-  and `office`.
-- Integration tests under `cmd/office/fetch/` and `cmd/office/preview/`
-  (`-tags=integration`) hit the live OnlyOffice API — no fixture maps or
-  httptest vendor mocks. Unit tests remain for pure UI/formatting helpers only.
-
-### Added — library
-
-- **CRM dedupe & cleanup** — `crm_normalize.go`, `crm_dedupe_plan.go`, `crm_dedupe.go`:
-  merge duplicate companies/persons/deals by normalized name; remove duplicate
-  contact-info rows and opportunity members (including same `displayName` with
-  different ids); fix malformed deal titles (` @ Company` → `Company`).
-  `MergeContacts`, `UpdateOpportunityTitle`, `ListAllContacts`,
-  `ListAllOpportunities`, `DeleteContactInfo`, `RemoveOpportunityMember`,
-  `IsOpportunityMember`, `HasContactInfo`, `CleanupCRM`.
-- Slogan-aware grouping: `StripSloganSuffix`, `CompanyGroupingKey` merge names
-  like `Affirm` and `Affirm — Fraud Engineering` (companies, deals, members).
-- **Workspace mail** — [`mails.go`](mails.go): `ListMailAccounts`, `ListMailFolders`,
-  `ListMailMessages`, `GetMailMessage`, `RemoveMailMessages` against OnlyOffice
-  Mail addon (`/api/2.0/mail/*`).
-- [`crm_integration_test.go`](crm_integration_test.go) — live merge, rename,
-  dedupe smoke tests.
-
-### Added — CLI
-
-- `oo mails accounts|folders|list|get|delete` — OnlyOffice Workspace mail (same `ONLYOFFICE_*` creds).
-- `oo companies dedupe|dedupe-persons`, `oo persons dedupe`, `oo contacts dedupe-info`,
-  `oo opportunities dedupe|dedupe-members|fix-titles`, `oo crm cleanup`.
-
-### Added — CI/CD
-
-- GitHub Actions: `test.yml` (vet, unit tests, `oo` build), `release-please.yml`
-  (semver from conventional commits), `release.yml` (GoReleaser binaries for `oo`).
-
-### Changed — CLI
-
-- README: expanded **oo CLI use cases** (CRM cleanup, applications sync, mail, contacts).
-- `oo applications sync` — empty position uses company-only deal title; skips
-  duplicate opportunity members; paginated find-or-create lookups.
-- `oo` now loads OnlyOffice credentials only from `.env` in the current
-  working directory.
-- Produktor.io shorthand env names are accepted by the CLI dotenv loader:
-  `OO_URL` → `ONLYOFFICE_URL`, `OO_USER` → `ONLYOFFICE_USER`, and
-  `OO_PASS` → `ONLYOFFICE_PASS`. Canonical `ONLYOFFICE_*` values still win
-  when already set in the process environment.
 
 ## [0.6.0] - 2026-04-24
 
