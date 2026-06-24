@@ -593,10 +593,10 @@ Spreadsheet files: inline CSV/JSON preview in the right pane; install
 [`vex`](https://github.com/CodeOne45/vex-tui) on `PATH` for full-screen
 xlsx/csv viewing (`v` on a file row — coming in next iteration).
 
-Integration tests for list loaders:
+Integration tests for list loaders and preview (live API only — no mocks):
 
 ```bash
-go test -tags=integration ./cmd/office/fetch/...
+go test -tags=integration ./cmd/office/fetch/... ./cmd/office/preview/...
 ```
 
 **Project / task documents (`oo`):**
