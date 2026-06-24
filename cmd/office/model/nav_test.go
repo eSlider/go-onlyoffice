@@ -69,7 +69,7 @@ func TestPrevFocusPane(t *testing.T) {
 
 func TestActionsForContact(t *testing.T) {
 	acts := model.ActionsFor(model.KindContact)
-	if len(acts) < 2 {
-		t.Fatalf("expected view+delete, got %d", len(acts))
+	if len(acts) != 1 || acts[0].ID != model.ActionDelete {
+		t.Fatalf("expected delete only, got %v", acts)
 	}
 }
