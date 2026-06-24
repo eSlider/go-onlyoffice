@@ -9,7 +9,7 @@ import (
 func TestNavTreeHasExpectedRoots(t *testing.T) {
 	tree := model.DefaultNavTree()
 	roots := tree.RootLabels()
-	want := []string{"Projects", "Calendar", "CRM", "Mail", "Users"}
+	want := []string{"Projects", "Tasks", "By project", "Calendar", "CRM", "Mail", "Users"}
 	if len(roots) != len(want) {
 		t.Fatalf("roots=%v want %v", roots, want)
 	}
@@ -22,39 +22,76 @@ func TestNavTreeHasExpectedRoots(t *testing.T) {
 
 func TestNavExpandCollapse(t *testing.T) {
 	tree := model.DefaultNavTree()
-	if !tree.IsExpandable(0) {
-		t.Fatal("Projects should be expandable")
+	var crm int = -1
+	for i := 0; i < tree.VisibleCount(); i++ {
+		n, ok := tree.NodeAtVisible(i)
+		if ok && n.Label == "CRM" {
+			crm = i
+			break
+		}
 	}
-	tree.ToggleExpand(0)
-	if !tree.IsExpanded(0) {
-		t.Fatal("Projects should expand")
+	if crm < 0 {
+		t.Fatal("CRM node not found")
 	}
-	tree.ToggleExpand(0)
-	if tree.IsExpanded(0) {
-		t.Fatal("Projects should collapse")
+	if !tree.IsExpandable(crm) {
+		t.Fatal("CRM should be expandable")
+	}
+	tree.ToggleExpand(crm)
+	if !tree.IsExpanded(crm) {
+		t.Fatal("CRM should expand")
+	}
+	tree.ToggleExpand(crm)
+	if tree.IsExpanded(crm) {
+		t.Fatal("CRM should collapse")
 	}
 }
 
-func TestNavLeafReturnsListSpec(t *testing.T) {
+func TestNavCalendarLeafReturnsListSpec(t *testing.T) {
 	tree := model.DefaultNavTree()
-	tree.ToggleExpand(0) // Projects
-	tree.ToggleExpand(1) // Browse
-	// Find "All projects" leaf cursor
 	var found int = -1
 	for i := 0; i < tree.VisibleCount(); i++ {
 		n, ok := tree.NodeAtVisible(i)
-		if ok && n.List != nil && n.List.Subject == model.SubjectProjects {
+		if ok && n.Label == "Calendar" {
 			found = i
 			break
 		}
 	}
 	if found < 0 {
-		t.Fatal("all projects leaf not found")
+		t.Fatal("Calendar node not found")
 	}
 	tree.SetCursor(found)
 	spec, ok := tree.CurrentListSpec()
-	if !ok || spec.Subject != model.SubjectProjects {
+	if !ok || spec.Subject != model.SubjectCalendar {
 		t.Fatalf("spec=%v ok=%v", spec, ok)
+	}
+}
+
+func TestNavProjectsLeafReturnsListSpec(t *testing.T) {
+	tree := model.DefaultNavTree()
+	tree.SetCursor(0)
+	spec, ok := tree.CurrentListSpec()
+	if !ok || spec.Subject != model.SubjectProjects {
+		t.Fatalf("projects spec=%v ok=%v", spec, ok)
+	}
+}
+
+func TestNavTasksLeafReturnsListSpec(t *testing.T) {
+	tree := model.DefaultNavTree()
+	var found int = -1
+	for i := 0; i < tree.VisibleCount(); i++ {
+		n, ok := tree.NodeAtVisible(i)
+		if ok && n.Label == "Tasks" {
+			found = i
+			break
+		}
+	}
+	if found < 0 {
+		t.Fatal("Tasks node not found")
+	}
+	tree.SetCursor(found)
+	spec, ok := tree.CurrentListSpec()
+	if !ok || spec.Subject != model.SubjectTasks {
+		t.Fatalf("tasks spec=%v ok=%v", spec, ok)
 	}
 }
 
@@ -64,6 +101,41 @@ func TestPrevFocusPane(t *testing.T) {
 	}
 	if got := model.PrevFocusPane(model.FocusMenu); got != model.FocusPreview {
 		t.Fatalf("got %v", got)
+	}
+}
+
+func TestNavFilterByLabel(t *testing.T) {
+	tree := model.DefaultNavTree()
+	tree.SetFilter("inbox")
+	found := false
+	for i := 0; i < tree.VisibleCount(); i++ {
+		n, ok := tree.NodeAtVisible(i)
+		if ok && n.Label == "Inbox" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("Inbox should remain visible when filtering mail")
+	}
+	for i := 0; i < tree.VisibleCount(); i++ {
+		n, ok := tree.NodeAtVisible(i)
+		if ok && n.Label == "Calendar" {
+			t.Fatal("Calendar should be hidden when filtering inbox")
+		}
+	}
+}
+
+func TestNavClearFilterRestoresTree(t *testing.T) {
+	tree := model.DefaultNavTree()
+	before := tree.VisibleCount()
+	tree.SetFilter("zzz-no-match")
+	if tree.VisibleCount() >= before {
+		t.Fatalf("filter should shrink visible nodes")
+	}
+	tree.ClearFilter()
+	if tree.VisibleCount() != before {
+		t.Fatalf("clear filter should restore visible count")
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/eslider/go-onlyoffice/cmd/office/model"
+	"github.com/mattn/go-runewidth"
 )
 
 func sampleItems() []model.Item {
@@ -32,7 +33,7 @@ func TestDataTableMoveColScrolls(t *testing.T) {
 	items[0] = model.Item{ID: "1", Title: "One", Raw: map[string]any{
 		"alpha": "a", "beta": "b", "gamma": "c", "delta": "d",
 	}}
-	tbl.SetData(model.ListSpec{Subject: model.SubjectTasks}, items)
+	tbl.SetData(model.ListSpec{Subject: model.SubjectContacts}, items)
 	last := len(tbl.columns) - 1
 	tbl.cursorCol = last
 	tbl.ensureColVisible()
@@ -85,6 +86,55 @@ func TestDistributeColumnWidthsFillsTotal(t *testing.T) {
 	}
 	if w[2] <= 20 {
 		t.Fatalf("title should expand, got %d", w[2])
+	}
+}
+
+func TestTruncateCellText(t *testing.T) {
+	long := strings.Repeat("x", 40)
+	got := truncateCellText(long, 10)
+	if runewidth.StringWidth(got) > 10 {
+		t.Fatalf("truncated width=%d want <=10", runewidth.StringWidth(got))
+	}
+	if !strings.HasSuffix(got, "...") {
+		t.Fatalf("expected ellipsis suffix, got %q", got)
+	}
+}
+
+func TestDataTableTruncatesNonSelectedRows(t *testing.T) {
+	long := strings.Repeat("A", 60)
+	items := []model.Item{
+		{ID: "1", Title: "Short"},
+		{ID: "2", Title: long},
+	}
+	tbl := newDataTable()
+	tbl.SetSize(50, 10)
+	tbl.SetData(model.ListSpec{Subject: model.SubjectTasks}, items)
+	tbl.cursorRow = 0
+
+	if strings.Contains(tbl.renderRow(1), long) {
+		t.Fatal("non-cursor row should truncate long title")
+	}
+
+	tbl.cursorRow = 1
+	if !strings.Contains(tbl.renderRow(1), long) {
+		t.Fatal("cursor row should show full title")
+	}
+}
+
+func TestDataTableShowsFullTextWhenSpaceSelected(t *testing.T) {
+	long := strings.Repeat("B", 60)
+	items := []model.Item{
+		{ID: "1", Title: "Short"},
+		{ID: "2", Title: long, Selected: true},
+	}
+	tbl := newDataTable()
+	tbl.SetSize(50, 10)
+	tbl.SetData(model.ListSpec{Subject: model.SubjectTasks}, items)
+	tbl.cursorRow = 0
+
+	rowSelected := tbl.renderRow(1)
+	if !strings.Contains(rowSelected, long) {
+		t.Fatal("space-selected row should show full title")
 	}
 }
 

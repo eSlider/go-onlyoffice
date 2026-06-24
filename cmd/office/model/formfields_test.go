@@ -14,6 +14,9 @@ func TestIsDocumentKind(t *testing.T) {
 	if !IsDocumentKind(KindFile) {
 		t.Fatal("file should be document")
 	}
+	if !IsDocumentKind(KindMail) {
+		t.Fatal("mail should be document preview")
+	}
 	if IsDocumentKind(KindTask) {
 		t.Fatal("task should be form")
 	}

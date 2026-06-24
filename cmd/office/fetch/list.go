@@ -6,11 +6,13 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"time"
 
 	onlyoffice "github.com/eslider/go-onlyoffice"
 	"github.com/eslider/go-onlyoffice/cmd/office/model"
 )
+
+// MailListPageSize is how many messages each infinite-scroll fetch loads.
+const MailListPageSize = 25
 
 // Loader fetches list items for a menu subject using the OnlyOffice client.
 type Loader struct {
@@ -30,10 +32,12 @@ func (l *Loader) List(ctx context.Context, spec model.ListSpec) ([]model.Item, e
 			return l.listTasksForProject(ctx, spec.ProjectID)
 		}
 		return l.listTasks(ctx)
+	case model.SubjectCalendar:
+		return l.ListCalendar(ctx)
 	case model.SubjectCalendars:
-		return l.listCalendars(ctx)
+		return l.ListCalendar(ctx)
 	case model.SubjectEvents:
-		return l.listEvents(ctx)
+		return l.ListCalendar(ctx)
 	case model.SubjectContacts:
 		return l.listContacts(ctx, nil)
 	case model.SubjectPersons:
@@ -49,15 +53,15 @@ func (l *Loader) List(ctx context.Context, spec model.ListSpec) ([]model.Item, e
 	case model.SubjectCRMTasks:
 		return l.listCRMTasks(ctx)
 	case model.SubjectMailInbox:
-		return l.listMail(ctx, onlyoffice.MailFolderInbox)
+		return l.listMail(ctx, onlyoffice.MailFolderInbox, 0)
 	case model.SubjectMailSent:
-		return l.listMail(ctx, onlyoffice.MailFolderSent)
+		return l.listMail(ctx, onlyoffice.MailFolderSent, 0)
 	case model.SubjectMailDrafts:
-		return l.listMail(ctx, onlyoffice.MailFolderDrafts)
+		return l.listMail(ctx, onlyoffice.MailFolderDrafts, 0)
 	case model.SubjectMailTrash:
-		return l.listMail(ctx, onlyoffice.MailFolderTrash)
+		return l.listMail(ctx, onlyoffice.MailFolderTrash, 0)
 	case model.SubjectMailSpam:
-		return l.listMail(ctx, onlyoffice.MailFolderSpam)
+		return l.listMail(ctx, onlyoffice.MailFolderSpam, 0)
 	case model.SubjectUsers:
 		return l.listUsers(ctx)
 	case model.SubjectProjectFiles:
@@ -260,6 +264,9 @@ func (l *Loader) listProjects(ctx context.Context) ([]model.Item, error) {
 		if p.ParticipantCount != nil {
 			raw["participantCount"] = *p.ParticipantCount
 		}
+		if p.Status != nil {
+			raw["status"] = *p.Status
+		}
 		items[i] = model.Item{
 			ID: id, Title: title, Kind: model.KindProject, Raw: raw,
 		}
@@ -273,24 +280,6 @@ func (l *Loader) listTasks(ctx context.Context) ([]model.Item, error) {
 		return nil, err
 	}
 	return ItemsFromMaps(rows, model.KindTask, TaskItemFields), nil
-}
-
-func (l *Loader) listCalendars(ctx context.Context) ([]model.Item, error) {
-	rows, err := l.Client.ListCalendars(ctx, "", "")
-	if err != nil {
-		return nil, err
-	}
-	return ItemsFromMaps(rows, model.KindCalendar, FieldMap{IDKey: "objectId", TitleKey: "title"}), nil
-}
-
-func (l *Loader) listEvents(ctx context.Context) ([]model.Item, error) {
-	start := time.Now().Format("2006-01-02")
-	end := time.Now().AddDate(0, 0, 7).Format("2006-01-02")
-	rows, err := l.Client.ListEvents(ctx, start, end)
-	if err != nil {
-		return nil, err
-	}
-	return ItemsFromMaps(rows, model.KindEvent, FieldMap{IDKey: "objectId", TitleKey: "title", SubtitleKey: "start"}), nil
 }
 
 func (l *Loader) listContacts(ctx context.Context, companyOnly *bool) ([]model.Item, error) {
@@ -335,12 +324,42 @@ func (l *Loader) listCRMTasks(ctx context.Context) ([]model.Item, error) {
 	return ItemsFromMaps(rows, model.KindCRMTask, TaskItemFields), nil
 }
 
-func (l *Loader) listMail(ctx context.Context, folder int) ([]model.Item, error) {
-	rows, err := l.Client.ListMailMessages(ctx, onlyoffice.MailMessagesFilter{Folder: folder, Count: 50})
+func (l *Loader) listMail(ctx context.Context, folder int, startIndex int) ([]model.Item, error) {
+	rows, err := l.Client.ListMailMessages(ctx, onlyoffice.MailMessagesFilter{
+		Folder:     folder,
+		Count:      MailListPageSize,
+		StartIndex: startIndex,
+	})
 	if err != nil {
 		return nil, err
 	}
 	return ItemsFromMaps(rows, model.KindMail, MailItemFields), nil
+}
+
+// ListMailMore loads the next page of messages for an active mail folder list.
+func (l *Loader) ListMailMore(ctx context.Context, spec model.ListSpec, startIndex int) ([]model.Item, error) {
+	folder, ok := mailFolderForSubject(spec.Subject)
+	if !ok {
+		return nil, fmt.Errorf("fetch: %q is not a mail folder", spec.Subject)
+	}
+	return l.listMail(ctx, folder, startIndex)
+}
+
+func mailFolderForSubject(subject model.Subject) (int, bool) {
+	switch subject {
+	case model.SubjectMailInbox:
+		return onlyoffice.MailFolderInbox, true
+	case model.SubjectMailSent:
+		return onlyoffice.MailFolderSent, true
+	case model.SubjectMailDrafts:
+		return onlyoffice.MailFolderDrafts, true
+	case model.SubjectMailTrash:
+		return onlyoffice.MailFolderTrash, true
+	case model.SubjectMailSpam:
+		return onlyoffice.MailFolderSpam, true
+	default:
+		return 0, false
+	}
 }
 
 func (l *Loader) listUsers(ctx context.Context) ([]model.Item, error) {

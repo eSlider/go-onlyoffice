@@ -11,7 +11,7 @@ func (m *Model) scrollFocusedPane(key string) bool {
 		return scrollViewport(&m.menuVP, key)
 	case model.FocusList:
 		switch key {
-		case "pgdown", "pgdn", "f", "ctrl+d":
+		case "pgdown", "pgdn", "ctrl+d":
 			m.listTable.PageScroll(1)
 			return true
 		case "pgup", "b", "ctrl+u":
@@ -20,10 +20,10 @@ func (m *Model) scrollFocusedPane(key string) bool {
 		}
 		return false
 	case model.FocusPreview:
-		if m.detail.Zone() != detailZoneContent || m.detail.mode != detailDocument {
+		if m.detail.Zone() != detailZoneContent {
 			return false
 		}
-		return scrollViewport(&m.detail.docVP, key)
+		return m.detail.ScrollDocument(key)
 	default:
 		return false
 	}
@@ -50,7 +50,13 @@ func (m *Model) paneInnerWidth(outer int) int {
 
 func scrollViewport(vp *viewport.Model, key string) bool {
 	switch key {
-	case "pgdown", "pgdn", "f", "ctrl+d":
+	case "up", "k":
+		vp.LineUp(1)
+		return true
+	case "down", "j":
+		vp.LineDown(1)
+		return true
+	case "pgdown", "pgdn", "ctrl+d":
 		vp.ViewDown()
 		return true
 	case "pgup", "b", "ctrl+u":

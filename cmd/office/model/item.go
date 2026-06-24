@@ -39,7 +39,18 @@ const (
 	SubjectProjectFiles  Subject = "project_files"
 	SubjectTaskFiles     Subject = "task_files"
 	SubjectUsers         Subject = "users"
+	SubjectCalendar      Subject = "calendar"
 )
+
+// SubjectIsMail reports whether a list subject loads mailbox messages.
+func SubjectIsMail(s Subject) bool {
+	switch s {
+	case SubjectMailInbox, SubjectMailSent, SubjectMailDrafts, SubjectMailTrash, SubjectMailSpam:
+		return true
+	default:
+		return false
+	}
+}
 
 // FocusPane is which column has keyboard focus.
 type FocusPane int
