@@ -13,6 +13,7 @@
 //	oo cases         list | create | delete | member-add
 //	oo crm-tasks     list | create | delete | categories
 //	oo crm           cleanup
+//	oo mails         accounts | folders | list | get | delete
 //	oo applications  sync
 //
 // Every list supports `--output/-o json|table` (table is the default).
