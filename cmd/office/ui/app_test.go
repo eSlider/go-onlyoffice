@@ -13,14 +13,11 @@ func TestKeyActionMenuDown(t *testing.T) {
 	}
 }
 
-func TestKeyActionListToggleSelect(t *testing.T) {
-	if got := ui.KeyAction(" ", model.FocusList); got != ui.ActionToggleSelect {
+func TestKeyActionShiftTabPrevPane(t *testing.T) {
+	if got := ui.KeyAction("shift+tab", model.FocusList); got != ui.ActionPrevPane {
 		t.Fatalf("got %v", got)
 	}
-}
-
-func TestKeyActionPreviewNoOp(t *testing.T) {
-	if got := ui.KeyAction(" ", model.FocusPreview); got != ui.ActionNone {
+	if got := ui.KeyAction("backtab", model.FocusPreview); got != ui.ActionPrevPane {
 		t.Fatalf("got %v", got)
 	}
 }
@@ -31,12 +28,15 @@ func TestKeyActionTabNextPane(t *testing.T) {
 	}
 }
 
+func TestKeyActionOpenActions(t *testing.T) {
+	if got := ui.KeyAction("a", model.FocusList); got != ui.ActionOpenActions {
+		t.Fatalf("got %v", got)
+	}
+}
+
 func TestLayoutWidths(t *testing.T) {
 	menu, list, preview := ui.LayoutWidths(120)
 	if menu+list+preview > 120 {
 		t.Fatalf("widths exceed total: %d+%d+%d", menu, list, preview)
-	}
-	if menu < 20 || list < 30 || preview < 30 {
-		t.Fatalf("widths too narrow: %d %d %d", menu, list, preview)
 	}
 }

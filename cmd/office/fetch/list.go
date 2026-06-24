@@ -3,6 +3,9 @@ package fetch
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
 	"time"
 
 	onlyoffice "github.com/eslider/go-onlyoffice"
@@ -14,15 +17,18 @@ type Loader struct {
 	Client *onlyoffice.Client
 }
 
-// List returns items for the given subject.
-func (l *Loader) List(ctx context.Context, subject model.Subject) ([]model.Item, error) {
+// List returns items for the given list spec (nav leaf).
+func (l *Loader) List(ctx context.Context, spec model.ListSpec) ([]model.Item, error) {
 	if l == nil || l.Client == nil {
 		return nil, fmt.Errorf("fetch: client is nil")
 	}
-	switch subject {
+	switch spec.Subject {
 	case model.SubjectProjects:
 		return l.listProjects(ctx)
 	case model.SubjectTasks:
+		if spec.ProjectID != "" {
+			return l.listTasksForProject(ctx, spec.ProjectID)
+		}
 		return l.listTasks(ctx)
 	case model.SubjectCalendars:
 		return l.listCalendars(ctx)
@@ -55,12 +61,27 @@ func (l *Loader) List(ctx context.Context, subject model.Subject) ([]model.Item,
 	case model.SubjectUsers:
 		return l.listUsers(ctx)
 	case model.SubjectProjectFiles:
-		return l.listProjectFiles(ctx)
+		pid := spec.ProjectID
+		if pid == "" {
+			pid = onlyoffice.GetEnvironmentDefaults().ProjectID
+		}
+		if pid == "" {
+			return nil, fmt.Errorf("set ONLYOFFICE_PROJECT_ID or pick a project in the tree")
+		}
+		return l.listProjectFiles(ctx, pid)
 	case model.SubjectTaskFiles:
-		return nil, fmt.Errorf("select a task in Tasks first (task files need task id)")
+		if spec.TaskID == "" {
+			return nil, fmt.Errorf("pick a task under Projects in the tree")
+		}
+		return l.listTaskFiles(ctx, spec.TaskID)
 	default:
-		return nil, fmt.Errorf("unsupported subject %q", subject)
+		return nil, fmt.Errorf("unsupported subject %q", spec.Subject)
 	}
+}
+
+// LoadProjectsForNav returns projects to inject as dynamic tree nodes.
+func (l *Loader) LoadProjectsForNav(ctx context.Context) ([]model.Item, error) {
+	return l.listProjects(ctx)
 }
 
 // Detail fetches full record data for preview when list row is insufficient.
@@ -72,7 +93,7 @@ func (l *Loader) Detail(ctx context.Context, item model.Item) (map[string]any, e
 		return l.Client.GetContact(ctx, item.ID)
 	case model.KindMail:
 		return l.Client.GetMailMessage(ctx, item.ID)
-	case model.KindTask:
+	case model.KindTask, model.KindCRMTask:
 		return l.Client.GetTaskByID(ctx, item.ID)
 	case model.KindProject:
 		return l.Client.GetProjectByID(ctx, item.ID)
@@ -82,6 +103,130 @@ func (l *Loader) Detail(ctx context.Context, item model.Item) (map[string]any, e
 		}
 		return map[string]any{"id": item.ID, "title": item.Title}, nil
 	}
+}
+
+// Execute runs a user-selected action on an item.
+func (l *Loader) Execute(ctx context.Context, action model.ActionID, item model.Item, destPath string) (string, error) {
+	switch action {
+	case model.ActionView:
+		return "view", nil
+	case model.ActionDelete:
+		return l.executeDelete(ctx, item)
+	case model.ActionDownload:
+		return l.executeDownload(ctx, item, destPath)
+	default:
+		return "", fmt.Errorf("unsupported action %q", action)
+	}
+}
+
+func (l *Loader) executeDelete(ctx context.Context, item model.Item) (string, error) {
+	switch item.Kind {
+	case model.KindProject:
+		id, err := strconv.Atoi(item.ID)
+		if err != nil {
+			return "", err
+		}
+		if _, err := l.Client.DeleteProject(id); err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("Deleted project %s", item.Title), nil
+	case model.KindTask:
+		if _, err := l.Client.DeleteTask(ctx, item.ID); err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("Deleted task %s", item.Title), nil
+	case model.KindContact:
+		if _, err := l.Client.DeleteContact(ctx, item.ID); err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("Deleted contact %s", item.Title), nil
+	case model.KindOpportunity:
+		if _, err := l.Client.DeleteOpportunity(ctx, item.ID); err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("Deleted deal %s", item.Title), nil
+	case model.KindCase:
+		if _, err := l.Client.DeleteCase(ctx, item.ID); err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("Deleted case %s", item.Title), nil
+	case model.KindCRMTask:
+		if _, err := l.Client.DeleteCRMTask(ctx, item.ID); err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("Deleted CRM task %s", item.Title), nil
+	case model.KindMail:
+		id, err := strconv.Atoi(item.ID)
+		if err != nil {
+			return "", err
+		}
+		if _, err := l.Client.RemoveMailMessages(ctx, id); err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("Deleted message %s", item.Title), nil
+	case model.KindFile:
+		id, err := strconv.Atoi(item.ID)
+		if err != nil {
+			return "", err
+		}
+		if err := l.Client.DeleteFiles(ctx, []int{id}); err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("Deleted file %s", item.Title), nil
+	default:
+		return "", fmt.Errorf("delete not supported for %s", item.Kind)
+	}
+}
+
+func (l *Loader) executeDownload(ctx context.Context, item model.Item, destPath string) (string, error) {
+	if item.Kind != model.KindFile {
+		return "", fmt.Errorf("download only for files")
+	}
+	if destPath == "" {
+		destPath = filepath.Join(os.TempDir(), "office", item.Title)
+	}
+	if err := os.MkdirAll(filepath.Dir(destPath), 0o755); err != nil {
+		return "", err
+	}
+	f, err := os.Create(destPath)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	if _, err := l.Client.DownloadFile(ctx, item.ID, f); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("Downloaded to %s", destPath), nil
+}
+
+func (l *Loader) listTasksForProject(ctx context.Context, projectID string) ([]model.Item, error) {
+	rows, err := l.Client.ListTasks(ctx, projectID, "")
+	if err != nil {
+		return nil, err
+	}
+	return ItemsFromMaps(rows, model.KindTask, TaskItemFields), nil
+}
+
+func (l *Loader) listTaskFiles(ctx context.Context, taskID string) ([]model.Item, error) {
+	files, err := l.Client.GetTaskFiles(ctx, taskID)
+	if err != nil {
+		return nil, err
+	}
+	var items []model.Item
+	for _, f := range files {
+		id, title := "", ""
+		if f.ID != nil {
+			id = f.ID.String()
+		}
+		if f.Title != nil {
+			title = *f.Title
+		}
+		items = append(items, model.Item{
+			ID: id, Title: title, Kind: model.KindFile,
+			Raw: map[string]any{"id": id, "title": title},
+		})
+	}
+	return items, nil
 }
 
 func (l *Loader) listProjects(ctx context.Context) ([]model.Item, error) {
@@ -214,14 +359,8 @@ func (l *Loader) listUsers(ctx context.Context) ([]model.Item, error) {
 	return items, nil
 }
 
-func (l *Loader) listProjectFiles(ctx context.Context) ([]model.Item, error) {
-	def := l.Client // need project id from defaults
-	_ = def
-	pid := onlyoffice.GetEnvironmentDefaults().ProjectID
-	if pid == "" {
-		return nil, fmt.Errorf("set ONLYOFFICE_PROJECT_ID for project files")
-	}
-	resp, err := l.Client.GetProjectFiles(ctx, pid)
+func (l *Loader) listProjectFiles(ctx context.Context, projectID string) ([]model.Item, error) {
+	resp, err := l.Client.GetProjectFiles(ctx, projectID)
 	if err != nil {
 		return nil, err
 	}
