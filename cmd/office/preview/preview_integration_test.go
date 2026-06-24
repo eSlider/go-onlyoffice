@@ -151,6 +151,31 @@ func TestIntegrationPreviewTaskFromAPI(t *testing.T) {
 	}
 }
 
+func TestIntegrationPreviewFileFromAPI(t *testing.T) {
+	skipWithoutLiveAPI(t)
+	if os.Getenv("ONLYOFFICE_PROJECT_ID") == "" {
+		t.Skip("ONLYOFFICE_PROJECT_ID not set")
+	}
+	loader, ctx := liveLoader(t)
+	items, err := loader.List(ctx, model.ListSpec{Subject: model.SubjectProjectFiles})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) == 0 {
+		t.Skip("no project files")
+	}
+	md, err := loader.PreviewMarkdown(ctx, items[0])
+	if err != nil {
+		t.Fatalf("PreviewMarkdown: %v", err)
+	}
+	if md == "" {
+		t.Fatal("empty preview")
+	}
+	if !strings.Contains(md, items[0].Title) && !strings.Contains(md, "|") && !strings.Contains(md, "```") {
+		t.Fatalf("unexpected file preview for %q:\n%s", items[0].Title, md)
+	}
+}
+
 func TestIntegrationPreviewCSVFromDownloadedFile(t *testing.T) {
 	skipWithoutLiveAPI(t)
 	if os.Getenv("ONLYOFFICE_PROJECT_ID") == "" {

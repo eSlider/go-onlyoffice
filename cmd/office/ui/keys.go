@@ -9,14 +9,18 @@ const (
 	ActionNone Action = iota
 	ActionMoveUp
 	ActionMoveDown
+	ActionMoveLeft
+	ActionMoveRight
+	ActionSort
 	ActionToggleSelect
-	ActionOpenPreview
-	ActionOpenActions
+	ActionFocusDetail
+	ActionToggleMenuPane
+	ActionToggleListPane
+	ActionToggleDetailPane
 	ActionNextPane
 	ActionPrevPane
 	ActionRefresh
 	ActionQuit
-	ActionOpenVex
 )
 
 // KeyAction maps a key string and focused pane to an action.
@@ -25,53 +29,49 @@ func KeyAction(key string, pane model.FocusPane) Action {
 	case "q", "ctrl+c":
 		return ActionQuit
 	case "tab":
-		return ActionNextPane
+		if pane != model.FocusPreview {
+			return ActionNextPane
+		}
 	case "shift+tab", "backtab":
-		return ActionPrevPane
+		if pane != model.FocusPreview {
+			return ActionPrevPane
+		}
 	case "r":
 		return ActionRefresh
 	case "up", "k":
 		return ActionMoveUp
 	case "down", "j":
 		return ActionMoveDown
+	case "s":
+		if pane == model.FocusList {
+			return ActionSort
+		}
+	case "left", "h":
+		return ActionMoveLeft
+	case "right", "l":
+		return ActionMoveRight
 	case " ":
 		if pane == model.FocusList {
 			return ActionToggleSelect
 		}
-	case "a":
+	case "v", "p":
 		if pane == model.FocusList {
-			return ActionOpenActions
+			return ActionFocusDetail
 		}
-	case "enter":
-		if pane == model.FocusList {
-			return ActionOpenPreview
-		}
-	case "v":
-		if pane == model.FocusList {
-			return ActionOpenVex
-		}
+	case "alt+1":
+		return ActionToggleMenuPane
+	case "alt+2":
+		return ActionToggleListPane
+	case "alt+3":
+		return ActionToggleDetailPane
 	}
 	return ActionNone
 }
 
-// LayoutWidths splits total terminal width into menu, list, preview columns.
-func LayoutWidths(total int) (menu, list, preview int) {
-	if total < 80 {
-		total = 80
-	}
-	menu = total / 5
-	if menu < 22 {
-		menu = 22
-	}
-	preview = total / 3
-	if preview < 28 {
-		preview = 28
-	}
-	list = total - menu - preview - 2
-	if list < 24 {
-		list = 24
-	}
-	return menu, list, preview
+// LayoutWidthsLegacy is kept for tests that expect the old signature.
+func LayoutWidthsLegacy(total int) (menu, list, preview int) {
+	pw := LayoutWidths(total, defaultPaneVisibility())
+	return pw.Menu, pw.List, pw.Detail
 }
 
 // ResolveMoveUp returns the action for upward navigation keys.
