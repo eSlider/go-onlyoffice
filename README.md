@@ -575,12 +575,16 @@ office
 
 | Key | Action |
 |---|---|
-| `Tab` | Switch pane (menu → list → preview) |
-| `↑↓` / `j` / `k` | Navigate |
-| `Space` / `Enter` | Toggle selection on list row |
-| `Enter` | Load preview for focused row |
+| `Tab` | Next pane (menu → list → preview) |
+| `Shift+Tab` | Previous pane |
+| `↑↓` / `j` / `k` | Navigate / scroll within focused pane |
+| `Enter` / `→` | Expand tree branch or open leaf list |
+| `Space` | Toggle multi-select on list row |
+| `Enter` / `a` | Action menu (view, delete, download, …) |
 | `r` | Refresh current list |
 | `q` | Quit |
+
+Navigate the **tree** on the left: expand modules (`▸`/`▾`), drill to a **leaf** (marked `•`) — the center list loads only at the last level. Under **Projects → By project**, live projects appear as subnodes with **Tasks** and **Files** leaves.
 
 Optional env for DOCX preview via Document Server (see [`.env.example`](.env.example)):
 

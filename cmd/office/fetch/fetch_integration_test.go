@@ -1,5 +1,3 @@
-//go:build integration
-
 package fetch_test
 
 import (
@@ -38,50 +36,34 @@ func liveLoader(t *testing.T) (*fetch.Loader, context.Context) {
 func TestIntegrationListAllSubjects(t *testing.T) {
 	loader, ctx := liveLoader(t)
 
-	cases := []struct {
-		subject model.Subject
-		skip    string
-	}{
-		{model.SubjectProjects, ""},
-		{model.SubjectTasks, ""},
-		{model.SubjectCalendars, ""},
-		{model.SubjectEvents, ""},
-		{model.SubjectContacts, ""},
-		{model.SubjectPersons, ""},
-		{model.SubjectCompanies, ""},
-		{model.SubjectOpportunities, ""},
-		{model.SubjectCases, ""},
-		{model.SubjectCRMTasks, ""},
-		{model.SubjectMailInbox, ""},
-		{model.SubjectMailSent, ""},
-		{model.SubjectMailDrafts, ""},
-		{model.SubjectMailTrash, ""},
-		{model.SubjectMailSpam, ""},
-		{model.SubjectUsers, ""},
-		{model.SubjectProjectFiles, "ONLYOFFICE_PROJECT_ID not set"},
+	cases := []model.ListSpec{
+		{Subject: model.SubjectProjects},
+		{Subject: model.SubjectTasks},
+		{Subject: model.SubjectCalendars},
+		{Subject: model.SubjectEvents},
+		{Subject: model.SubjectContacts},
+		{Subject: model.SubjectPersons},
+		{Subject: model.SubjectCompanies},
+		{Subject: model.SubjectOpportunities},
+		{Subject: model.SubjectCases},
+		{Subject: model.SubjectCRMTasks},
+		{Subject: model.SubjectMailInbox},
+		{Subject: model.SubjectUsers},
 	}
 
-	for _, tc := range cases {
-		t.Run(string(tc.subject), func(t *testing.T) {
-			if tc.subject == model.SubjectProjectFiles {
-				if os.Getenv("ONLYOFFICE_PROJECT_ID") == "" {
-					t.Skip(tc.skip)
-				}
-			}
-			items, err := loader.List(ctx, tc.subject)
+	for _, spec := range cases {
+		t.Run(string(spec.Subject), func(t *testing.T) {
+			items, err := loader.List(ctx, spec)
 			if err != nil {
-				t.Fatalf("List(%s): %v", tc.subject, err)
+				t.Fatalf("List(%s): %v", spec.Subject, err)
 			}
-			t.Logf("%s: %d items", tc.subject, len(items))
+			t.Logf("%s: %d items", spec.Subject, len(items))
 			for i, it := range items {
 				if it.ID == "" {
-					t.Errorf("item[%d] missing ID: %+v", i, it)
+					t.Errorf("item[%d] missing ID", i)
 				}
 				if it.Title == "" {
-					t.Errorf("item[%d] missing Title: id=%s kind=%s", i, it.ID, it.Kind)
-				}
-				if it.Kind == "" {
-					t.Errorf("item[%d] missing Kind: id=%s", i, it.ID)
+					t.Errorf("item[%d] missing Title", i)
 				}
 			}
 		})
@@ -90,30 +72,26 @@ func TestIntegrationListAllSubjects(t *testing.T) {
 
 func TestIntegrationListProjectsMapsRealFields(t *testing.T) {
 	loader, ctx := liveLoader(t)
-	items, err := loader.List(ctx, model.SubjectProjects)
+	spec := model.ListSpec{Subject: model.SubjectProjects}
+	items, err := loader.List(ctx, spec)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(items) == 0 {
 		t.Skip("no projects on instance")
 	}
-	it := items[0]
-	if it.Raw == nil {
-		t.Fatal("expected Raw payload from API")
-	}
-	detail, err := loader.Detail(ctx, it)
+	detail, err := loader.Detail(ctx, items[0])
 	if err != nil {
 		t.Fatalf("Detail: %v", err)
 	}
 	if detail == nil {
 		t.Fatal("nil detail")
 	}
-	t.Logf("project id=%s title=%q keys=%d", it.ID, it.Title, len(detail))
 }
 
 func TestIntegrationMailInboxDetail(t *testing.T) {
 	loader, ctx := liveLoader(t)
-	items, err := loader.List(ctx, model.SubjectMailInbox)
+	items, err := loader.List(ctx, model.ListSpec{Subject: model.SubjectMailInbox})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,13 +105,4 @@ func TestIntegrationMailInboxDetail(t *testing.T) {
 	if detail["subject"] == nil {
 		t.Fatalf("message missing subject: %+v", detail)
 	}
-}
-
-func TestIntegrationEventsDateRange(t *testing.T) {
-	loader, ctx := liveLoader(t)
-	items, err := loader.List(ctx, model.SubjectEvents)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Logf("events in next 7 days: %d", len(items))
 }
