@@ -42,5 +42,8 @@ jobs:
       - name: Build oo
         run: go build -trimpath -buildvcs=false -o /tmp/oo ./cmd/oo
 
+      - name: Build office
+        run: go build -trimpath -buildvcs=false -o /tmp/office ./cmd/office
+
       - name: Run tests
         run: go test -race -shuffle=on -count=1 ./...

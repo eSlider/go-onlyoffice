@@ -31,11 +31,39 @@ builds:
       - -X main.version={{.Version}}
       - -X main.commit={{.Commit}}
       - -X main.date={{.Date}}
+  - id: office
+    main: ./cmd/office
+    binary: office
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    flags:
+      - -trimpath
+      - -buildvcs=false
 
 archives:
   - id: oo
     ids: [oo]
     name_template: "oo_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - LICENSE
+      - README.md
+      - CHANGELOG.md
+  - id: office
+    ids: [office]
+    name_template: "office_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     format_overrides:
       - goos: windows
         formats: [zip]
@@ -82,14 +110,15 @@ release:
   prerelease: auto
   mode: replace
   header: |
-    ## `oo` {{ .Tag }}
+    ## Release {{ .Tag }}
 
     Install:
 
     ```sh
     go install github.com/eslider/go-onlyoffice/cmd/oo@{{ .Tag }}
+    go install github.com/eslider/go-onlyoffice/cmd/office@{{ .Tag }}
     ```
 
-    Or download a prebuilt binary below.
+    Or download prebuilt binaries below.
   footer: |
     **Full Changelog**: https://github.com/eSlider/go-onlyoffice/compare/{{ .PreviousTag }}...{{ .Tag }}

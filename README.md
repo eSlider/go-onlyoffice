@@ -536,11 +536,11 @@ company, _ := client.FindCompany(ctx, "ACME")
 client.AddSubtask(ctx, "4242", "Prepare CV")
 ```
 
-### oo (bundled command)
+### oo (bundled CLI)
 
 A ready-to-use [Cobra](https://github.com/spf13/cobra) CLI wrapping the
-library lives under `cmd/oo`. The command tree is **subject-based**, mirroring
-the [`tea`](https://gitea.com/gitea/tea) CLI:
+library lives under [`cmd/oo`](cmd/oo/). The command tree is **subject-based**,
+mirroring the [`tea`](https://gitea.com/gitea/tea) CLI:
 
 ```bash
 go install github.com/eslider/go-onlyoffice/cmd/oo@latest
@@ -560,7 +560,48 @@ oo opportunities stages
 oo cases list
 oo crm-tasks categories
 oo applications sync --path ./applications/2026 --apply
+```
 
+### office (TUI)
+
+Terminal UI for browsing OnlyOffice Workspace — module tree (left), selectable
+lists (center), and markdown preview (right). Uses the same `.env` credentials
+as `oo`. Lives under [`cmd/office`](cmd/office/).
+
+```bash
+go install github.com/eslider/go-onlyoffice/cmd/office@latest
+office
+```
+
+| Key | Action |
+|---|---|
+| `Tab` | Switch pane (menu → list → preview) |
+| `↑↓` / `j` / `k` | Navigate |
+| `Space` / `Enter` | Toggle selection on list row |
+| `Enter` | Load preview for focused row |
+| `r` | Refresh current list |
+| `q` | Quit |
+
+Optional env for DOCX preview via Document Server (see [`.env.example`](.env.example)):
+
+```bash
+ONLYOFFICE_DOCS_URL=https://docs.example.com
+ONLYOFFICE_DOCS_SECRET=…   # when JWT signing is enabled
+```
+
+Spreadsheet files: inline CSV/JSON preview in the right pane; install
+[`vex`](https://github.com/CodeOne45/vex-tui) on `PATH` for full-screen
+xlsx/csv viewing (`v` on a file row — coming in next iteration).
+
+Integration tests for list loaders:
+
+```bash
+go test -tags=integration ./cmd/office/fetch/...
+```
+
+**Project / task documents (`oo`):**
+
+```bash
 # Project Documents (files module)
 oo projects files list 33
 oo projects files upload 33 ./notes.md
@@ -606,6 +647,205 @@ Run `oo --help` or `oo <subject> --help` for the full command reference.
 > (`oo calendar events`, `oo tasks list`, `oo contacts list`,
 > `oo applications sync`). Flags on leaf commands are unchanged.
 
+## oo CLI use cases
+
+The `oo` binary is the day-to-day operator interface. It loads credentials from
+`.env` in the **current working directory** (copy from [`.env.example`](.env.example)):
+
+```bash
+cp .env.example .env
+# ONLYOFFICE_URL=https://office.example.com
+# ONLYOFFICE_USER=you@example.com
+# ONLYOFFICE_PASS=…
+
+go install github.com/eslider/go-onlyoffice/cmd/oo@latest
+oo whoami
+```
+
+Every list command accepts `-o table` (default) or `-o json` for scripting.
+
+### CRM cleanup after imports or sync drift
+
+**Problem:** Duplicate companies (`Acme` / `ACME GmbH`), persons created twice,
+the same email on a contact three times, deals titled ` @ 711media`, or the same
+HR contact linked to a deal twice.
+
+**One-shot fix** — runs every dedupe pass in order:
+
+```bash
+oo crm cleanup -o json
+```
+
+Steps inside `crm cleanup`:
+
+| Step | What it does |
+|------|----------------|
+| `companies` | Merge companies with the same normalized name (slogan variants like `Affirm` / `Affirm — Fraud Engineering` count as one) |
+| `persons` | Merge duplicate persons globally (same first+last) |
+| `company-persons` | Merge duplicate persons under each company |
+| `contact-info` | Remove duplicate email/phone/website rows |
+| `opportunity-members` | Drop duplicate contacts on the same deal |
+| `opportunities` | Merge duplicate deals by title |
+| `fix-titles` | Repair malformed titles (` @ Company` → `Company`) |
+
+**Targeted passes** when you only want one kind of fix:
+
+```bash
+# Duplicate company records
+oo companies dedupe
+
+# Same person entered twice under one employer
+oo companies dedupe-persons
+
+# Global person duplicates (same name, different ids)
+oo persons dedupe
+
+# Repeated email/phone rows on contacts
+oo contacts dedupe-info
+
+# Two deals with the same title
+oo opportunities dedupe
+
+# Same contact attached twice to one deal (common after applications sync)
+oo opportunities dedupe-members
+
+# Titles like " @ 711media" or extra whitespace
+oo opportunities fix-titles
+```
+
+**Deal grouping flag** — when the same role at the same company created
+separate deals (`Engineer @ Acme` vs `Engineer`):
+
+```bash
+oo opportunities dedupe --ignore-company-suffix
+oo crm cleanup --ignore-company-suffix
+```
+
+**Inspect before/after:**
+
+```bash
+oo opportunities list --count 200 | grep -i 711media
+oo contacts get 857 -o json
+oo crm cleanup -o json
+```
+
+### Job applications → CRM (`applications sync`)
+
+**Problem:** You keep CVs in a folder tree (`applications/2026/Acme/README.md`)
+and want companies, persons, deals, and history notes in OnlyOffice without
+re-typing.
+
+**Dry-run first** (default — prints what would happen, writes nothing):
+
+```bash
+oo applications sync --path ./applications/2026 --verbose
+```
+
+**Apply** when the preview looks right:
+
+```bash
+oo applications sync --path ./applications/2026 --apply --verbose
+```
+
+Each `README.md` is parsed for company, role, email, phone, LinkedIn, etc.
+The sync creates or finds contacts, opens a deal, adds members, and appends a
+history note. Re-running is safe: duplicate members and duplicate deal titles
+are skipped when already present.
+
+**After a large sync**, run CRM cleanup to collapse duplicates introduced by
+repeated runs or manual edits:
+
+```bash
+oo applications sync --path ./applications/2026 --apply
+oo crm cleanup -o json
+```
+
+### Workspace mail (`oo mails`)
+
+**Problem:** Mail lives in OnlyOffice Mail (`/addons/mail/#inbox`), bound to your
+portal account — not a separate archive service. You want to list, read, or
+remove messages from the shell.
+
+Uses the same `ONLYOFFICE_*` credentials as every other `oo` command.
+
+```bash
+# Which mailbox is linked?
+oo mails accounts
+
+# Folder counters (inbox unread, trash size, …)
+oo mails folders
+
+# Latest inbox messages (API returns 25 per page; --limit paginates automatically)
+oo mails list --folder inbox --limit 50
+
+# Page through older mail
+oo mails list --folder inbox --limit 100 --offset 100
+
+# Other folders
+oo mails list --folder sent --limit 20
+oo mails list --folder spam --limit 100
+
+# Read full message (subject, htmlBody, attachments metadata)
+oo mails get 5664 -o json | jq '{subject, from, to, date}'
+
+# Remove one or more messages (server moves to trash or deletes per Mail rules)
+oo mails delete 5664
+oo mails delete 5664 5663 5661
+```
+
+**Table output** splits the `from` header into `fromName` and `fromAddress`
+(e.g. `Bitfinex` + `no-reply@bitfinex.com`). **JSON output** returns the raw
+API payload.
+
+**Scripting example** — export today's inbox subjects:
+
+```bash
+oo mails list --folder inbox --limit 200 -o json \
+  | jq -r '.[] | "\(.id)\t\(.subject)"'
+```
+
+### Contacts, companies, and deals (everyday CRM)
+
+```bash
+# Search companies
+oo companies list --search acme
+
+# Create company + person with primary email
+oo companies create --name "Acme GmbH" --website https://acme.com
+oo persons create --first Jane --last Doe --email jane@acme.com --company-id 42
+
+# Attach email or LinkedIn to existing contact
+oo contacts info-add 42 --type Email --value jane@acme.com --primary
+
+# Pipeline overview
+oo opportunities list --count 100
+oo opportunities stages
+oo opportunities get 231 -o json
+```
+
+### Calendar and project ops
+
+```bash
+# Next week's events
+oo calendar events --start 2026-06-24 --end 2026-07-01
+
+# Schedule interview block
+oo calendar add "Technical interview" 2026-06-26T10:00:00Z 2026-06-26T11:00:00Z
+
+# Attach CV to a hiring task
+oo tasks files upload 208 ./cv.pdf
+oo projects files list 33
+```
+
+### Suggested maintenance cadence
+
+| When | Command |
+|------|---------|
+| After `applications sync --apply` | `oo crm cleanup` |
+| After bulk CSV import into CRM | `oo crm cleanup` |
+| Weekly inbox triage | `oo mails list --folder inbox --limit 100` |
+| Before exec reporting | `oo opportunities list` + `oo projects list` |
+
 ## Environment Variables
 
 | Variable | Description |
@@ -617,20 +857,7 @@ Run `oo --help` or `oo <subject> --help` for the full command reference.
 | `ONLYOFFICE_PROJECT_ID` | Default project id used when omitted (default `33`) |
 | `OO_URL`, `OO_USER`, `OO_PASS` | CLI-only produktor.io aliases mapped to `ONLYOFFICE_URL`, `ONLYOFFICE_USER`, `ONLYOFFICE_PASS` |
 
-### Workspace mail (`oo mails`)
-
-Uses the same OnlyOffice credentials as other `oo` commands. Talks to the
-built-in Mail addon (`/addons/mail`) via `/api/2.0/mail/*`:
-
-```bash
-oo mails accounts
-oo mails folders
-oo mails list --folder inbox --limit 20
-oo mails get 5664
-oo mails delete 5664
-```
-
-Folder names: `inbox`, `sent`, `drafts`, `trash`, `spam` (or numeric id).
+Mail, CRM cleanup, and applications sync are documented in [oo CLI use cases](#oo-cli-use-cases) above.
 
 ### CI / releases
 
@@ -638,9 +865,9 @@ GitHub Actions (pattern from [`eSlider/go-config`](https://github.com/eSlider/go
 
 | Workflow | Trigger | Purpose |
 |---|---|---|
-| `test.yml` | push / PR | `go vet`, unit tests, build `oo` |
+| `test.yml` | push / PR | `go vet`, unit tests, build `oo` + `office` |
 | `release-please.yml` | push to `main` | semver PR from conventional commits |
-| `release.yml` | tag `v*` | GoReleaser cross-platform `oo` binaries |
+| `release.yml` | tag `v*` | GoReleaser cross-platform `oo` + `office` binaries |
 
 Repo setting required once: **Settings → Actions → General → Allow GitHub Actions to create and approve pull requests**.
 
@@ -655,6 +882,7 @@ Merge the release-please PR to tag a version; GoReleaser publishes assets to [Gi
 | [crm](examples/crm/) | List contacts and opportunities, add company/deal/history note |
 | [subtasks](examples/subtasks/) | Create a parent task and attach subtasks |
 | [`cmd/oo`](cmd/oo/) | Full-featured CLI using all modules |
+| [`cmd/office`](cmd/office/) | Terminal UI — browse Workspace with markdown preview |
 
 ## Related Libraries
 
