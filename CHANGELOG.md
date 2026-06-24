@@ -4,6 +4,33 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0](https://github.com/eSlider/go-onlyoffice/compare/v0.3.2...v0.4.0) (2026-06-24)
+
+
+### ⚠ BREAKING CHANGES
+
+* **cli:** subject-based command tree (tea-style) + global --output flag
+* rename oo-cli → oo, split library by domain, relocate applications
+
+### Features
+
+* **cli:** subject-based command tree (tea-style) + global --output flag ([1e6d22f](https://github.com/eSlider/go-onlyoffice/commit/1e6d22f38dd7a70d4cf1b69ef0b8749b01fded1a))
+* **crm:** dedupe duplicates, fix deal titles, and add cleanup CLI ([c77519f](https://github.com/eSlider/go-onlyoffice/commit/c77519fac5ae9dffaad3f1f0ae722d969e62dde9))
+* **crm:** merge company slogan variants in dedupe grouping ([3eb649c](https://github.com/eSlider/go-onlyoffice/commit/3eb649c58bf489b221f90734e04f33063f736914))
+* **files:** project/task Documents API + oo projects|tasks files ([e03fd62](https://github.com/eSlider/go-onlyoffice/commit/e03fd6220012c73b110f1e0b02a12971174eb290))
+* **mails:** add Workspace mail CLI with pagination and parsed from fields ([1cb228e](https://github.com/eSlider/go-onlyoffice/commit/1cb228e5d83ab453660bbace5f936a77f9381fc2))
+* **office:** add Workspace TUI with shared bootstrap and test suite ([7358ff5](https://github.com/eSlider/go-onlyoffice/commit/7358ff5c326cdc873cb68b3f96d31155ecba1ee3))
+
+
+### Code Refactoring
+
+* rename oo-cli → oo, split library by domain, relocate applications ([cff8145](https://github.com/eSlider/go-onlyoffice/commit/cff8145f8c35656a77b7a36338428bf9be0eda0f))
+
+
+### Documentation
+
+* CHANGELOG 0.6.0, README, AGENTS.md, cmd/oo/main.go tree. ([e03fd62](https://github.com/eSlider/go-onlyoffice/commit/e03fd6220012c73b110f1e0b02a12971174eb290))
+
 ## [Unreleased]
 
 ### Added — `office` TUI
