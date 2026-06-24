@@ -24,7 +24,7 @@ func TestGroupCompaniesByName(t *testing.T) {
 	if len(groups) != 2 {
 		t.Fatalf("groups: %d", len(groups))
 	}
-	key := NormalizeCompanyName("711media")
+	key := CompanyGroupingKey("711media")
 	if len(groups[key]) != 2 {
 		t.Fatalf("711media group: %d", len(groups[key]))
 	}
@@ -61,11 +61,40 @@ func TestGroupContactInfoRows(t *testing.T) {
 	}
 }
 
+func TestGroupCompaniesBySlogan(t *testing.T) {
+	items := []map[string]any{
+		{"id": float64(1), "displayName": "Affirm", "isCompany": true},
+		{"id": float64(2), "displayName": "Affirm — Fraud Engineering", "isCompany": true},
+	}
+	groups := GroupCompaniesByName(items)
+	if len(groups) != 1 {
+		t.Fatalf("groups: %d", len(groups))
+	}
+	key := CompanyGroupingKey("Affirm")
+	if len(groups[key]) != 2 {
+		t.Fatalf("affirm group: %d", len(groups[key]))
+	}
+}
+
+func TestDedupeMembersBySloganDisplayName(t *testing.T) {
+	members := []map[string]any{
+		{"id": float64(1), "displayName": "Affirm"},
+		{"id": float64(2), "displayName": "Affirm — Fraud Engineering"},
+	}
+	remove := DedupeMembersByDisplayName(members)
+	if !reflect.DeepEqual(remove, []int64{2}) {
+		t.Fatalf("remove %v", remove)
+	}
+}
+
 func TestDealTitleKey(t *testing.T) {
-	if got := DealTitleKey("Dev @ Acme", false); got != NormalizeOpportunityTitle("Dev @ Acme") {
+	if got := DealTitleKey("Dev @ Acme", false); got != collapseKey("Dev @ Acme") {
 		t.Fatalf("got %q", got)
 	}
 	if got := DealTitleKey("Dev @ Acme", true); got != NormalizeOpportunityTitle("Dev") {
 		t.Fatalf("got %q", got)
+	}
+	if got := DealTitleKey("Dev @ Affirm — Fraud Engineering", false); got != DealTitleKey("Dev @ Affirm", false) {
+		t.Fatalf("slogan keys differ: %q vs %q", got, DealTitleKey("Dev @ Affirm", false))
 	}
 }

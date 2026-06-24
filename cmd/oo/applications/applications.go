@@ -406,7 +406,7 @@ func findExistingOpp(ctx context.Context, c *onlyoffice.Client, title string) ma
 			return nil
 		}
 		for _, d := range deals {
-			if strings.TrimSpace(fmt.Sprint(d["title"])) == needle {
+			if onlyoffice.OpportunityTitlesMatch(fmt.Sprint(d["title"]), needle) {
 				return d
 			}
 		}
