@@ -15,6 +15,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `MergeContacts`, `UpdateOpportunityTitle`, `ListAllContacts`,
   `ListAllOpportunities`, `DeleteContactInfo`, `RemoveOpportunityMember`,
   `IsOpportunityMember`, `HasContactInfo`, `CleanupCRM`.
+- Slogan-aware grouping: `StripSloganSuffix`, `CompanyGroupingKey` merge names
+  like `Affirm` and `Affirm — Fraud Engineering` (companies, deals, members).
 - [`crm_integration_test.go`](crm_integration_test.go) — live merge, rename,
   dedupe smoke tests.
 

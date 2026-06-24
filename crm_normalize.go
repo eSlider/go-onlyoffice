@@ -7,6 +7,26 @@ import (
 
 var multiSpace = regexp.MustCompile(`\s+`)
 
+// sloganSeparators split a company name from a trailing tagline/slogan.
+var sloganSeparators = []string{" — ", " – ", " - ", "—", "–"}
+
+// StripSloganSuffix returns the part before an em/en dash tagline, e.g.
+// "Affirm — Fraud Engineering" → "Affirm".
+func StripSloganSuffix(s string) string {
+	s = strings.TrimSpace(s)
+	for _, sep := range sloganSeparators {
+		if i := strings.Index(s, sep); i > 0 {
+			return strings.TrimSpace(s[:i])
+		}
+	}
+	return s
+}
+
+// CompanyGroupingKey normalizes a company name for dedupe (ignores slogans).
+func CompanyGroupingKey(s string) string {
+	return NormalizeCompanyName(StripSloganSuffix(s))
+}
+
 // NormalizeCompanyName lowercases and collapses whitespace for grouping.
 func NormalizeCompanyName(s string) string {
 	return collapseKey(s)
@@ -61,7 +81,7 @@ func ContactInfoKey(infoType, value string) string {
 
 // MemberDisplayKey normalizes a member displayName for duplicate detection.
 func MemberDisplayKey(displayName string) string {
-	return NormalizeCompanyName(displayName)
+	return CompanyGroupingKey(displayName)
 }
 
 func collapseKey(s string) string {
@@ -70,7 +90,11 @@ func collapseKey(s string) string {
 	return strings.ToLower(s)
 }
 
-// DealTitleForApplication builds the sync deal title from position and company.
+// OpportunityTitlesMatch reports whether two deal titles refer to the same role+company.
+func OpportunityTitlesMatch(a, b string) bool {
+	return DealTitleKey(a, false) == DealTitleKey(b, false)
+}
+
 func DealTitleForApplication(position, company string) string {
 	position = strings.TrimSpace(position)
 	company = strings.TrimSpace(company)
