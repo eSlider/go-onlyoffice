@@ -9,7 +9,7 @@ Canonical Go client for OnlyOffice Workspace (Projects + Calendar + CRM) and the
   - `request.go` — `Request`, `Query`, `Time`, `Token`, `MetaResponse`, `Permissions`.
   - `auth.go` — `Authenticate`, `AuthenticateContext`, `InvalidateToken`, `Auth`, token lifecycle.
   - `http.go` — transport + DRY response decoders (`ResponseArray`/`ResponseObject`/`postFormObject`/`putFormObject`/`deleteObject`).
-  - `projects.go`, `tasks.go`, `users.go`, `calendar.go`, `crm.go`, `files.go` — typed / untyped domain methods. **`files.go`** — CRM opportunity upload plus **project/task Documents** (`GetProjectFiles`, `UploadProjectFile`, `GetTaskFiles`, `AttachFilesToTask`, `UploadTaskFile`, `DetachTaskFile`, `GetFile`, `RenameFile`, `DeleteFiles`, `DownloadFile`).
+  - `projects.go`, `tasks.go`, `users.go`, `calendar.go`, `crm.go`, `files.go`, `mails.go` — typed / untyped domain methods. **`files.go`** — CRM opportunity upload plus **project/task Documents** (`GetProjectFiles`, `UploadProjectFile`, `GetTaskFiles`, `AttachFilesToTask`, `UploadTaskFile`, `DetachTaskFile`, `GetFile`, `RenameFile`, `DeleteFiles`, `DownloadFile`). **`mails.go`** — OnlyOffice Workspace Mail addon (`ListMailAccounts`, `ListMailFolders`, `ListMailMessages`, `GetMailMessage`, `RemoveMailMessages`).
   - Pure stdlib + `google/go-querystring`; no UI, no dotenv.
 - **CLI — `cmd/oo/` as `package main`.** Cobra wrapper that loads `.env` via `godotenv` at startup. **Subject-based command tree** mirroring [`tea`](https://gitea.com/gitea/tea):
   - `main.go` — entry point (docstring lists the command tree).

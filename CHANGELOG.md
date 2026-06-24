@@ -17,11 +17,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `IsOpportunityMember`, `HasContactInfo`, `CleanupCRM`.
 - Slogan-aware grouping: `StripSloganSuffix`, `CompanyGroupingKey` merge names
   like `Affirm` and `Affirm — Fraud Engineering` (companies, deals, members).
+- **Workspace mail** — [`mails.go`](mails.go): `ListMailAccounts`, `ListMailFolders`,
+  `ListMailMessages`, `GetMailMessage`, `RemoveMailMessages` against OnlyOffice
+  Mail addon (`/api/2.0/mail/*`).
 - [`crm_integration_test.go`](crm_integration_test.go) — live merge, rename,
   dedupe smoke tests.
 
 ### Added — CLI
 
+- `oo mails accounts|folders|list|get|delete` — OnlyOffice Workspace mail (same `ONLYOFFICE_*` creds).
 - `oo companies dedupe|dedupe-persons`, `oo persons dedupe`, `oo contacts dedupe-info`,
   `oo opportunities dedupe|dedupe-members|fix-titles`, `oo crm cleanup`.
 
