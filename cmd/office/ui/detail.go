@@ -34,12 +34,14 @@ type DetailPane struct {
 	loadedID  string
 	actions   []model.ItemAction
 	actionIdx int
+	tabStop   int
 	zone      detailZone
 	focused   bool
 	width     int
 	height    int
 	form      EntityForm
 	docVP     viewport.Model
+	formVP    viewport.Model
 	docText   string
 	styles    detailStyles
 }
@@ -56,9 +58,11 @@ func newDetailPane() DetailPane {
 	d := DetailPane{
 		form:   newEntityForm(),
 		docVP:  viewport.New(40, 10),
+		formVP: viewport.New(40, 10),
 		styles: newDetailStyles(),
 	}
 	d.docVP.MouseWheelEnabled = true
+	d.formVP.MouseWheelEnabled = true
 	return d
 }
 
@@ -79,14 +83,112 @@ func (d *DetailPane) Clear() {
 	d.loadedID = ""
 	d.actions = nil
 	d.actionIdx = 0
+	d.tabStop = 0
 	d.docText = ""
 	d.form.Clear()
 	d.docVP.SetContent("")
+	d.formVP.SetContent("")
 }
 
 func (d *DetailPane) SetFocused(on bool) {
 	d.focused = on
-	d.form.SetFocused(on && d.zone == detailZoneContent && d.mode == detailForm)
+	d.applyTabStop(d.tabStop)
+}
+
+func (d *DetailPane) FocusFirstStop() {
+	d.tabStop = 0
+	d.applyTabStop(0)
+}
+
+func (d *DetailPane) maxTabStop() int {
+	switch d.mode {
+	case detailForm:
+		if d.form.readOnly {
+			if len(d.actions) == 0 {
+				return 0
+			}
+			return len(d.actions) - 1
+		}
+		fields := d.form.FieldCount()
+		if len(d.actions) == 0 {
+			if fields == 0 {
+				return 0
+			}
+			return fields - 1
+		}
+		return fields + len(d.actions) - 1
+	case detailDocument:
+		if len(d.actions) == 0 {
+			return 0
+		}
+		return len(d.actions)
+	default:
+		return 0
+	}
+}
+
+func (d *DetailPane) applyTabStop(stop int) {
+	if stop < 0 {
+		stop = 0
+	}
+	max := d.maxTabStop()
+	if stop > max {
+		stop = max
+	}
+	d.tabStop = stop
+
+	switch d.mode {
+	case detailForm:
+		if d.form.readOnly {
+			d.zone = detailZoneActions
+			d.actionIdx = stop
+			d.form.SetFocused(false)
+			return
+		}
+		fields := d.form.FieldCount()
+		if stop < fields {
+			d.zone = detailZoneContent
+			d.form.SetFieldIndex(stop)
+			d.form.SetFocused(d.focused)
+			return
+		}
+		d.zone = detailZoneActions
+		d.actionIdx = stop - fields
+		d.form.SetFocused(false)
+	case detailDocument:
+		if stop == 0 {
+			d.zone = detailZoneContent
+			d.form.SetFocused(false)
+			return
+		}
+		d.zone = detailZoneActions
+		d.actionIdx = stop - 1
+		d.form.SetFocused(false)
+	default:
+		d.zone = detailZoneContent
+		d.form.SetFocused(false)
+	}
+}
+
+// TabForward moves to the next field/button. It returns true when focus should leave the pane.
+func (d *DetailPane) TabForward() bool {
+	max := d.maxTabStop()
+	if d.tabStop < max {
+		d.applyTabStop(d.tabStop + 1)
+		return false
+	}
+	d.FocusFirstStop()
+	return true
+}
+
+// TabBackward moves to the previous field/button. It returns true when focus should leave the pane.
+func (d *DetailPane) TabBackward() bool {
+	if d.tabStop > 0 {
+		d.applyTabStop(d.tabStop - 1)
+		return false
+	}
+	d.applyTabStop(d.maxTabStop())
+	return true
 }
 
 func (d *DetailPane) SetSize(w, h int) {
@@ -102,6 +204,8 @@ func (d *DetailPane) SetSize(w, h int) {
 	d.form.SetSize(w, contentH)
 	d.docVP.Width = w
 	d.docVP.Height = contentH
+	d.formVP.Width = w
+	d.formVP.Height = contentH
 }
 
 func (d *DetailPane) splitHeights() (contentH, actionH int) {
@@ -125,7 +229,10 @@ func (d *DetailPane) LoadForm(item model.Item, fields model.FormFields) {
 	d.loadedID = item.ID
 	d.actions = model.ActionsFor(item.Kind)
 	d.actionIdx = 0
+	d.tabStop = 0
 	d.form.Load(item.Kind, item.ID, fields)
+	d.refreshFormViewport()
+	d.applyTabStop(0)
 	d.layoutContent()
 }
 
@@ -135,6 +242,7 @@ func (d *DetailPane) LoadDocument(item model.Item, markdown string, renderWidth 
 	d.loadedID = item.ID
 	d.actions = model.ActionsFor(item.Kind)
 	d.actionIdx = 0
+	d.tabStop = 0
 	d.form.Clear()
 	text, err := preview.RenderMarkdown(markdown, renderWidth)
 	if err != nil {
@@ -142,6 +250,8 @@ func (d *DetailPane) LoadDocument(item model.Item, markdown string, renderWidth 
 	}
 	d.docText = text
 	d.docVP.SetContent(text)
+	d.docVP.GotoTop()
+	d.applyTabStop(0)
 	d.layoutContent()
 }
 
@@ -150,6 +260,17 @@ func (d *DetailPane) layoutContent() {
 	d.form.SetSize(d.width, contentH)
 	d.docVP.Width = d.width
 	d.docVP.Height = contentH
+	d.formVP.Width = d.width
+	d.formVP.Height = contentH
+	d.refreshFormViewport()
+}
+
+func (d *DetailPane) refreshFormViewport() {
+	if d.mode != detailForm || !d.form.readOnly {
+		d.formVP.SetContent("")
+		return
+	}
+	d.formVP.SetContent(d.form.View())
 }
 
 func (d *DetailPane) LoadedID() string { return d.loadedID }
@@ -158,22 +279,45 @@ func (d *DetailPane) Item() model.Item { return d.item }
 
 func (d *DetailPane) Zone() detailZone { return d.zone }
 
-func (d *DetailPane) FocusActions() {
-	d.zone = detailZoneActions
-	d.form.SetFocused(false)
-}
-
 func (d *DetailPane) FocusContent() {
-	d.zone = detailZoneContent
-	d.form.SetFocused(d.focused && d.mode == detailForm)
+	d.applyTabStop(d.tabStop)
+	if d.zone == detailZoneContent && d.mode == detailForm {
+		d.form.SetFocused(d.focused)
+	}
 }
 
-func (d *DetailPane) ToggleZone() {
-	if d.zone == detailZoneContent {
-		d.FocusActions()
-	} else {
-		d.FocusContent()
+func (d *DetailPane) FocusActions() {
+	max := d.maxTabStop()
+	switch d.mode {
+	case detailForm:
+		if d.form.readOnly {
+			d.applyTabStop(max)
+			return
+		}
+		if len(d.actions) > 0 {
+			d.applyTabStop(d.form.FieldCount())
+		}
+	case detailDocument:
+		if len(d.actions) > 0 {
+			d.applyTabStop(1)
+		}
 	}
+}
+
+// MoveTabStop moves between title, description, and action buttons without leaving the pane.
+func (d *DetailPane) MoveTabStop(delta int) {
+	if delta == 0 {
+		return
+	}
+	next := d.tabStop + delta
+	if next < 0 {
+		next = 0
+	}
+	max := d.maxTabStop()
+	if next > max {
+		next = max
+	}
+	d.applyTabStop(next)
 }
 
 func (d *DetailPane) MoveAction(delta int) {
@@ -190,6 +334,62 @@ func (d *DetailPane) SelectedAction() (model.ItemAction, bool) {
 	return d.actions[d.actionIdx], true
 }
 
+func (d DetailPane) IsDocumentContent() bool {
+	return d.mode == detailDocument
+}
+
+func (d DetailPane) isReadOnlyFormContent() bool {
+	return d.mode == detailForm && d.form.readOnly
+}
+
+func (d DetailPane) documentContentHeight() int {
+	contentH, _ := d.splitHeights()
+	return contentH
+}
+
+// ScrollDocument scrolls the read-only document viewport (mail, file preview).
+func (d *DetailPane) ScrollDocument(key string) bool {
+	if d.IsDocumentContent() {
+		return scrollViewport(&d.docVP, key)
+	}
+	if d.isReadOnlyFormContent() && d.zone == detailZoneContent {
+		return scrollViewport(&d.formVP, key)
+	}
+	return false
+}
+
+// ScrollDocumentMouse applies wheel events to scrollable preview content.
+func (d *DetailPane) ScrollDocumentMouse(msg tea.MouseMsg) tea.Cmd {
+	var vp *viewport.Model
+	switch {
+	case d.IsDocumentContent():
+		vp = &d.docVP
+	case d.isReadOnlyFormContent():
+		vp = &d.formVP
+	default:
+		return nil
+	}
+	if msg.Y >= d.documentContentHeight() {
+		return nil
+	}
+	if !vp.MouseWheelEnabled || msg.Action != tea.MouseActionPress {
+		return nil
+	}
+	switch msg.Button {
+	case tea.MouseButtonWheelUp, tea.MouseButtonWheelDown:
+	default:
+		return nil
+	}
+	var cmd tea.Cmd
+	*vp, cmd = vp.Update(msg)
+	return cmd
+}
+
+// DocumentYOffset exposes scroll position for tests.
+func (d DetailPane) DocumentYOffset() int {
+	return d.docVP.YOffset
+}
+
 func (d *DetailPane) Update(msg tea.Msg) tea.Cmd {
 	if !d.focused {
 		return nil
@@ -197,14 +397,21 @@ func (d *DetailPane) Update(msg tea.Msg) tea.Cmd {
 	if d.zone == detailZoneContent {
 		switch d.mode {
 		case detailForm:
+			if d.form.readOnly {
+				if key, ok := msg.(tea.KeyMsg); ok {
+					if scrollViewport(&d.formVP, key.String()) {
+						return nil
+					}
+				}
+				var cmd tea.Cmd
+				d.formVP, cmd = d.formVP.Update(msg)
+				return cmd
+			}
 			return d.form.Update(msg)
 		case detailDocument:
-			if _, ok := msg.(tea.KeyMsg); ok {
-				switch msg.(tea.KeyMsg).String() {
-				case "pgdown", "pgdn", "f", "ctrl+d":
-					d.docVP.ViewDown()
-				case "pgup", "b", "ctrl+u":
-					d.docVP.ViewUp()
+			if key, ok := msg.(tea.KeyMsg); ok {
+				if scrollViewport(&d.docVP, key.String()) {
+					return nil
 				}
 			}
 			var cmd tea.Cmd
@@ -223,9 +430,25 @@ func (d DetailPane) View() string {
 	var top string
 	switch d.mode {
 	case detailForm:
-		top = lipgloss.NewStyle().Width(d.width).Height(contentH).Render(d.form.View())
+		if d.form.readOnly {
+			top = ApplyVerticalScrollbar(
+				d.formVP.View(),
+				d.formVP.Width,
+				d.formVP.Height,
+				d.formVP.TotalLineCount(),
+				d.formVP.YOffset,
+			)
+		} else {
+			top = lipgloss.NewStyle().Width(d.width).Height(contentH).Render(d.form.View())
+		}
 	case detailDocument:
-		top = d.docVP.View()
+		top = ApplyVerticalScrollbar(
+			d.docVP.View(),
+			d.docVP.Width,
+			d.docVP.Height,
+			d.docVP.TotalLineCount(),
+			d.docVP.YOffset,
+		)
 	default:
 		top = ""
 	}
@@ -258,7 +481,7 @@ func (d DetailPane) renderActions() string {
 	}
 	line := strings.Join(parts, "")
 	if d.focused && d.zone == detailZoneActions {
-		line += d.styles.empty.Render("  ←/→ select · Enter run")
+		line += d.styles.empty.Render("  Tab · Enter run")
 	}
 	return line
 }

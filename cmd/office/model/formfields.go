@@ -9,6 +9,9 @@ type FormFields struct {
 	Primary        string
 	Secondary      string
 	ReadOnly       bool
+	HasStatus      bool
+	Status         ProjectLifecycle
+	ResponsibleID  string
 }
 
 // KindHeading returns a short label for the detail pane header.
@@ -80,6 +83,21 @@ func FormFieldsFromRaw(kind Kind, raw map[string]any) FormFields {
 			Primary: strRaw(raw, "title"), Secondary: strRaw(raw, "description"),
 			ReadOnly: true,
 		}
+	case KindProject:
+		title := strRaw(raw, "title")
+		if title == "" {
+			title = strRaw(raw, "name")
+		}
+		return FormFields{
+			PrimaryLabel:   "Title",
+			SecondaryLabel: "Description",
+			Primary:        title,
+			Secondary:      strRaw(raw, "description"),
+			ReadOnly:       false,
+			HasStatus:      true,
+			Status:         ProjectStatusFromAny(raw["status"]),
+			ResponsibleID:  ResponsibleIDFromRaw(raw),
+		}
 	default:
 		title := strRaw(raw, "title")
 		if title == "" {
@@ -109,7 +127,19 @@ func strRaw(m map[string]any, key string) string {
 	return fmt.Sprint(m[key])
 }
 
-// IsDocumentKind is true when the right pane should show file content, not a form.
+// ResponsibleIDFromRaw extracts the project responsible user id from API detail.
+func ResponsibleIDFromRaw(raw map[string]any) string {
+	if id := strRaw(raw, "responsibleId"); id != "" {
+		return id
+	}
+	resp, ok := raw["responsible"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	return strRaw(resp, "id")
+}
+
+// IsDocumentKind is true when the right pane should show rendered preview content, not an editable form.
 func IsDocumentKind(kind Kind) bool {
-	return kind == KindFile
+	return kind == KindFile || kind == KindMail
 }

@@ -17,6 +17,7 @@ const (
 	ActionToggleMenuPane
 	ActionToggleListPane
 	ActionToggleDetailPane
+	ActionFilter
 	ActionNextPane
 	ActionPrevPane
 	ActionRefresh
@@ -38,6 +39,8 @@ func KeyAction(key string, pane model.FocusPane) Action {
 		}
 	case "r":
 		return ActionRefresh
+	case "f":
+		return ActionFilter
 	case "up", "k":
 		return ActionMoveUp
 	case "down", "j":

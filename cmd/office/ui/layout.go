@@ -17,42 +17,58 @@ func defaultPaneVisibility() PaneVisibility {
 	return PaneVisibility{Menu: true, List: true, Detail: true}
 }
 
-// LayoutWidths splits total terminal width evenly across visible panes.
+const (
+	defaultMenuShare  = 10
+	defaultListShare  = 60
+	defaultDetailShare = 30
+)
+
+// LayoutWidths splits total terminal width across visible panes (default 10% / 60% / 30%).
 func LayoutWidths(total int, vis PaneVisibility) PaneWidths {
 	if total < 1 {
 		total = 80
 	}
 	v := vis
-	n := countVisible(v)
-	if n == 0 {
+	if countVisible(v) == 0 {
 		v = defaultPaneVisibility()
-		n = 3
 	}
-	base := total / n
-	rem := total % n
-	out := PaneWidths{Visibility: v}
+	shareSum := 0
 	if v.Menu {
-		out.Menu = base
-		if rem > 0 {
-			out.Menu++
-			rem--
-		}
+		shareSum += defaultMenuShare
 	}
 	if v.List {
-		out.List = base
-		if rem > 0 {
-			out.List++
-			rem--
-		}
+		shareSum += defaultListShare
 	}
 	if v.Detail {
-		out.Detail = base
-		if rem > 0 {
-			out.Detail++
-			rem--
-		}
+		shareSum += defaultDetailShare
 	}
+	assign := func(visible bool, share int) int {
+		if !visible || shareSum == 0 {
+			return 0
+		}
+		return total * share / shareSum
+	}
+	out := PaneWidths{Visibility: v}
+	out.Menu = assign(v.Menu, defaultMenuShare)
+	out.List = assign(v.List, defaultListShare)
+	out.Detail = assign(v.Detail, defaultDetailShare)
+	fixPaneWidthSum(&out, total)
 	return out
+}
+
+// DetailPaneXRange returns the [start, end) column span of the detail pane.
+func DetailPaneXRange(pw PaneWidths) (start, end int) {
+	if !pw.Visibility.Detail {
+		return 0, 0
+	}
+	if pw.Visibility.Menu {
+		start += pw.Menu
+	}
+	if pw.Visibility.List {
+		start += pw.List
+	}
+	end = start + pw.Detail
+	return start, end
 }
 
 func countVisible(v PaneVisibility) int {

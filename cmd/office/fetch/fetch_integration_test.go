@@ -39,8 +39,7 @@ func TestIntegrationListAllSubjects(t *testing.T) {
 	cases := []model.ListSpec{
 		{Subject: model.SubjectProjects},
 		{Subject: model.SubjectTasks},
-		{Subject: model.SubjectCalendars},
-		{Subject: model.SubjectEvents},
+		{Subject: model.SubjectCalendar},
 		{Subject: model.SubjectContacts},
 		{Subject: model.SubjectPersons},
 		{Subject: model.SubjectCompanies},

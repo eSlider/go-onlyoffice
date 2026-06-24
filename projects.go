@@ -204,3 +204,15 @@ func (c *Client) UpdateProject(req ProjectUpdateRequest) (*Project, error) {
 			Response *Project `json:"response"`
 		}{p})
 }
+
+// UpdateProjectStatus sets project lifecycle status (open, paused, closed).
+func (c *Client) UpdateProjectStatus(id int, status string) (*Project, error) {
+	p := &Project{}
+	return p, c.Query(Request{
+		Uri:    fmt.Sprintf("/api/2.0/project/%d/status", id),
+		Method: "PUT",
+		Body:   map[string]string{"status": status},
+	}, &struct {
+		Response *Project `json:"response"`
+	}{p})
+}

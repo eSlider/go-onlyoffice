@@ -1,5 +1,7 @@
 package model
 
+import "strings"
+
 // ListSpec tells the fetch layer what to load when a nav leaf is active.
 type ListSpec struct {
 	Subject   Subject
@@ -24,6 +26,7 @@ type NavTree struct {
 	expanded map[string]bool
 	cursor   int
 	visible  []string
+	filter   string
 }
 
 // DefaultNavTree returns the OnlyOffice module tree (static skeleton).
@@ -42,15 +45,11 @@ func DefaultNavTree() *NavTree {
 		}
 	}
 
-	add("projects", "Projects", "", true, nil)
-	add("projects.browse", "Browse", "projects", true, nil)
-	add("projects.browse.all", "All projects", "projects.browse", false, &ListSpec{Subject: SubjectProjects})
-	add("projects.browse.tasks", "All tasks", "projects.browse", false, &ListSpec{Subject: SubjectTasks})
-	add("projects.dynamic", "By project", "projects", true, nil)
+	add("projects", "Projects", "", false, &ListSpec{Subject: SubjectProjects})
+	add("tasks", "Tasks", "", false, &ListSpec{Subject: SubjectTasks})
+	add("projects.dynamic", "By project", "", true, nil)
 
-	add("calendar", "Calendar", "", true, nil)
-	add("calendar.cals", "Calendars", "calendar", false, &ListSpec{Subject: SubjectCalendars})
-	add("calendar.events", "Events", "calendar", false, &ListSpec{Subject: SubjectEvents})
+	add("calendar", "Calendar", "", false, &ListSpec{Subject: SubjectCalendar})
 
 	add("crm", "CRM", "", true, nil)
 	add("crm.contacts", "Contacts", "crm", false, &ListSpec{Subject: SubjectContacts})
@@ -185,20 +184,66 @@ func (t *NavTree) Activate() (*ListSpec, bool) {
 	return nil, false
 }
 
+func (t *NavTree) SetFilter(query string) {
+	t.filter = strings.ToLower(strings.TrimSpace(query))
+	t.rebuildVisible()
+}
+
+func (t *NavTree) ClearFilter() {
+	t.filter = ""
+	t.rebuildVisible()
+}
+
+func (t *NavTree) FilterQuery() string { return t.filter }
+
+func (t *NavTree) nodeLabelMatches(id string) bool {
+	if t.filter == "" {
+		return true
+	}
+	n, ok := t.nodes[id]
+	if !ok {
+		return false
+	}
+	return strings.Contains(strings.ToLower(n.Label), t.filter)
+}
+
+func (t *NavTree) hasMatchingDescendant(id string) bool {
+	for _, child := range t.children[id] {
+		if t.nodeLabelMatches(child) || t.hasMatchingDescendant(child) {
+			return true
+		}
+	}
+	return false
+}
+
+func (t *NavTree) visibleUnderFilter(id string) bool {
+	if t.filter == "" {
+		return true
+	}
+	return t.nodeLabelMatches(id) || t.hasMatchingDescendant(id)
+}
+
 func (t *NavTree) rebuildVisible() {
 	t.visible = t.visible[:0]
-	var walk func(id string, depth int)
-	walk = func(id string, depth int) {
+	var walk func(id string)
+	walk = func(id string) {
+		if !t.visibleUnderFilter(id) {
+			return
+		}
 		t.visible = append(t.visible, id)
-		if !t.expanded[id] {
+		expanded := t.expanded[id]
+		if t.filter != "" && t.hasMatchingDescendant(id) {
+			expanded = true
+		}
+		if !expanded {
 			return
 		}
 		for _, child := range t.children[id] {
-			walk(child, depth+1)
+			walk(child)
 		}
 	}
 	for _, root := range t.roots {
-		walk(root, 0)
+		walk(root)
 	}
 	if t.cursor >= len(t.visible) {
 		t.cursor = len(t.visible) - 1
