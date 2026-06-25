@@ -15,13 +15,73 @@ func (t *DataTable) computeLayout() columnLayout {
 	if len(t.columns) == 0 || contentW <= 0 {
 		return columnLayout{widths: map[int]int{}}
 	}
-	if t.spec.Subject == model.SubjectProjects {
-		return layoutProjectTable(t.columns, contentW)
-	}
-	if t.spec.Subject == model.SubjectUsers {
-		return layoutUserTable(t.columns, contentW)
+	if flex, ok := model.TableFlexLayoutFor(t.spec.Subject); ok {
+		return layoutFlexTable(t.columns, contentW, flex.FlexColumnKey, flex.MinFlexWidth)
 	}
 	return layoutScrollingTable(t.columns, t.colScroll, contentW)
+}
+
+const minFixedColumnWidth = 3
+
+// layoutFlexTable shows every column; flexKey absorbs leftover width.
+func layoutFlexTable(cols []model.TableColumn, totalW int, flexKey string, minFlexWidth int) columnLayout {
+	indices := make([]int, len(cols))
+	for i := range cols {
+		indices[i] = i
+	}
+	widths := make(map[int]int, len(cols))
+
+	flexIdx := -1
+	fixed := 0
+	for i, col := range cols {
+		if col.Key == flexKey {
+			flexIdx = i
+			continue
+		}
+		widths[i] = col.Width
+		fixed += widths[i]
+	}
+	if flexIdx < 0 {
+		return layoutScrollingTable(cols, 0, totalW)
+	}
+
+	flexW := totalW - fixed
+	if flexW < minFlexWidth {
+		shrinkFixedColumns(widths, indices, flexIdx, fixed+minFlexWidth-totalW)
+		fixed = 0
+		for _, i := range indices {
+			if i != flexIdx {
+				fixed += widths[i]
+			}
+		}
+		flexW = totalW - fixed
+		if flexW < minFlexWidth {
+			flexW = minFlexWidth
+		}
+	}
+	widths[flexIdx] = flexW
+	normalizeWidthSum(widths, indices, totalW, flexIdx)
+	return columnLayout{indices: indices, widths: widths}
+}
+
+func shrinkFixedColumns(widths map[int]int, indices []int, flexIdx, need int) {
+	for need > 0 {
+		changed := false
+		for _, i := range indices {
+			if i == flexIdx || widths[i] <= minFixedColumnWidth {
+				continue
+			}
+			widths[i]--
+			need--
+			changed = true
+			if need == 0 {
+				return
+			}
+		}
+		if !changed {
+			return
+		}
+	}
 }
 
 func layoutScrollingTable(cols []model.TableColumn, colScroll, contentW int) columnLayout {
