@@ -39,7 +39,11 @@ func TestUserFormFieldCount(t *testing.T) {
 
 func TestLayoutUserTableEmailAbsorbsWidth(t *testing.T) {
 	cols := model.BuildColumns(model.SubjectUsers, nil)
-	lay := layoutUserTable(cols, 100)
+	flex, ok := model.TableFlexLayoutFor(model.SubjectUsers)
+	if !ok {
+		t.Fatal("expected flex layout")
+	}
+	lay := layoutFlexTable(cols, 100, flex.FlexColumnKey, flex.MinFlexWidth)
 	sum := 0
 	emailW := 0
 	for _, i := range lay.indices {
