@@ -400,7 +400,7 @@ func (t *DataTable) styleCell(row, col int, colKey string, selected bool, item m
 }
 
 func (t *DataTable) ensureColVisible() {
-	if t.spec.Subject == model.SubjectProjects || t.spec.Subject == model.SubjectUsers {
+	if flex, ok := model.TableFlexLayoutFor(t.spec.Subject); ok && flex.FlexColumnKey != "" {
 		t.colScroll = 0
 		return
 	}

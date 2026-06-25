@@ -94,7 +94,11 @@ func TestDistributeColumnWidthsFillsTotal(t *testing.T) {
 
 func TestProjectTableTitleAbsorbsWidth(t *testing.T) {
 	cols := model.BuildColumns(model.SubjectProjects, nil)
-	lay := layoutProjectTable(cols, 120)
+	flex, ok := model.TableFlexLayoutFor(model.SubjectProjects)
+	if !ok {
+		t.Fatal("expected flex layout")
+	}
+	lay := layoutFlexTable(cols, 120, flex.FlexColumnKey, flex.MinFlexWidth)
 	if len(lay.indices) != len(cols) {
 		t.Fatalf("expected all %d columns visible, got %d", len(cols), len(lay.indices))
 	}
