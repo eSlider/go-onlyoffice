@@ -16,9 +16,11 @@ func (l *Loader) SaveItem(ctx context.Context, item model.Item, fields model.For
 	}
 	switch item.Kind {
 	case model.KindTask:
-		return l.UpdateTask(ctx, item.ID, fields.Primary, fields.Secondary)
+		return l.UpdateTask(ctx, item.ID, fields)
 	case model.KindProject:
 		return l.saveProject(ctx, item.ID, fields)
+	case model.KindUser:
+		return l.SaveUser(ctx, item.ID, fields)
 	default:
 		return fmt.Errorf("save not supported for %s", item.Kind)
 	}
@@ -60,5 +62,13 @@ func (l *Loader) DetailForm(ctx context.Context, item model.Item) (model.FormFie
 	if err != nil {
 		return model.FormFields{}, err
 	}
-	return model.FormFieldsFromRaw(item.Kind, raw), nil
+	fields := model.FormFieldsFromRaw(item.Kind, raw)
+	if item.Kind == model.KindTask {
+		choices, uerr := l.LoadUserChoices(ctx)
+		if uerr != nil {
+			return model.FormFields{}, uerr
+		}
+		fields.UserChoices = choices
+	}
+	return fields, nil
 }

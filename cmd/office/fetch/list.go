@@ -101,6 +101,8 @@ func (l *Loader) Detail(ctx context.Context, item model.Item) (map[string]any, e
 		return l.Client.GetTaskByID(ctx, item.ID)
 	case model.KindProject:
 		return l.Client.GetProjectByID(ctx, item.ID)
+	case model.KindUser:
+		return l.Client.GetUser(ctx, item.ID)
 	default:
 		if item.Raw != nil {
 			return item.Raw, nil
@@ -360,33 +362,6 @@ func mailFolderForSubject(subject model.Subject) (int, bool) {
 	default:
 		return 0, false
 	}
-}
-
-func (l *Loader) listUsers(ctx context.Context) ([]model.Item, error) {
-	users, err := l.Client.GetUsers()
-	if err != nil {
-		return nil, err
-	}
-	items := make([]model.Item, len(users))
-	for i, u := range users {
-		id := ""
-		if u.ID != nil {
-			id = fmt.Sprint(*u.ID)
-		}
-		title := ""
-		if u.DisplayName != nil {
-			title = *u.DisplayName
-		}
-		email := ""
-		if u.Email != nil {
-			email = *u.Email
-		}
-		items[i] = model.Item{
-			ID: id, Title: title, Subtitle: email, Kind: model.KindUser,
-			Raw: map[string]any{"id": id, "displayName": title, "email": email},
-		}
-	}
-	return items, nil
 }
 
 func (l *Loader) listProjectFiles(ctx context.Context, projectID string) ([]model.Item, error) {

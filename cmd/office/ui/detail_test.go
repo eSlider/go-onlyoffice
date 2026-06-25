@@ -30,8 +30,8 @@ func TestDetailPaneFormAndActions(t *testing.T) {
 		Primary: "Hello", Secondary: "World",
 	})
 	view := d.View()
-	if !strings.Contains(view, "Save") {
-		t.Fatal("expected Save action button")
+	if !strings.Contains(view, "Save") || !strings.Contains(view, "Close") {
+		t.Fatal("expected Save and Close action buttons")
 	}
 	if !strings.Contains(view, "Hello") {
 		t.Fatal("expected form content")

@@ -8,7 +8,11 @@ import (
 func (m *Model) scrollFocusedPane(key string) bool {
 	switch m.focus {
 	case model.FocusMenu:
-		return scrollViewport(&m.menuVP, key)
+		switch key {
+		case "pgdown", "pgdn", "ctrl+d", "pgup", "b", "ctrl+u", "home", "g", "end", "G":
+			return scrollViewport(&m.menuVP, key)
+		}
+		return false
 	case model.FocusList:
 		switch key {
 		case "pgdown", "pgdn", "ctrl+d":
@@ -37,15 +41,38 @@ func (m *Model) paneHeight() int {
 	return h
 }
 
-func (m *Model) paneInnerWidth(outer int) int {
-	if outer <= 0 {
+const (
+	paneBorderChars  = 2 // left + right border drawn outside lipgloss Width
+	panePaddingChars = 2 // Padding(0, 1) on paneStyle
+)
+
+// paneLipglossWidth maps an on-screen pane width to lipgloss Style.Width.
+// Bordered panes render two cells wider than the Width value.
+func paneLipglossWidth(rendered int) int {
+	if rendered <= 0 {
 		return 8
 	}
-	w := outer - 2 // border only; content fills inner box
+	w := rendered - paneBorderChars
 	if w < 8 {
 		w = 8
 	}
 	return w
+}
+
+// paneContentWidth is the usable inner width for viewports and tables.
+func paneContentWidth(rendered int) int {
+	if rendered <= 0 {
+		return 8
+	}
+	w := rendered - paneBorderChars - panePaddingChars
+	if w < 8 {
+		w = 8
+	}
+	return w
+}
+
+func (m *Model) paneInnerWidth(rendered int) int {
+	return paneContentWidth(rendered)
 }
 
 func scrollViewport(vp *viewport.Model, key string) bool {

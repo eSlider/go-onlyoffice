@@ -65,13 +65,12 @@ type Model struct {
 	err       string
 	loading   bool
 	menuVP    viewport.Model
-	listTable DataTable
+	listTable   DataTable
+	listToolbar ListToolbar
 	detail    DetailPane
 	showMenu  bool
 	showList  bool
 	showDetail bool
-	filterActive bool
-	filterSearch FilterSearch
 	customPaneLayout bool
 	paneSizes        PaneWidths
 	resize           paneResizeState
@@ -86,14 +85,14 @@ func NewModel(client *onlyoffice.Client) Model {
 		nav:       model.DefaultNavTree(),
 		selection: model.NewSelection(),
 		focus:     model.FocusMenu,
-		status:    "Tab: pane · f: filter · row select loads detail · Ctrl+S save · q quit",
+		status:    "Tab: pane · / filter · Space select row · 💾🗑 when selected · v: detail · q quit",
 		height:    h,
 		width:     w,
 	}
 	m.menuVP = viewport.New(m.paneInnerWidth(22), m.paneHeight())
 	m.listTable = newDataTable()
+	m.listToolbar = newListToolbar()
 	m.detail = newDetailPane()
-	m.filterSearch = newFilterSearch()
 	m.showMenu, m.showList, m.showDetail = true, true, true
 	m.menuVP.MouseWheelEnabled = true
 	return m
@@ -117,17 +116,40 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		key := msg.String()
-		if key == "esc" && m.filterActive {
-			m.exitFilter()
+		if key == "esc" && m.focus == model.FocusList && m.listToolbar.Zone() != listZoneTable {
+			m.listToolbar.FocusTable()
+			m.syncPaneFocus()
 			return m, nil
 		}
-		if m.filterActive && m.focus == model.FocusPreview && m.showDetail {
+		if key == "esc" && m.focus == model.FocusList && m.listToolbar.Query() != "" {
+			m.listToolbar.ClearFilter()
+			m.nav.ClearFilter()
+			m.syncMenuContent()
+			m.syncListTable()
+			return m, nil
+		}
+		if m.focus == model.FocusList && m.listToolbar.Zone() == listZoneFilter {
 			switch key {
 			case "tab", "shift+tab", "backtab":
-				// allow pane switching while filter stays active
+				// allow pane switching
 			default:
-				cmd := m.filterSearch.Update(msg)
+				cmd := m.listToolbar.Update(msg, m.listToolbarMeta())
 				m.applyFilter()
+				return m, cmd
+			}
+		}
+		if m.focus == model.FocusList && m.listToolbar.Zone() == listZoneActions {
+			meta := m.listToolbarMeta()
+			switch key {
+			case "enter":
+				if act, ok := m.listToolbar.SelectedAction(meta); ok && m.listToolbar.IsActionEnabled(act, meta) {
+					return m, m.runListToolbarAction(act)
+				}
+				return m, nil
+			case "tab", "shift+tab", "backtab":
+				// allow pane switching
+			default:
+				cmd := m.listToolbar.Update(msg, meta)
 				return m, cmd
 			}
 		}
@@ -138,9 +160,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.scrollFocusedPane(key) {
 			return m, nil
 		}
-		if m.filterActive && m.focus == model.FocusPreview {
-			// filter input owns keys except pane switching handled above
-		} else if m.focus == model.FocusPreview {
+		if m.focus == model.FocusPreview {
 			if cmd, handled := m.handleDetailKey(key, msg); handled {
 				return m, cmd
 			}
@@ -155,16 +175,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case ActionNextPane:
 			prev := m.focus
 			m.focus = NextVisibleFocus(m.focus, m.paneVis())
-			if m.focus == model.FocusPreview && prev != model.FocusPreview && !m.filterActive {
+			if m.focus == model.FocusPreview && prev != model.FocusPreview {
 				m.detail.FocusFirstStop()
+			}
+			if m.focus == model.FocusList && prev != model.FocusList {
+				m.listToolbar.FocusTable()
 			}
 			m.syncPaneFocus()
 			return m, nil
 		case ActionPrevPane:
 			prev := m.focus
 			m.focus = PrevVisibleFocus(m.focus, m.paneVis())
-			if m.focus == model.FocusPreview && prev != model.FocusPreview && !m.filterActive {
+			if m.focus == model.FocusPreview && prev != model.FocusPreview {
 				m.detail.FocusFirstStop()
+			}
+			if m.focus == model.FocusList && prev != model.FocusList {
+				m.listToolbar.FocusTable()
 			}
 			m.syncPaneFocus()
 			return m, nil
@@ -172,22 +198,37 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.focus == model.FocusPreview {
 				return m.handleDetailMove(-1)
 			}
+			if m.focus == model.FocusList && m.listToolbar.Zone() != listZoneTable {
+				return m, nil
+			}
 			m.moveUp()
 			m.syncFocusedPane()
-			return m, m.onListRowChanged()
+			if m.focus == model.FocusList {
+				return m, m.onListRowChanged()
+			}
+			return m, nil
 		case ActionMoveDown:
 			if m.focus == model.FocusPreview {
 				return m.handleDetailMove(1)
 			}
+			if m.focus == model.FocusList && m.listToolbar.Zone() != listZoneTable {
+				return m, nil
+			}
 			m.moveDown()
 			m.syncFocusedPane()
-			return m, m.onListRowChanged()
+			if m.focus == model.FocusList {
+				return m, m.onListRowChanged()
+			}
+			return m, nil
 		case ActionMoveLeft:
 			if m.focus == model.FocusPreview && m.detail.Zone() == detailZoneActions {
 				m.detail.MoveTabStop(-1)
 				return m, nil
 			}
-			if m.focus == model.FocusList && m.hasList {
+			if m.focus == model.FocusMenu {
+				return m.handleMenuHorizontal(-1)
+			}
+			if m.focus == model.FocusList && m.hasList && m.listToolbar.Zone() == listZoneTable {
 				m.listTable.MoveCol(-1)
 			}
 			return m, nil
@@ -196,12 +237,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.detail.MoveTabStop(1)
 				return m, nil
 			}
-			if m.focus == model.FocusList && m.hasList {
+			if m.focus == model.FocusMenu {
+				return m.handleMenuHorizontal(1)
+			}
+			if m.focus == model.FocusList && m.hasList && m.listToolbar.Zone() == listZoneTable {
 				m.listTable.MoveCol(1)
 			}
 			return m, nil
 		case ActionSort:
-			if m.focus == model.FocusList && m.hasList {
+			if m.focus == model.FocusList && m.hasList && m.listToolbar.Zone() == listZoneTable {
 				m.listTable.ToggleSort()
 			}
 			return m, nil
@@ -236,7 +280,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.togglePane(3)
 			return m, nil
 		case ActionFilter:
-			m.enterFilter()
+			if m.hasList {
+				m.focus = model.FocusList
+				m.listToolbar.FocusFilter()
+				m.syncPaneFocus()
+			}
 			return m, nil
 		case ActionRefresh:
 			if m.hasList {
@@ -255,13 +303,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if spec, ok := m.nav.Activate(); ok {
 					return m.withList(*spec)
 				}
-				m.syncMenuContent()
-				return m, nil
-			case "right", "l":
-				if spec, ok := m.nav.CurrentListSpec(); ok {
-					return m.withList(*spec)
-				}
-				m.nav.Activate()
 				m.syncMenuContent()
 				return m, nil
 			}
@@ -284,9 +325,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.hasList = true
 			m.listHasMore = model.SubjectIsMail(msg.spec.Subject) && len(msg.items) >= fetch.MailListPageSize
 			m.listTable.SetData(m.listSpec, m.items)
-			if m.filterActive {
-				m.applyFilter()
-			}
+			m.applyFilter()
 		}
 		return m, tea.Batch(m.onListRowChanged(), m.maybeLoadMoreList())
 
@@ -337,8 +376,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.updateItemAfterSave(msg.item, msg.fields)
 			m.detail.LoadForm(msg.item, msg.fields)
+			m.detail.form.MarkClean()
 			m.detail.SetFocused(m.focus == model.FocusPreview)
-			m.status = "Saved"
+			if msg.fields.HasTaskStatus && msg.fields.TaskStatus == model.TaskLifecycleClosed {
+				m.status = "Closed"
+			} else {
+				m.status = "Saved"
+			}
 			m.err = ""
 		}
 		return m, nil
@@ -350,6 +394,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.status = msg.message
 			m.err = ""
+			m.selection.Clear()
 			if m.hasList {
 				m.loading = true
 				return m, m.loadListCmd(m.listSpec)
@@ -376,11 +421,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case model.FocusMenu:
 			m.menuVP, cmd = m.menuVP.Update(msg)
 		case model.FocusList:
-			cmd = m.listTable.Update(msg)
-		case model.FocusPreview:
-			if !m.filterActive {
-				cmd = m.detail.Update(msg)
+			if m.listToolbar.Zone() == listZoneTable {
+				cmd = m.listTable.Update(msg)
 			}
+		case model.FocusPreview:
+			cmd = m.detail.Update(msg)
 		}
 		return m, cmd
 	}
@@ -392,9 +437,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case model.FocusList:
 		cmd = m.listTable.Update(msg)
 	case model.FocusPreview:
-		if !m.filterActive {
-			cmd = m.detail.Update(msg)
-		}
+		cmd = m.detail.Update(msg)
 	}
 	return m, cmd
 }
@@ -425,6 +468,9 @@ func (m *Model) handleDetailKey(key string, msg tea.KeyMsg) (tea.Cmd, bool) {
 			if act.ID == model.ActionSave {
 				return m.saveDetailCmd(), true
 			}
+			if act.ID == model.ActionClose && m.detail.Item().Kind == model.KindTask {
+				return m.closeTaskCmd(), true
+			}
 			return m.executeActionCmd(act.ID, m.detail.Item()), true
 		}
 	}
@@ -435,7 +481,7 @@ func (m *Model) handleDetailKey(key string, msg tea.KeyMsg) (tea.Cmd, bool) {
 }
 
 func (m *Model) routeDetailDocumentMouse(msg tea.MouseMsg) (tea.Cmd, bool) {
-	if m.filterActive || !m.showDetail {
+	if !m.showDetail {
 		return nil, false
 	}
 	if !m.detail.IsDocumentContent() && !m.detail.isReadOnlyFormContent() {
@@ -476,7 +522,7 @@ func (m Model) View() string {
 	h := m.paneHeight() + 2
 	var parts []string
 	if pw.Visibility.Menu {
-		menuStyle := paneStyle(m.focus == model.FocusMenu).Width(pw.Menu).Height(h)
+		menuStyle := paneStyle(m.focus == model.FocusMenu).Width(paneLipglossWidth(pw.Menu)).Height(h)
 		menuBody := ApplyVerticalScrollbar(
 			m.menuVP.View(),
 			m.menuVP.Width,
@@ -487,18 +533,17 @@ func (m Model) View() string {
 		parts = append(parts, menuStyle.Render(menuBody))
 	}
 	if pw.Visibility.List {
-		listStyle := paneStyle(m.focus == model.FocusList).Width(pw.List).Height(h)
-		parts = append(parts, listStyle.Render(m.listTable.View()))
+		listStyle := paneStyle(m.focus == model.FocusList).Width(paneLipglossWidth(pw.List)).Height(h)
+		meta := m.listToolbarMeta()
+		body := lipgloss.JoinVertical(lipgloss.Left,
+			m.listToolbar.View(meta),
+			m.listTable.View(),
+		)
+		parts = append(parts, listStyle.Render(body))
 	}
 	if pw.Visibility.Detail {
-		prevStyle := paneStyle(m.focus == model.FocusPreview).Width(pw.Detail).Height(h)
-		var detailBody string
-		if m.filterActive {
-			detailBody = m.filterSearch.View()
-		} else {
-			detailBody = m.detail.View()
-		}
-		parts = append(parts, prevStyle.Render(detailBody))
+		prevStyle := paneStyle(m.focus == model.FocusPreview).Width(paneLipglossWidth(pw.Detail)).Height(h)
+		parts = append(parts, prevStyle.Render(m.detail.View()))
 	}
 
 	status := m.status
@@ -526,14 +571,103 @@ func (m Model) paneLayout() PaneWidths {
 }
 
 func (m *Model) syncPaneFocus() {
-	m.listTable.SetFocused(m.focus == model.FocusList && m.showList)
-	if m.filterActive {
-		m.filterSearch.SetFocused(m.focus == model.FocusPreview && m.showDetail)
-		m.detail.SetFocused(false)
-		return
+	onList := m.focus == model.FocusList && m.showList
+	m.listTable.SetFocused(onList && m.listToolbar.Zone() == listZoneTable)
+	if onList {
+		m.listToolbar.syncInputFocus()
+	} else {
+		m.listToolbar.filter.SetFocused(false)
 	}
-	m.filterSearch.SetFocused(false)
 	m.detail.SetFocused(m.focus == model.FocusPreview && m.showDetail)
+}
+
+func (m Model) listToolbarMeta() ListToolbarMeta {
+	meta := ListToolbarMeta{
+		Subject:       m.listTable.SubjectLabel(),
+		Count:         m.listTable.ItemCount(),
+		SortLabel:     m.listTable.SortHint(),
+		LoadingMore:   m.listTable.LoadingMore(),
+		SaveEnabled:   m.canSaveFromList(),
+		DeleteEnabled: m.canDeleteFromList(),
+	}
+	return meta
+}
+
+func (m Model) selectedItems() []model.Item {
+	var out []model.Item
+	for _, it := range m.items {
+		if it.Selected {
+			out = append(out, it)
+		}
+	}
+	return out
+}
+
+func (m Model) canSaveFromList() bool {
+	selected := m.selectedItems()
+	if len(selected) != 1 {
+		return false
+	}
+	for _, act := range model.ActionsFor(selected[0].Kind) {
+		if act.ID == model.ActionSave && m.detail.LoadedID() == selected[0].ID {
+			return true
+		}
+	}
+	return false
+}
+
+func (m Model) canDeleteFromList() bool {
+	selected := m.selectedItems()
+	if len(selected) == 0 {
+		return false
+	}
+	for _, it := range selected {
+		if !actionAvailable(model.ActionsFor(it.Kind), model.ActionDelete) {
+			return false
+		}
+	}
+	return true
+}
+
+func actionAvailable(actions []model.ItemAction, id model.ActionID) bool {
+	for _, a := range actions {
+		if a.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
+func (m *Model) runListToolbarAction(action model.ActionID) tea.Cmd {
+	meta := m.listToolbarMeta()
+	if !m.listToolbar.IsActionEnabled(action, meta) {
+		return nil
+	}
+	switch action {
+	case model.ActionSave:
+		m.loading = true
+		return m.saveDetailCmd()
+	case model.ActionDelete:
+		m.loading = true
+		return m.deleteSelectedCmd()
+	default:
+		return nil
+	}
+}
+
+func (m *Model) deleteSelectedCmd() tea.Cmd {
+	selected := m.selectedItems()
+	if len(selected) == 0 {
+		return nil
+	}
+	if len(selected) == 1 {
+		return m.executeActionCmd(model.ActionDelete, selected[0])
+	}
+	cmds := make([]tea.Cmd, len(selected))
+	for i, it := range selected {
+		cmds[i] = m.executeActionCmd(model.ActionDelete, it)
+	}
+	return tea.Batch(cmds...)
 }
 
 func (m *Model) togglePane(which int) {
@@ -587,11 +721,12 @@ func (m *Model) layoutViewports() {
 		m.menuVP.Height = h
 	}
 	if pw.Visibility.List {
-		m.listTable.SetSize(m.paneInnerWidth(pw.List), h)
+		w := m.paneInnerWidth(pw.List)
+		m.listToolbar.SetWidth(w)
+		m.listTable.SetSize(w, h-listToolbarHeight)
 	}
 	if pw.Visibility.Detail {
 		m.detail.SetSize(m.paneInnerWidth(pw.Detail), h)
-		m.filterSearch.SetSize(m.paneInnerWidth(pw.Detail), h)
 	}
 }
 
@@ -606,34 +741,14 @@ func (m *Model) syncListTable() {
 		return
 	}
 	items := m.items
-	if m.filterActive {
-		items = model.FilterItems(m.items, m.filterSearch.Query())
+	if q := m.listToolbar.Query(); q != "" {
+		items = model.FilterItems(m.items, q)
 	}
 	m.listTable.UpdateItems(items)
 }
 
-func (m *Model) enterFilter() {
-	if !m.showDetail {
-		m.showDetail = true
-		m.layoutViewports()
-	}
-	m.filterActive = true
-	m.focus = model.FocusPreview
-	m.syncPaneFocus()
-	m.applyFilter()
-}
-
-func (m *Model) exitFilter() {
-	m.filterActive = false
-	m.filterSearch.Clear()
-	m.nav.ClearFilter()
-	m.syncMenuContent()
-	m.syncListTable()
-	m.syncPaneFocus()
-}
-
 func (m *Model) applyFilter() {
-	q := m.filterSearch.Query()
+	q := m.listToolbar.Query()
 	m.nav.SetFilter(q)
 	m.syncMenuContent()
 	m.syncListTable()
@@ -645,8 +760,8 @@ func (m Model) listTableItem() (model.Item, bool) {
 		return model.Item{}, false
 	}
 	items := m.items
-	if m.filterActive {
-		items = model.FilterItems(m.items, m.filterSearch.Query())
+	if q := m.listToolbar.Query(); q != "" {
+		items = model.FilterItems(m.items, q)
 	}
 	if idx >= len(items) {
 		return model.Item{}, false
@@ -657,7 +772,7 @@ func (m Model) listTableItem() (model.Item, bool) {
 func (m *Model) syncMenuContent() {
 	var b strings.Builder
 	title := "Navigation"
-	if m.filterActive && m.filterSearch.Query() != "" {
+	if m.listToolbar.Query() != "" {
 		title += " (filtered)"
 	}
 	b.WriteString(title + "\n\n")
@@ -703,6 +818,23 @@ func truncateRunes(s string, max int) string {
 		return string(r[:max])
 	}
 	return string(r[:max-1]) + "…"
+}
+
+func (m Model) handleMenuHorizontal(delta int) (Model, tea.Cmd) {
+	cur := m.nav.Cursor()
+	switch delta {
+	case 1:
+		if spec, ok := m.nav.CurrentListSpec(); ok {
+			return m.withList(*spec)
+		}
+		m.nav.Activate()
+	case -1:
+		if m.nav.IsExpandable(cur) && m.nav.IsExpanded(cur) {
+			m.nav.ToggleExpand(cur)
+		}
+	}
+	m.syncMenuContent()
+	return m, nil
 }
 
 func (m *Model) syncFocusedPane() {
@@ -790,9 +922,6 @@ func (m *Model) loadNavProjectsCmd() tea.Cmd {
 }
 
 func (m *Model) onListRowChanged() tea.Cmd {
-	if m.filterActive {
-		return nil
-	}
 	if !m.hasList {
 		m.detail.Clear()
 		return m.maybeLoadMoreList()
@@ -814,7 +943,7 @@ func (m *Model) onListRowChanged() tea.Cmd {
 const mailListLoadThreshold = 3
 
 func (m *Model) maybeLoadMoreList() tea.Cmd {
-	if !m.hasList || m.listLoadingMore || !m.listHasMore || m.filterActive {
+	if !m.hasList || m.listLoadingMore || !m.listHasMore {
 		return nil
 	}
 	if !model.SubjectIsMail(m.listSpec.Subject) {
@@ -850,6 +979,17 @@ func (m *Model) loadDetailCmd(item model.Item) tea.Cmd {
 	}
 }
 
+func (m *Model) closeTaskCmd() tea.Cmd {
+	item := m.detail.Item()
+	fields := m.detail.form.FormFields()
+	fields.TaskStatus = model.TaskLifecycleClosed
+	return func() tea.Msg {
+		ctx := context.Background()
+		err := m.loader.CloseTask(ctx, item.ID, fields)
+		return detailSavedMsg{item: item, fields: fields, err: err}
+	}
+}
+
 func (m *Model) saveDetailCmd() tea.Cmd {
 	item := m.detail.Item()
 	fields := m.detail.form.FormFields()
@@ -873,6 +1013,12 @@ func (m *Model) updateItemAfterSave(item model.Item, fields model.FormFields) {
 		m.items[i].Raw["description"] = fields.Secondary
 		if fields.HasStatus {
 			m.items[i].Raw["status"] = statusInt(fields.Status)
+		}
+		if fields.HasTaskStatus {
+			m.items[i].Raw["status"] = int(fields.TaskStatus)
+		}
+		if fields.ResponsibleID != "" {
+			m.items[i].Raw["responsibleIds"] = []any{fields.ResponsibleID}
 		}
 		m.syncListTable()
 		return
@@ -899,5 +1045,5 @@ func paneStyle(focused bool) lipgloss.Style {
 }
 
 func helpText() string {
-	return "Alt+1/2/3: toggle panes · drag borders to resize · f: filter · Tab: fields/actions/pane · j/k: scroll mail · v: detail · Ctrl+S: save · q: quit"
+	return "Alt+1/2/3: panes · / filter · Space select · 💾🗑 when selected · v: detail · Ctrl+S: save · q: quit"
 }
