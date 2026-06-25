@@ -39,8 +39,13 @@ func KeyAction(key string, pane model.FocusPane) Action {
 		}
 	case "r":
 		return ActionRefresh
-	case "f":
-		return ActionFilter
+	case "f", "/":
+		if pane == model.FocusList {
+			return ActionFilter
+		}
+		if pane == model.FocusMenu {
+			return ActionFilter
+		}
 	case "up", "k":
 		return ActionMoveUp
 	case "down", "j":

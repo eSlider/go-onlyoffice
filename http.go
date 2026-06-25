@@ -113,7 +113,8 @@ func (c *Client) deleteObject(ctx context.Context, path string) (map[string]any,
 
 // unmarshalResponseObject extracts the "response" field from a raw OnlyOffice
 // envelope and decodes it into map[string]any. Returns (nil, nil) for a null
-// response and (nil, err) when the field is missing or malformed.
+// response, an empty array, or scalar payloads. When the API returns a list
+// (for example PUT /people/status/...), the first element is returned.
 func unmarshalResponseObject(raw json.RawMessage) (map[string]any, error) {
 	resp, err := responseField(raw, "response")
 	if err != nil {
@@ -122,11 +123,25 @@ func unmarshalResponseObject(raw json.RawMessage) (map[string]any, error) {
 	if len(resp) == 0 || string(resp) == "null" {
 		return nil, nil
 	}
-	var out map[string]any
-	if err := json.Unmarshal(resp, &out); err != nil {
-		return nil, err
+	switch resp[0] {
+	case '{':
+		var out map[string]any
+		if err := json.Unmarshal(resp, &out); err != nil {
+			return nil, err
+		}
+		return out, nil
+	case '[':
+		var list []map[string]any
+		if err := json.Unmarshal(resp, &list); err != nil {
+			return nil, err
+		}
+		if len(list) == 0 {
+			return nil, nil
+		}
+		return list[0], nil
+	default:
+		return nil, nil
 	}
-	return out, nil
 }
 
 // getJSON issues an authenticated GET and returns the raw response body.

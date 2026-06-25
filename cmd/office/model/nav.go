@@ -66,8 +66,7 @@ func DefaultNavTree() *NavTree {
 	add("mail.trash", "Trash", "mail", false, &ListSpec{Subject: SubjectMailTrash})
 	add("mail.spam", "Spam", "mail", false, &ListSpec{Subject: SubjectMailSpam})
 
-	add("users", "Users", "", true, nil)
-	add("users.dir", "Directory", "users", false, &ListSpec{Subject: SubjectUsers})
+	add("users", "Users", "", false, &ListSpec{Subject: SubjectUsers})
 
 	t.rebuildVisible()
 	return t

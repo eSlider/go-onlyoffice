@@ -25,7 +25,7 @@ type filterSearchStyles struct {
 func newFilterSearch() FilterSearch {
 	in := textinput.New()
 	in.Prompt = "/ "
-	in.Placeholder = "Filter navigation and list…"
+	in.Placeholder = "Filter list…"
 	in.CharLimit = 256
 	return FilterSearch{
 		input: in,
@@ -74,6 +74,17 @@ func (f *FilterSearch) Update(msg tea.Msg) tea.Cmd {
 	var cmd tea.Cmd
 	f.input, cmd = f.input.Update(msg)
 	return cmd
+}
+
+func (f *FilterSearch) SetInputWidth(inner int) {
+	if inner < 8 {
+		inner = 8
+	}
+	f.input.Width = inner
+}
+
+func (f *FilterSearch) CompactView() string {
+	return f.input.View()
 }
 
 func (f FilterSearch) View() string {

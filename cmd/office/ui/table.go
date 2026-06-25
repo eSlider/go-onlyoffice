@@ -9,7 +9,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/eslider/go-onlyoffice/cmd/office/model"
-	"github.com/mattn/go-runewidth"
 )
 
 type tableStyles struct {
@@ -80,7 +79,7 @@ func (t *DataTable) SetSize(w, h int) {
 	t.width = w
 	t.height = h
 	t.viewport.Width = w
-	t.viewport.Height = h - 2 // title + header
+	t.viewport.Height = h - 1 // column header
 	if t.viewport.Height < 1 {
 		t.viewport.Height = 1
 	}
@@ -260,155 +259,63 @@ func (t *DataTable) Update(msg tea.Msg) tea.Cmd {
 	return nil
 }
 
+func (t DataTable) LoadingMore() bool { return t.loadingMore }
+
 func (t DataTable) View() string {
 	if !t.ready {
-		return "List\n\nSelect a leaf node in the tree\n(marked with •) and press Enter.\n"
-	}
-	title := t.styles.title.Render(fmt.Sprintf("%s (%d)", t.spec.Subject, len(t.items)))
-	if t.loadingMore {
-		title += t.styles.help.Render("  …")
-	}
-	sortHint := ""
-	if t.sortCol >= 0 && t.sortCol < len(t.columns) {
-		dir := "▲"
-		if !t.sortAsc {
-			dir = "▼"
-		}
-		sortHint = t.styles.help.Render(fmt.Sprintf("  sort: %s %s", t.columns[t.sortCol].Title, dir))
+		return "\nSelect a leaf in the tree (•) and press Enter.\n"
 	}
 	header := t.renderHeader()
+	if t.hasVerticalScrollbar() {
+		header = padANSIWidth(header, t.lineContentWidth())
+	}
 	body := ApplyVerticalScrollbar(
 		t.viewport.View(),
-		t.viewport.Width,
+		t.width,
 		t.viewport.Height,
 		t.viewport.TotalLineCount(),
 		t.viewport.YOffset,
 	)
-	content := lipgloss.JoinVertical(lipgloss.Left, title+sortHint, header, body)
-	return lipgloss.NewStyle().Width(t.width).Render(content)
+	return lipgloss.JoinVertical(lipgloss.Left, header, body)
+}
+
+func (t DataTable) SortHint() string {
+	if t.sortCol < 0 || t.sortCol >= len(t.columns) {
+		return ""
+	}
+	dir := "▲"
+	if !t.sortAsc {
+		dir = "▼"
+	}
+	return fmt.Sprintf("sort: %s %s", t.columns[t.sortCol].Title, dir)
+}
+
+func (t DataTable) SubjectLabel() string {
+	if !t.ready {
+		return "List"
+	}
+	return string(t.spec.Subject)
+}
+
+func (t DataTable) ItemCount() int {
+	return len(t.items)
+}
+
+func (t DataTable) hasVerticalScrollbar() bool {
+	return t.ready && t.viewport.TotalLineCount() > t.viewport.Height
+}
+
+func (t DataTable) lineContentWidth() int {
+	w := t.width
+	if t.hasVerticalScrollbar() && w > 1 {
+		w--
+	}
+	return w
 }
 
 func (t *DataTable) visibleLayout() (indices []int, widths map[int]int) {
-	widths = make(map[int]int)
-	if len(t.columns) == 0 || t.width <= 0 {
-		return nil, widths
-	}
-	indices = t.pickVisibleColumnIndices()
-	if len(indices) == 0 {
-		return indices, widths
-	}
-	minSum := 0
-	for _, i := range indices {
-		minSum += t.columns[i].Width
-	}
-	widths = distributeColumnWidths(minSum, t.width, indices, t.columns)
-	return indices, widths
-}
-
-func (t *DataTable) pickVisibleColumnIndices() []int {
-	var out []int
-	used := 0
-	for colIdx := t.colScroll; colIdx < len(t.columns); colIdx++ {
-		w := t.columns[colIdx].Width
-		if len(out) > 0 && used+w > t.width {
-			break
-		}
-		out = append(out, colIdx)
-		used += w
-	}
-	if len(out) == 0 {
-		colIdx := t.colScroll
-		if colIdx < 0 || colIdx >= len(t.columns) {
-			colIdx = 0
-		}
-		out = []int{colIdx}
-	}
-	return out
-}
-
-// distributeColumnWidths expands or shrinks visible columns to exactly fill total width.
-func distributeColumnWidths(minSum, total int, indices []int, cols []model.TableColumn) map[int]int {
-	out := make(map[int]int, len(indices))
-	if len(indices) == 0 {
-		return out
-	}
-	if total < len(indices) {
-		total = len(indices)
-	}
-	if minSum <= 0 {
-		each := total / len(indices)
-		if each < 1 {
-			each = 1
-		}
-		for _, i := range indices {
-			out[i] = each
-		}
-		fixColumnWidthSum(out, indices, total)
-		return out
-	}
-	for _, i := range indices {
-		out[i] = cols[i].Width
-	}
-	if minSum >= total {
-		for _, i := range indices {
-			out[i] = cols[i].Width * total / minSum
-			if out[i] < 1 {
-				out[i] = 1
-			}
-		}
-		fixColumnWidthSum(out, indices, total)
-		return out
-	}
-	extra := total - minSum
-	flex := make([]int, 0, len(indices))
-	for _, i := range indices {
-		switch cols[i].Key {
-		case "title", "subtitle", "description", "displayName", "primaryEmail", "from", "to", "tasks", "type":
-			flex = append(flex, i)
-		}
-	}
-	if len(flex) == 0 {
-		flex = append(flex, indices...)
-	}
-	flexSum := 0
-	for _, i := range flex {
-		flexSum += cols[i].Width
-	}
-	if flexSum <= 0 {
-		flexSum = len(flex)
-	}
-	for _, i := range flex {
-		out[i] += extra * cols[i].Width / flexSum
-	}
-	fixColumnWidthSum(out, indices, total)
-	return out
-}
-
-func fixColumnWidthSum(widths map[int]int, indices []int, total int) {
-	if len(indices) == 0 {
-		return
-	}
-	sum := 0
-	for _, i := range indices {
-		sum += widths[i]
-	}
-	widths[indices[len(indices)-1]] += total - sum
-	if widths[indices[len(indices)-1]] < 1 {
-		widths[indices[len(indices)-1]] = 1
-	}
-}
-
-const cellHPadding = 2 // lipgloss Padding(0, 1) on each side
-
-func truncateCellText(text string, colWidth int) string {
-	inner := colWidth - cellHPadding
-	if inner < 1 {
-		inner = 1
-	}
-	if runewidth.StringWidth(text) <= inner {
-		return text
-	}
-	return runewidth.Truncate(text, inner, "...")
+	lay := t.computeLayout()
+	return lay.indices, lay.widths
 }
 
 func (t *DataTable) renderHeader() string {
@@ -430,7 +337,7 @@ func (t *DataTable) renderHeader() string {
 		if t.focused && colIdx == t.cursorCol {
 			style = t.styles.headerSort
 		}
-		cells = append(cells, style.Width(w).MaxWidth(w).Render(text))
+		cells = append(cells, renderTableCell(style, text, w))
 	}
 	return lipgloss.JoinHorizontal(lipgloss.Left, cells...)
 }
@@ -450,30 +357,24 @@ func (t *DataTable) refreshViewport() {
 func (t *DataTable) renderRow(row int) string {
 	item := t.items[t.order[row]]
 	selected := item.Selected
-	fullRow := row == t.cursorRow || selected
 	indices, widths := t.visibleLayout()
 	cells := make([]string, 0, len(indices))
 	for _, colIdx := range indices {
 		col := t.columns[colIdx]
 		w := widths[colIdx]
 		raw := strings.TrimSpace(model.CellText(item, col.Key))
-		text := raw
-		if !fullRow {
-			text = truncateCellText(raw, w)
-		}
-		cells = append(cells, t.styleCell(row, colIdx, col.Key, selected, item, text, w, fullRow))
+		text := truncateCellText(raw, w)
+		cells = append(cells, t.styleCell(row, colIdx, col.Key, selected, item, text, w))
 	}
 	return lipgloss.JoinHorizontal(lipgloss.Left, cells...)
 }
 
-func applyCellWidth(s lipgloss.Style, width int, full bool) lipgloss.Style {
-	if full {
-		return s
+func (t *DataTable) styleCell(row, col int, colKey string, selected bool, item model.Item, text string, width int) string {
+	if t.spec.Subject == model.SubjectProjects {
+		style := t.projectCellStyle(row, col, colKey, selected, item)
+		return renderTableCell(style, text, width)
 	}
-	return s.Width(width).MaxWidth(width)
-}
 
-func (t *DataTable) styleCell(row, col int, colKey string, selected bool, item model.Item, text string, width int, fullWidth bool) string {
 	isRow := row == t.cursorRow
 	isCol := col == t.cursorCol
 	isCell := t.focused && isRow && isCol
@@ -495,29 +396,16 @@ func (t *DataTable) styleCell(row, col int, colKey string, selected bool, item m
 	default:
 		base = t.styles.cell
 	}
-	base = t.applyProjectRowStyle(base, item, colKey)
-	return applyCellWidth(base, width, fullWidth).Render(text)
-}
-
-func (t *DataTable) applyProjectRowStyle(base lipgloss.Style, item model.Item, colKey string) lipgloss.Style {
-	if t.spec.Subject != model.SubjectProjects {
-		return base
-	}
-	open := model.ProjectIsOpen(item.Raw)
-	if colKey == "status" {
-		if open {
-			return base.Foreground(lipgloss.Color("42")).Bold(true)
-		}
-		return base.Foreground(lipgloss.Color("245"))
-	}
-	if open {
-		return base.Background(lipgloss.Color("22")).Foreground(lipgloss.Color("255"))
-	}
-	return base.Background(lipgloss.Color("238")).Foreground(lipgloss.Color("252"))
+	return renderTableCell(base, text, width)
 }
 
 func (t *DataTable) ensureColVisible() {
-	vis := t.pickVisibleColumnIndices()
+	if t.spec.Subject == model.SubjectProjects || t.spec.Subject == model.SubjectUsers {
+		t.colScroll = 0
+		return
+	}
+	contentW := t.lineContentWidth()
+	vis := pickVisibleColumnIndices(t.columns, t.colScroll, contentW)
 	if len(vis) == 0 {
 		return
 	}
@@ -528,7 +416,7 @@ func (t *DataTable) ensureColVisible() {
 	if t.cursorCol > last {
 		t.colScroll = t.cursorCol
 		for t.cursorCol >= 0 {
-			vis = t.pickVisibleColumnIndices()
+			vis = pickVisibleColumnIndices(t.columns, t.colScroll, contentW)
 			if len(vis) == 0 {
 				break
 			}

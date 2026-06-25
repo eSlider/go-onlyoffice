@@ -1,9 +1,14 @@
 package ui
 
 import (
+	"regexp"
+	"strings"
 	"testing"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/eslider/go-onlyoffice/cmd/office/model"
+	"github.com/mattn/go-runewidth"
+	"github.com/muesli/termenv"
 )
 
 func TestLayoutWidthsAllVisibleUsesFullWidth(t *testing.T) {
@@ -63,6 +68,53 @@ func TestPrevVisibleFocusSkipsHidden(t *testing.T) {
 	vis := PaneVisibility{Menu: true, List: false, Detail: true}
 	if got := PrevVisibleFocus(model.FocusPreview, vis); got != model.FocusMenu {
 		t.Fatalf("got %v", got)
+	}
+}
+
+func TestThreePaneRenderedWidthMatchesTerminal(t *testing.T) {
+	prev := lipgloss.ColorProfile()
+	lipgloss.SetColorProfile(termenv.TrueColor)
+	t.Cleanup(func() { lipgloss.SetColorProfile(prev) })
+
+	total := 120
+	pw := LayoutWidths(total, PaneVisibility{Menu: true, List: true, Detail: true})
+	h := 12
+	menu := paneStyle(false).Width(paneLipglossWidth(pw.Menu)).Height(h).Render(strings.Repeat("m", paneContentWidth(pw.Menu)))
+	inner := paneContentWidth(pw.List)
+	tbl := newDataTable()
+	tbl.SetSize(inner, h-listToolbarHeight)
+	tbl.SetData(model.ListSpec{Subject: model.SubjectProjects}, []model.Item{
+		{ID: "1", Title: "Alpha", Kind: model.KindProject, Raw: map[string]any{"status": 0}},
+	})
+	toolbar := newListToolbar()
+	toolbar.SetWidth(inner)
+	body := lipgloss.JoinVertical(lipgloss.Left, toolbar.View(ListToolbarMeta{Subject: "projects", Count: 1}), tbl.View())
+	list := paneStyle(true).Width(paneLipglossWidth(pw.List)).Height(h).Render(body)
+	detail := paneStyle(false).Width(paneLipglossWidth(pw.Detail)).Height(h).Render(strings.Repeat("d", paneContentWidth(pw.Detail)))
+	full := lipgloss.JoinHorizontal(lipgloss.Top, menu, list, detail)
+	re := regexp.MustCompile(`\x1b\[[0-9;]*m`)
+	top := strings.Split(full, "\n")[0]
+	got := runewidth.StringWidth(re.ReplaceAllString(top, ""))
+	if got != total {
+		t.Fatalf("top border width=%d want %d", got, total)
+	}
+	for _, line := range strings.Split(tbl.View(), "\n") {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		w := runewidth.StringWidth(re.ReplaceAllString(line, ""))
+		if w > inner+1 {
+			t.Fatalf("table line width=%d want <=%d", w, inner+1)
+		}
+	}
+}
+
+func TestPaneContentWidth(t *testing.T) {
+	if got := paneContentWidth(72); got != 68 {
+		t.Fatalf("content width=%d want 68", got)
+	}
+	if got := paneLipglossWidth(72); got != 70 {
+		t.Fatalf("lipgloss width=%d want 70", got)
 	}
 }
 

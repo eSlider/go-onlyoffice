@@ -29,12 +29,25 @@ func TestBuildProjectColumns(t *testing.T) {
 
 func TestCellTextProjectStatus(t *testing.T) {
 	open := Item{Kind: KindProject, Raw: map[string]any{"status": 0}}
-	if got := CellText(open, "status"); got != "Open" {
+	if got := CellText(open, "status"); got != "🟢 Open" {
 		t.Fatalf("got %q", got)
 	}
 	closed := Item{Kind: KindProject, Raw: map[string]any{"status": 2}}
-	if got := CellText(closed, "status"); got != "Closed" {
+	if got := CellText(closed, "status"); got != "🔴 Closed" {
 		t.Fatalf("got %q", got)
+	}
+	paused := Item{Kind: KindProject, Raw: map[string]any{"status": 1}}
+	if got := CellText(paused, "status"); got != "🟡 Paused" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestBuildProjectColumnsStatusHeaderIsIcon(t *testing.T) {
+	cols := BuildColumns(SubjectProjects, nil)
+	for _, c := range cols {
+		if c.Key == "status" && c.Title != "●" {
+			t.Fatalf("status header=%q want ●", c.Title)
+		}
 	}
 }
 

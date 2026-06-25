@@ -29,13 +29,15 @@ var subjectExtraKeys = map[Subject][]string{
 	SubjectMailDrafts:    {"to", "date"},
 	SubjectMailTrash:     {"from", "date"},
 	SubjectMailSpam:      {"from", "date"},
-	SubjectUsers:         {"email", "displayName"},
 }
 
 // BuildColumns derives table columns from the list subject and item payloads.
 func BuildColumns(subject Subject, items []Item) []TableColumn {
 	if subject == SubjectProjects {
 		return buildProjectColumns(items)
+	}
+	if subject == SubjectUsers {
+		return buildUserColumns(items)
 	}
 	if subject == SubjectTasks {
 		return buildTaskColumns(items)
@@ -102,18 +104,28 @@ func buildTaskColumns(items []Item) []TableColumn {
 	return cols
 }
 
+func buildUserColumns(items []Item) []TableColumn {
+	_ = items
+	return []TableColumn{
+		{Key: "_sel", Title: "✓", Width: 3},
+		{Key: "userName", Title: "User", Width: 14},
+		{Key: "registration", Title: "Registered", Width: 12},
+		{Key: "status", Title: "Status", Width: 10},
+		{Key: "email", Title: "Email", Width: 20},
+	}
+}
+
 func buildProjectColumns(items []Item) []TableColumn {
-	cols := []TableColumn{
+	_ = items
+	return []TableColumn{
 		{Key: "_sel", Title: "✓", Width: 3},
 		{Key: "id", Title: "ID", Width: 8},
-		{Key: "status", Title: "Status", Width: 8},
-		{Key: "title", Title: "Title", Width: 28},
-		{Key: "tasks", Title: "Tasks (open/closed)", Width: 18},
-		{Key: "documents", Title: "Documents", Width: 11},
-		{Key: "users", Title: "Users", Width: 8},
+		{Key: "status", Title: "●", Width: 10},
+		{Key: "title", Title: "Title", Width: 16},
+		{Key: "tasks", Title: "Tasks", Width: 11},
+		{Key: "documents", Title: "Docs", Width: 7},
+		{Key: "users", Title: "Users", Width: 7},
 	}
-	sizeColumns(cols, items)
-	return cols
 }
 
 // CellText returns the display string for one table cell.
@@ -141,7 +153,9 @@ func CellText(it Item, key string) string {
 	case "status":
 		switch it.Kind {
 		case KindProject:
-			return ProjectStatusLabel(it.Raw)
+			return ProjectStatusCell(it.Raw)
+		case KindUser:
+			return UserStatusLabel(it.Raw)
 		case KindTask, KindCRMTask:
 			if it.Raw == nil {
 				return ""
@@ -170,6 +184,20 @@ func CellText(it Item, key string) string {
 		}
 		return formatAny(it.Raw["responsible"])
 	case "subtitle":
+		return it.Subtitle
+	case "userName":
+		if it.Raw != nil {
+			if u := strRaw(it.Raw, "userName"); u != "" {
+				return u
+			}
+		}
+		return it.Title
+	case "registration":
+		return FormatUserRegistration(it.Raw)
+	case "email":
+		if it.Raw != nil {
+			return strRaw(it.Raw, "email")
+		}
 		return it.Subtitle
 	case "tasks":
 		return formatProjectTasks(it.Raw)

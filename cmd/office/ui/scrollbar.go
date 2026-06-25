@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/mattn/go-runewidth"
 )
 
 // ScrollbarMetrics computes thumb position for a vertical scrollbar.
@@ -49,7 +48,7 @@ func ApplyVerticalScrollbar(view string, width, height, totalLines, yOffset int)
 	thumb := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 	out := make([]string, height)
 	for row := 0; row < height; row++ {
-		line := padDisplayWidth(lines[row], contentWidth)
+		line := padANSIWidth(lines[row], contentWidth)
 		ch := "│"
 		style := track
 		if row >= thumbStart && row < thumbEnd {
@@ -62,15 +61,5 @@ func ApplyVerticalScrollbar(view string, width, height, totalLines, yOffset int)
 }
 
 func padDisplayWidth(line string, width int) string {
-	if width < 1 {
-		return ""
-	}
-	w := runewidth.StringWidth(line)
-	if w > width {
-		return runewidth.Truncate(line, width, "")
-	}
-	if w < width {
-		line += strings.Repeat(" ", width-w)
-	}
-	return line
+	return padANSIWidth(line, width)
 }

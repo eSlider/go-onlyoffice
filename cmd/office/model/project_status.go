@@ -46,6 +46,27 @@ func ProjectStatusLabel(raw map[string]any) string {
 	return ProjectStatusFromAny(raw["status"]).Label()
 }
 
+// ProjectStatusIcon returns the list-cell emoji for a project lifecycle state.
+func (s ProjectLifecycle) Icon() string {
+	switch s {
+	case ProjectLifecycleClosed:
+		return "🔴"
+	case ProjectLifecyclePaused:
+		return "🟡"
+	default:
+		return "🟢"
+	}
+}
+
+// ProjectStatusCell returns emoji and label on one line for project table cells.
+func ProjectStatusCell(raw map[string]any) string {
+	if raw == nil {
+		return ProjectLifecycleOpen.Icon() + " Open"
+	}
+	s := ProjectStatusFromAny(raw["status"])
+	return s.Icon() + " " + s.Label()
+}
+
 // ProjectIsOpen is true when the project is not closed.
 func ProjectIsOpen(raw map[string]any) bool {
 	if raw == nil {
