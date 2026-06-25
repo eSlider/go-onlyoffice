@@ -20,27 +20,27 @@ func TestIntegrationUpdateTaskTitleDescription(t *testing.T) {
 		t.Skip("no tasks")
 	}
 	item := items[0]
-	title, desc, err := loader.TaskFields(ctx, item)
+	fields, err := loader.DetailForm(ctx, item)
 	if err != nil {
 		t.Fatal(err)
 	}
-	restoreTitle, restoreDesc := title, desc
+	restore := fields
 	t.Cleanup(func() {
-		_ = loader.UpdateTask(context.Background(), item.ID, restoreTitle, restoreDesc)
+		_ = loader.UpdateTask(context.Background(), item.ID, restore)
 	})
-	newTitle := title + " (office TUI test)"
-	newDesc := desc + "\n\n_edited by office integration test_"
-	if err := loader.UpdateTask(ctx, item.ID, newTitle, newDesc); err != nil {
+	fields.Primary = fields.Primary + " (office TUI test)"
+	fields.Secondary = fields.Secondary + "\n\n_edited by office integration test_"
+	if err := loader.UpdateTask(ctx, item.ID, fields); err != nil {
 		t.Fatal(err)
 	}
-	gotTitle, gotDesc, err := loader.TaskFields(ctx, item)
+	got, err := loader.DetailForm(ctx, item)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if gotTitle != newTitle {
-		t.Fatalf("title: got %q want %q", gotTitle, newTitle)
+	if got.Primary != fields.Primary {
+		t.Fatalf("title: got %q want %q", got.Primary, fields.Primary)
 	}
-	if gotDesc != newDesc {
+	if got.Secondary != fields.Secondary {
 		t.Fatalf("description mismatch")
 	}
 }

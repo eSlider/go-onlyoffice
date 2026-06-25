@@ -6,6 +6,7 @@ type ActionID string
 const (
 	ActionView     ActionID = "view"
 	ActionSave     ActionID = "save"
+	ActionClose    ActionID = "close"
 	ActionDelete   ActionID = "delete"
 	ActionRefresh  ActionID = "refresh"
 	ActionDownload ActionID = "download"
@@ -29,7 +30,7 @@ func ActionsFor(kind Kind) []ItemAction {
 	case KindTask:
 		return []ItemAction{
 			{ID: ActionSave, Label: "Save"},
-			{ID: ActionDelete, Label: "Delete task", Danger: true},
+			{ID: ActionClose, Label: "Close"},
 		}
 	case KindCRMTask:
 		return []ItemAction{
@@ -56,7 +57,11 @@ func ActionsFor(kind Kind) []ItemAction {
 			{ID: ActionDownload, Label: "Download"},
 			{ID: ActionDelete, Label: "Delete file", Danger: true},
 		}
-	case KindEvent, KindCalendar, KindUser:
+	case KindUser:
+		return []ItemAction{
+			{ID: ActionSave, Label: "Save"},
+		}
+	case KindEvent, KindCalendar:
 		return nil
 	default:
 		return nil

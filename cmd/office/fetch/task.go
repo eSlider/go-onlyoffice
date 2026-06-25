@@ -9,8 +9,18 @@ import (
 	"github.com/eslider/go-onlyoffice/cmd/office/model"
 )
 
-// UpdateTask saves title and description for a project task.
-func (l *Loader) UpdateTask(ctx context.Context, taskID, title, description string) error {
+// UpdateTask saves editable task fields via the typed JSON API.
+func (l *Loader) UpdateTask(ctx context.Context, taskID string, fields model.FormFields) error {
+	return l.updateTask(ctx, taskID, fields, false)
+}
+
+// CloseTask saves fields and sets status to closed.
+func (l *Loader) CloseTask(ctx context.Context, taskID string, fields model.FormFields) error {
+	fields.TaskStatus = model.TaskLifecycleClosed
+	return l.updateTask(ctx, taskID, fields, true)
+}
+
+func (l *Loader) updateTask(ctx context.Context, taskID string, fields model.FormFields, closing bool) error {
 	if l == nil || l.Client == nil {
 		return fmt.Errorf("fetch: client is nil")
 	}
@@ -18,19 +28,26 @@ func (l *Loader) UpdateTask(ctx context.Context, taskID, title, description stri
 	if err != nil {
 		return fmt.Errorf("task id %q: %w", taskID, err)
 	}
-	_, err = l.Client.UpdateProjectTask(onlyoffice.ProjectTaskUpdateRequest{
-		ID:          id,
-		Title:       title,
-		Description: description,
-	})
-	return err
-}
-
-// TaskFields loads title and description for a project task item.
-func (l *Loader) TaskFields(ctx context.Context, item model.Item) (title, description string, err error) {
-	fields, err := l.DetailForm(ctx, item)
-	if err != nil {
-		return "", "", err
+	status := onlyoffice.ProjectTaskStatus(fields.TaskStatus)
+	if closing {
+		status = onlyoffice.ProjectTaskStatusClosed
 	}
-	return fields.Primary, fields.Secondary, nil
+	req := onlyoffice.ProjectTaskUpdateRequest{
+		ID:          id,
+		Title:       fields.Primary,
+		Description: fields.Secondary,
+		Status:      status,
+	}
+	if fields.ResponsibleID != "" {
+		req.Responsible = []string{fields.ResponsibleID}
+	} else if !closing {
+		raw, derr := l.Detail(ctx, model.Item{ID: taskID, Kind: model.KindTask})
+		if derr == nil {
+			if rid := model.TaskResponsibleIDFromRaw(raw); rid != "" {
+				req.Responsible = []string{rid}
+			}
+		}
+	}
+	_, err = l.Client.UpdateProjectTask(req)
+	return err
 }

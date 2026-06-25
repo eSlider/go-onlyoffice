@@ -5,6 +5,8 @@ package onlyoffice
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"net/url"
 	"time"
 )
 
@@ -39,6 +41,7 @@ type User struct {
 	MailSpace        *int       `json:"mailSpace,omitempty"`
 	TalkSpace        *int       `json:"talkSpace,omitempty"`
 	ProfileURL       *string    `json:"profileUrl,omitempty"`
+	RegistrationDate *time.Time `json:"registrationDate,omitempty"`
 	Title            *string    `json:"title,omitempty"`
 	Sex              *string    `json:"sex,omitempty"`
 	Lead             *string    `json:"lead,omitempty"`
@@ -69,6 +72,38 @@ func (c *Client) GetUsers() (list []*User, err error) {
 			MetaResponse `json:",inline"`
 			Response     *[]*User `json:"response"`
 		}{Response: &list})
+}
+
+// GetUser returns one portal user profile by ID.
+func (c *Client) GetUser(ctx context.Context, userID string) (map[string]any, error) {
+	return c.ResponseObject(ctx, fmt.Sprintf("/api/2.0/people/%s.json", url.PathEscape(userID)))
+}
+
+// UpdateUser updates portal user profile fields (admin ACL, etc.). Do not send
+// employee status here — use ChangeUserStatus instead.
+func (c *Client) UpdateUser(ctx context.Context, userID string, body map[string]any) (map[string]any, error) {
+	return c.putJSONObject(ctx, fmt.Sprintf("/api/2.0/people/%s", url.PathEscape(userID)), body)
+}
+
+// ChangeUserStatus activates or terminates a user via the status API.
+func (c *Client) ChangeUserStatus(ctx context.Context, userID string, active bool) error {
+	status := "Terminated"
+	if active {
+		status = "Active"
+	}
+	_, err := c.putJSONObject(ctx, fmt.Sprintf("/api/2.0/people/status/%s", status), map[string]any{
+		"userIds":   []string{userID},
+		"resendAll": false,
+	})
+	return err
+}
+
+// ChangeUserPassword sets a new password for the user.
+func (c *Client) ChangeUserPassword(ctx context.Context, userID, password string) error {
+	_, err := c.putJSONObject(ctx, fmt.Sprintf("/api/2.0/people/%s/password", url.PathEscape(userID)), map[string]string{
+		"password": password,
+	})
+	return err
 }
 
 // SelfUserID returns the ID of the authenticated user (people/@self), cached.

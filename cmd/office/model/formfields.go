@@ -11,7 +11,18 @@ type FormFields struct {
 	ReadOnly       bool
 	HasStatus      bool
 	Status         ProjectLifecycle
+	HasTaskStatus  bool
+	TaskStatus     TaskLifecycle
+	HasResponsible bool
 	ResponsibleID  string
+	UserChoices    []UserOption
+	ProjectTitle   string
+	TimingSummary  string
+	HasUserEdit    bool
+	UserEnabled    bool
+	UserACL        UserACLState
+	GroupsText     string
+	UserPassword   string
 }
 
 // KindHeading returns a short label for the detail pane header.
@@ -62,10 +73,13 @@ func FormFieldsFromRaw(kind Kind, raw map[string]any) FormFields {
 			ReadOnly: true,
 		}
 	case KindUser:
+		acl := UserACLFromRaw(raw)
 		return FormFields{
-			PrimaryLabel: "Name", SecondaryLabel: "Email",
-			Primary: strRaw(raw, "displayName"), Secondary: strRaw(raw, "email"),
-			ReadOnly: true,
+			HasUserEdit: true,
+			ReadOnly:    false,
+			UserEnabled: UserIsEnabled(raw),
+			UserACL:     acl,
+			GroupsText:  UserGroupsText(raw),
 		}
 	case KindContact:
 		name := strRaw(raw, "displayName")
@@ -98,6 +112,20 @@ func FormFieldsFromRaw(kind Kind, raw map[string]any) FormFields {
 			Status:         ProjectStatusFromAny(raw["status"]),
 			ResponsibleID:  ResponsibleIDFromRaw(raw),
 		}
+	case KindTask:
+		return FormFields{
+			PrimaryLabel:   "Title",
+			SecondaryLabel: "Description",
+			Primary:        strRaw(raw, "title"),
+			Secondary:      strRaw(raw, "description"),
+			ReadOnly:       false,
+			HasTaskStatus:  true,
+			TaskStatus:     TaskStatusFromAny(raw["status"]),
+			HasResponsible: true,
+			ResponsibleID:  TaskResponsibleIDFromRaw(raw),
+			ProjectTitle:   TaskProjectTitle(raw),
+			TimingSummary:  TaskTimingSummary(raw),
+		}
 	default:
 		title := strRaw(raw, "title")
 		if title == "" {
@@ -109,9 +137,69 @@ func FormFieldsFromRaw(kind Kind, raw map[string]any) FormFields {
 		return FormFields{
 			PrimaryLabel: "Title", SecondaryLabel: "Description",
 			Primary: title, Secondary: strRaw(raw, "description"),
-			ReadOnly: kind != KindTask && kind != KindProject,
+			ReadOnly: true,
 		}
 	}
+}
+
+// TaskResponsibleIDFromRaw returns the first assignee user id from task detail.
+func TaskResponsibleIDFromRaw(raw map[string]any) string {
+	if raw == nil {
+		return ""
+	}
+	if ids, ok := raw["responsibleIds"].([]any); ok && len(ids) > 0 {
+		return strRaw(map[string]any{"id": ids[0]}, "id")
+	}
+	if list, ok := raw["responsibles"].([]any); ok && len(list) > 0 {
+		if m, ok := list[0].(map[string]any); ok {
+			return strRaw(m, "id")
+		}
+	}
+	return ""
+}
+
+// TaskProjectTitle returns the owning project title when present.
+func TaskProjectTitle(raw map[string]any) string {
+	if raw == nil {
+		return ""
+	}
+	if po, ok := raw["projectOwner"].(map[string]any); ok {
+		if t := strRaw(po, "title"); t != "" {
+			return t
+		}
+	}
+	return strRaw(raw, "projectTitle")
+}
+
+// TaskTimingSummary formats start and deadline for the detail form.
+func TaskTimingSummary(raw map[string]any) string {
+	if raw == nil {
+		return ""
+	}
+	start := formatTaskDateLabel(raw["startDate"])
+	deadline := formatTaskDateLabel(raw["deadline"])
+	switch {
+	case start != "" && deadline != "":
+		return start + " → " + deadline
+	case deadline != "":
+		return "Due " + deadline
+	case start != "":
+		return "From " + start
+	default:
+		return ""
+	}
+}
+
+func formatTaskDateLabel(v any) string {
+	t, ok := parseDeadlineTime(v)
+	if !ok {
+		s := strRaw(map[string]any{"v": v}, "v")
+		if s == "" || s == "<nil>" {
+			return ""
+		}
+		return s
+	}
+	return t.Format("2006-01-02 15:04")
 }
 
 func strRaw(m map[string]any, key string) string {
