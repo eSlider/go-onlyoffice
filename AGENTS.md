@@ -51,6 +51,25 @@ write `mux.HandleFunc("/api/2.0/...")` to emulate OnlyOffice, we write an
 - Run integration with: `go test -tags=integration ./...`.
 - New endpoints **must** ship with an integration test before merge.
 
+## Cursor Cloud specific instructions
+
+- **Toolchain:** Go 1.22 (`go.mod` pins `go 1.22.2`). Standard commands work from the
+  repo root: `go build ./...`, `go vet ./...`, `go test ./...`. Build the CLI with
+  `go build -o /tmp/oo ./cmd/oo`. Dependency refresh on startup is just `go mod download`.
+- **This repo has no service to host locally.** The "application" is a Go library plus
+  the `oo` CLI; both are *clients* of an external OnlyOffice Workspace instance. There is
+  no docker-compose / local server to boot, and Docker is not installed by default.
+- **Running the CLI / live end-to-end requires credentials.** `oo` (via `newOO`) needs
+  `ONLYOFFICE_URL` (or `_HOST`), `ONLYOFFICE_USER` (or `_NAME`), `ONLYOFFICE_PASS`
+  (or `_PASSWORD`) pointing at a reachable OnlyOffice instance, supplied as env/secrets
+  or a CWD `.env` (gitignored; copy from `.env.example`). Without them every command
+  exits with a clear `need ONLYOFFICE_URL ...` guard error — that error means wiring is
+  fine, not that the build is broken.
+- **Integration tests skip cleanly without credentials** (`go test -tags=integration ./...`
+  stays green), so a green integration run with no creds means *skipped*, not *exercised*.
+- `cmd/oo/projects_files.go` is currently not `gofmt`-clean upstream; `gofmt -l .` reports
+  it. Don't treat that as something this task introduced.
+
 ## Related
 
 - [`eSlider/inventar`](https://git.produktor.io/eSlider/inventar) — ASR/ADR (see ASR-0008 Go library module conventions).
