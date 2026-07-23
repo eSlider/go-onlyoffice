@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // ListContacts returns a page of CRM contacts and the total count.
@@ -491,11 +492,25 @@ func (c *Client) ListCRMTasks(ctx context.Context, count, startIndex int) ([]map
 }
 
 // CreateCRMTask creates a CRM task (reminder) attached to an entity.
+// Empty deadline defaults to now+14d (API requires a deadline). Empty
+// responsibleID falls back to the authenticated user — without this the
+// portal assigns a stub "Profile has been removed" owner.
 func (c *Client) CreateCRMTask(ctx context.Context, title, deadline string, categoryID, contactID int, entityType string, entityID int, description string) (map[string]any, error) {
+	if deadline == "" {
+		deadline = time.Now().Add(14 * 24 * time.Hour).Format("2006-01-02T15:04:05")
+	}
+	if categoryID == 0 {
+		categoryID = 2 // Opportunity — matches applications sync
+	}
+	uid, err := c.SelfUserID(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("CreateCRMTask: resolve self: %w", err)
+	}
 	fields := url.Values{}
 	fields.Set("title", title)
 	fields.Set("deadline", deadline)
 	fields.Set("categoryId", strconv.Itoa(categoryID))
+	fields.Set("responsibleId", uid)
 	if contactID != 0 {
 		fields.Set("contactId", strconv.Itoa(contactID))
 	}
@@ -509,6 +524,29 @@ func (c *Client) CreateCRMTask(ctx context.Context, title, deadline string, cate
 		fields.Set("description", description)
 	}
 	return c.postFormObject(ctx, "/api/2.0/crm/task.json", fields)
+}
+
+// UpdateCRMTask updates title, deadline, category, and responsible on a CRM task.
+// Empty responsibleID falls back to SelfUserID; empty deadline is left unchanged
+// by the API only if omitted — callers should pass deadLine when known.
+func (c *Client) UpdateCRMTask(ctx context.Context, id, title, deadline string, categoryID int, responsibleID string) (map[string]any, error) {
+	if responsibleID == "" {
+		uid, err := c.SelfUserID(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("UpdateCRMTask: resolve self: %w", err)
+		}
+		responsibleID = uid
+	}
+	fields := url.Values{}
+	fields.Set("title", title)
+	fields.Set("responsibleId", responsibleID)
+	if deadline != "" {
+		fields.Set("deadline", deadline)
+	}
+	if categoryID != 0 {
+		fields.Set("categoryId", strconv.Itoa(categoryID))
+	}
+	return c.putFormObject(ctx, fmt.Sprintf("/api/2.0/crm/task/%s.json", url.PathEscape(id)), fields)
 }
 
 // DeleteCRMTask removes a CRM task by id.

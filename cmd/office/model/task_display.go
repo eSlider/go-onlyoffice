@@ -169,6 +169,9 @@ func personName(v any) string {
 		return ""
 	}
 	if name := strRaw(m, "displayName"); name != "" {
+		if strings.EqualFold(name, "Profile has been removed") {
+			return ""
+		}
 		return name
 	}
 	first := strRaw(m, "firstName")

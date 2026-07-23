@@ -110,7 +110,7 @@ func taskCreateCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&project, "project", "p", "", "project id (default $OO_PROJECT_ID)")
 	cmd.Flags().StringVar(&desc, "description", "", "description")
-	cmd.Flags().StringVar(&deadline, "deadline", "", "deadline YYYY-MM-DD")
+	cmd.Flags().StringVar(&deadline, "deadline", "", "deadline YYYY-MM-DD (default now+14d; always assigned to you)")
 	cmd.Flags().StringVar(&prio, "priority", "normal", "high|normal|low")
 	return cmd
 }
