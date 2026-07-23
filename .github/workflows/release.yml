@@ -18,10 +18,28 @@ jobs:
     name: GoReleaser
     runs-on: ubuntu-latest
     steps:
+      # Always clone default branch first. workflow_dispatch often races with
+      # release-please creating the tag; fetching refs/tags/X before it exists
+      # fails checkout. Retry fetch, then check out the tag.
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
+
+      - name: Checkout release tag
+        env:
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          echo "Releasing tag: $TAG"
+          for i in 1 2 3 4 5 6; do
+            if git fetch --force origin "refs/tags/${TAG}:refs/tags/${TAG}"; then
+              break
+            fi
+            echo "tag $TAG not visible yet (attempt $i); sleeping…"
+            sleep 10
+          done
+          git rev-parse "refs/tags/${TAG}"
+          git checkout --force "refs/tags/${TAG}"
 
       - name: Set up Go
         uses: actions/setup-go@v5
