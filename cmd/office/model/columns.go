@@ -171,10 +171,15 @@ func CellText(it Item, key string) string {
 		if it.Raw == nil {
 			return ""
 		}
-		if rel := FormatRelativeDeadline(it.Raw["deadline"]); rel != "" {
+		// CRM tasks use camelCase deadLine; project tasks use deadline.
+		rawDL := it.Raw["deadline"]
+		if rawDL == nil || formatAny(rawDL) == "" {
+			rawDL = it.Raw["deadLine"]
+		}
+		if rel := FormatRelativeDeadline(rawDL); rel != "" {
 			return rel
 		}
-		return formatAny(it.Raw["deadline"])
+		return formatAny(rawDL)
 	case "responsible":
 		if it.Kind == KindTask || it.Kind == KindCRMTask {
 			return TaskResponsibleLabel(it.Raw)
