@@ -9,6 +9,7 @@ permissions:
   contents: write
   pull-requests: write
   issues: write
+  actions: write
 
 jobs:
   release-please:
@@ -22,6 +23,18 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
           token: ${{ secrets.RELEASE_PLEASE_TOKEN != '' && secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+
+      # Tags/releases created with GITHUB_TOKEN do not trigger other workflows
+      # (push:tags on Release.yml never fires). Dispatch GoReleaser explicitly.
+      - name: Trigger GoReleaser
+        if: ${{ steps.release.outputs.release_created == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.release.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          echo "Dispatching Release workflow for $TAG"
+          gh workflow run release.yml --repo "${{ github.repository }}" -f "tag=${TAG}"
 
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
