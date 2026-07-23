@@ -24,6 +24,33 @@ import (
 
 var docExt = map[string]bool{".pdf": true, ".docx": true, ".xlsx": true, ".doc": true, ".xls": true}
 
+// Directories that are never application dossiers (WalkDir SkipDir).
+var skipDirNames = map[string]bool{
+	"pdfs": true, "node_modules": true, ".git": true, ".venv": true, "venv": true,
+	"vendor": true, "tools": true, "dist": true, "build": true, ".pnpm": true,
+	"coverage": true, "__pycache__": true, "out": true, ".turbo": true, ".next": true,
+}
+
+var appFolderNum = regexp.MustCompile(`^\d{2,4}$`)
+
+// looksLikeAppFolder accepts CV dossier slugs (uae-009-…, djinni-001-…, linkedin-elastic-…).
+func looksLikeAppFolder(name string) bool {
+	if name == "" || strings.HasPrefix(name, ".") {
+		return false
+	}
+	parts := strings.Split(name, "-")
+	if len(parts) < 3 {
+		return false
+	}
+	for _, p := range parts {
+		if appFolderNum.MatchString(p) {
+			return true
+		}
+	}
+	// Rare dossiers without NNN (e.g. alex-staff-cloud-platform-engineer)
+	return len(parts) >= 4 && len(name) >= 24
+}
+
 type RecruiterInfo struct {
 	First, Last, JobTitle, Company, Email, Phone, LinkedIn string
 }
@@ -51,7 +78,7 @@ func Discover(base string) ([]string, error) {
 			return err
 		}
 		if d.IsDir() {
-			if d.Name() == "pdfs" {
+			if skipDirNames[d.Name()] {
 				return fs.SkipDir
 			}
 			return nil
@@ -61,6 +88,9 @@ func Discover(base string) ([]string, error) {
 		}
 		dir := filepath.Dir(path)
 		if filepath.Clean(dir) == filepath.Clean(base) {
+			return nil
+		}
+		if !looksLikeAppFolder(filepath.Base(dir)) {
 			return nil
 		}
 		out = append(out, path)
@@ -97,9 +127,13 @@ func ParseReadme(path string) (Data, error) {
 		app.Source = filepath.Base(filepath.Dir(filepath.Dir(path)))
 	}
 	if app.Company == "" || strings.EqualFold(app.Company, "undisclosed") || app.Company == "?" || strings.EqualFold(app.Company, "tbd") {
+		// Prefer slug token after NNN (uae-009-dizzaract-… → Dizzaract), not source prefix.
 		parts := strings.Split(filepath.Base(filepath.Dir(path)), "-")
-		if len(parts) >= 2 {
-			app.Company = titleWord(parts[0])
+		for i, p := range parts {
+			if appFolderNum.MatchString(p) && i+1 < len(parts) {
+				app.Company = titleWord(parts[i+1])
+				break
+			}
 		}
 	}
 	app.Summary = buildSummary(app, text)
