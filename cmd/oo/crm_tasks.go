@@ -117,61 +117,50 @@ func crmTasksReassignSelfCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fixed, scanned := 0, 0
 
-			if !apply {
-				for start := 0; ; start += count {
-					list, total, err := c.ListCRMTasks(cmd.Context(), count, start)
-					if err != nil {
-						return err
+			type item struct {
+				id, title, deadline, ownerName string
+				categoryID                     int
+			}
+			var todos []item
+			scanned := 0
+			for start := 0; ; start += count {
+				list, total, err := c.ListCRMTasks(cmd.Context(), count, start)
+				if err != nil {
+					return err
+				}
+				for _, t := range list {
+					scanned++
+					need, name := crmTaskNeedsOwner(t)
+					if !need {
+						continue
 					}
-					for _, t := range list {
-						scanned++
-						need, name := crmTaskNeedsOwner(t)
-						if !need {
-							continue
-						}
-						fixed++
-						fmt.Printf("  task %s %q owner=%q → %s\n", fmt.Sprint(t["id"]), t["title"], name, uid)
-					}
-					if start+count >= total || len(list) == 0 {
+					title, _ := t["title"].(string)
+					dl, _ := t["deadLine"].(string)
+					todos = append(todos, item{
+						id: fmt.Sprint(t["id"]), title: title, deadline: dl,
+						ownerName: name, categoryID: crmTaskCategoryID(t),
+					})
+					if max > 0 && len(todos) >= max {
 						break
 					}
 				}
-			} else {
-				// Always re-fetch offset 0 so fixed tasks don't shift the window.
-				for {
-					list, _, err := c.ListCRMTasks(cmd.Context(), count, 0)
-					if err != nil {
-						return err
-					}
-					if len(list) == 0 {
-						break
-					}
-					pageFixed := 0
-					for _, t := range list {
-						scanned++
-						need, name := crmTaskNeedsOwner(t)
-						if !need {
-							continue
-						}
-						id := fmt.Sprint(t["id"])
-						title, _ := t["title"].(string)
-						dl, _ := t["deadLine"].(string)
-						fmt.Printf("  task %s %q owner=%q → %s\n", id, title, name, uid)
-						if _, err := c.UpdateCRMTask(cmd.Context(), id, title, dl, crmTaskCategoryID(t), uid); err != nil {
-							return fmt.Errorf("update %s: %w", id, err)
-						}
-						pageFixed++
-						fixed++
-						if max > 0 && fixed >= max {
-							break
-						}
-					}
-					if pageFixed == 0 || (max > 0 && fixed >= max) {
-						break
-					}
+				if (max > 0 && len(todos) >= max) || start+count >= total || len(list) == 0 {
+					break
 				}
+			}
+
+			fixed := 0
+			for _, t := range todos {
+				fmt.Printf("  task %s %q owner=%q → %s\n", t.id, t.title, t.ownerName, uid)
+				if !apply {
+					fixed++
+					continue
+				}
+				if _, err := c.UpdateCRMTask(cmd.Context(), t.id, t.title, t.deadline, t.categoryID, uid); err != nil {
+					return fmt.Errorf("update %s: %w", t.id, err)
+				}
+				fixed++
 			}
 
 			mode := "DRY-RUN"
@@ -184,7 +173,7 @@ func crmTasksReassignSelfCmd() *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&apply, "apply", false, "write changes (default dry-run)")
 	cmd.Flags().IntVar(&count, "count", 100, "page size")
-	cmd.Flags().IntVar(&max, "max", 0, "stop after N reassignments (0 = all)")
+	cmd.Flags().IntVar(&max, "max", 0, "stop after N candidates (0 = all)")
 	return cmd
 }
 
