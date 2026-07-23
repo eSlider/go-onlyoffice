@@ -4,6 +4,25 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0](https://github.com/eSlider/go-onlyoffice/compare/v0.6.0...v0.7.0) (2026-07-23)
+
+
+### Features
+
+* **office:** mail preview, infinite scroll, pane resize, and scrollbars ([72844df](https://github.com/eSlider/go-onlyoffice/commit/72844dfe243e04c61ea9bc4db66c55abc08d3ae8))
+* **office:** users admin UI, table rendering, and user save fixes ([40b74eb](https://github.com/eSlider/go-onlyoffice/commit/40b74eb8abf4d63793a2cb9e59bd899734368b7e))
+
+
+### Bug Fixes
+
+* **oo:** skip junk dirs in applications Discover ([470ac93](https://github.com/eSlider/go-onlyoffice/commit/470ac938b1e388a17aabc5146cd62070dbb00587))
+* **oo:** skip junk dirs in applications Discover ([830f0c7](https://github.com/eSlider/go-onlyoffice/commit/830f0c7208f94521a59dfe6f96d496509e6b29e9))
+
+
+### Code Refactoring
+
+* **office:** generalize DataTable layout and document TUI table skill ([38932b0](https://github.com/eSlider/go-onlyoffice/commit/38932b0e0eb9696c41a48ad74c943034ebed59e5))
+
 ## [0.6.0](https://github.com/eSlider/go-onlyoffice/compare/v0.5.0...v0.6.0) (2026-06-24)
 
 
