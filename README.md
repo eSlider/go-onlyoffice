@@ -751,7 +751,11 @@ oo applications sync --path ./applications/2026 --verbose
 oo applications sync --path ./applications/2026 --apply --verbose
 ```
 
-Each `README.md` is parsed for company, role, email, phone, LinkedIn, etc.
+Each dossier `README.md` is parsed for company, role, email, phone, LinkedIn, etc.
+Discovery walks `--path` and **skips** junk trees (`node_modules`, `tools`, `.venv`,
+`pdfs`, …). Only folders that look like CV application slugs (`source-NNN-…`, or
+long hyphenated dossiers) are synced — not npm package READMEs.
+
 The sync creates or finds contacts, opens a deal, adds members, and appends a
 history note. Re-running is safe: duplicate members and duplicate deal titles
 are skipped when already present.
