@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.1](https://github.com/eSlider/go-onlyoffice/compare/v0.8.0...v0.8.1) (2026-07-23)
+
+
+### Bug Fixes
+
+* **oo:** assign owner and deadline on task create ([#9](https://github.com/eSlider/go-onlyoffice/issues/9)) ([f608207](https://github.com/eSlider/go-onlyoffice/commit/f60820734924284d6c40b46c79380a24573432f3))
+
 ## [0.8.0](https://github.com/eSlider/go-onlyoffice/compare/v0.7.0...v0.8.0) (2026-07-23)
 
 
