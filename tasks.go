@@ -233,17 +233,26 @@ func (c *Client) GetTaskByID(ctx context.Context, taskID string) (map[string]any
 // AddTask creates a task via the form-encoded endpoint (no milestone/start).
 // Prefer the typed CreateProjectTask for new code; AddTask is kept for
 // parity with the Python reference tooling.
+//
+// Always assigns the authenticated user as responsible (form field
+// "responsibles"). Empty deadline defaults to today+14 days.
 func (c *Client) AddTask(ctx context.Context, projectID, title, description string, priority int, deadline string) (map[string]any, error) {
 	if projectID == "" {
 		projectID = c.defaults.ProjectID
+	}
+	if deadline == "" {
+		deadline = time.Now().Add(14 * 24 * time.Hour).Format("2006-01-02")
+	}
+	uid, err := c.SelfUserID(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("AddTask: resolve self: %w", err)
 	}
 	fields := url.Values{}
 	fields.Set("title", title)
 	fields.Set("description", description)
 	fields.Set("priority", strconv.Itoa(priority))
-	if deadline != "" {
-		fields.Set("deadline", deadline)
-	}
+	fields.Set("deadline", deadline)
+	fields.Set("responsibles", uid)
 	return c.postFormObject(ctx, fmt.Sprintf("/api/2.0/project/%s/task.json", url.PathEscape(projectID)), fields)
 }
 
