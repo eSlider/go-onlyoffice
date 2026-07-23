@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.2](https://github.com/eSlider/go-onlyoffice/compare/v0.8.1...v0.8.2) (2026-07-23)
+
+
+### Bug Fixes
+
+* **ci:** retry tag fetch in Release workflow ([#11](https://github.com/eSlider/go-onlyoffice/issues/11)) ([31b4aa0](https://github.com/eSlider/go-onlyoffice/commit/31b4aa0d90393e6d93513284e453b7da7e92c62d))
+
 ## [0.8.1](https://github.com/eSlider/go-onlyoffice/compare/v0.8.0...v0.8.1) (2026-07-23)
 
 
