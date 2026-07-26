@@ -46,9 +46,12 @@ func (c *Client) GetContact(ctx context.Context, contactID string) (map[string]a
 }
 
 // FindCompany searches for a company contact with an exact (case-insensitive)
-// displayName match. Returns nil when not found.
+// displayName match after slogan/legal-suffix normalization. Returns nil when not found.
 func (c *Client) FindCompany(ctx context.Context, name string) (map[string]any, error) {
 	needle := CompanyGroupingKey(name)
+	if needle == "" {
+		return nil, nil
+	}
 	const page = 50
 	for start := 0; ; start += page {
 		items, total, err := c.ListContacts(ctx, page, start, name)
@@ -65,6 +68,19 @@ func (c *Client) FindCompany(ctx context.Context, name string) (map[string]any, 
 		}
 		if start+page >= total || len(items) == 0 {
 			break
+		}
+	}
+	// Search filter may miss longer legal names; fall back to a full company scan.
+	all, err := c.ListAllContacts(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, co := range all {
+		if !isCompany(co) {
+			continue
+		}
+		if CompanyGroupingKey(fmt.Sprint(co["displayName"])) == needle {
+			return co, nil
 		}
 	}
 	return nil, nil
