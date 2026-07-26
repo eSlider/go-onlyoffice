@@ -18,20 +18,21 @@ trees, match against live OnlyOffice CRM, then create/update only rows with
 approve: true.
 
 Typical flow:
-  oo catalog scan-contacts --root PATH -o /tmp/contacts.yaml
-  oo catalog scan-projects --root ~/projects -o /tmp/projects.yaml
-  oo catalog merge -i /tmp/contacts.yaml -i /tmp/projects.yaml -o docs/catalog/clients-contacts.yaml
-  oo catalog match -i docs/catalog/clients-contacts.yaml -o docs/catalog/clients-contacts.yaml
+  oo catalog scan-contacts --root PATH -O /tmp/contacts.yaml
+  oo catalog scan-projects --root ~/projects -O /tmp/projects.yaml
+  oo catalog scan-thunderbird --root PATH -O /tmp/thunderbird.yaml
+  oo catalog merge -i /tmp/contacts.yaml -i /tmp/projects.yaml -i /tmp/thunderbird.yaml -O docs/catalog/clients-contacts.yaml
+  oo catalog match -i docs/catalog/clients-contacts.yaml
   # edit approve: true on pilot rows
   oo catalog apply --dry-run -i docs/catalog/clients-contacts.yaml
-  oo catalog apply --apply -i docs/catalog/clients-contacts.yaml -o docs/catalog/clients-contacts.yaml
-`,
-}
+  oo catalog apply --apply -i docs/catalog/clients-contacts.yaml
+`}
 
 func init() {
 	rootCmd.AddCommand(catalogCmd)
 	catalogCmd.AddCommand(catalogScanContactsCmd())
 	catalogCmd.AddCommand(catalogScanProjectsCmd())
+	catalogCmd.AddCommand(catalogScanThunderbirdCmd())
 	catalogCmd.AddCommand(catalogMergeCmd())
 	catalogCmd.AddCommand(catalogMatchCmd())
 	catalogCmd.AddCommand(catalogApplyCmd())
@@ -80,6 +81,35 @@ func catalogScanProjectsCmd() *cobra.Command {
 	}
 	cmd.Flags().String("root", "", "projects directory (local path)")
 	cmd.Flags().IntVar(&maxDepth, "max-depth", 4, "max directory depth for git roots")
+	cmd.Flags().StringVarP(&outPath, "out", "O", "", "write YAML to this path")
+	_ = cmd.MarkFlagRequired("root")
+	return cmd
+}
+
+func catalogScanThunderbirdCmd() *cobra.Command {
+	var outPath string
+	cmd := &cobra.Command{
+		Use:   "scan-thunderbird",
+		Short: "Thunderbird profiles: abook/history.mab + Gloda SQLite contacts",
+		Long: `Walk a directory tree for Thunderbird profiles and extract person rows from:
+  - *.mab address books (email regex)
+  - global-messages-db.sqlite Gloda contacts/identities
+
+Noisy senders (noreply, Amazon marketplace, GitHub reply, …) are skipped.
+Default zone is private; known work domains (e.g. wheregroup.com) get zone=warm role=work.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root, _ := cmd.Flags().GetString("root")
+			if root == "" {
+				return fmt.Errorf("--root is required")
+			}
+			doc, err := catalog.ScanThunderbirdRoot(root)
+			if err != nil {
+				return err
+			}
+			return writeCatalog(cmd, doc, outPath)
+		},
+	}
+	cmd.Flags().String("root", "", "Thunderbird profile or parent directory (local path)")
 	cmd.Flags().StringVarP(&outPath, "out", "O", "", "write YAML to this path")
 	_ = cmd.MarkFlagRequired("root")
 	return cmd
