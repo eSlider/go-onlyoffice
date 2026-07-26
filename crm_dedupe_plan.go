@@ -228,6 +228,11 @@ func GroupCompanyPersons(persons []map[string]any) map[int64]map[string][]map[st
 		}
 		cid := flexInt(row["companyId"])
 		if cid == 0 {
+			if co, ok := row["company"].(map[string]any); ok {
+				cid = flexInt(co["id"])
+			}
+		}
+		if cid == 0 {
 			continue
 		}
 		key := NormalizePersonKey(fmt.Sprint(row["firstName"]), fmt.Sprint(row["lastName"]))

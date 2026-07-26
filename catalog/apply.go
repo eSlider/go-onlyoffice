@@ -115,20 +115,13 @@ func applyCompany(ctx context.Context, client *onlyoffice.Client, e *Entry) (boo
 }
 
 func applyPerson(ctx context.Context, client *onlyoffice.Client, e *Entry) (bool, error) {
-	first := strings.TrimSpace(e.First)
-	last := strings.TrimSpace(e.Last)
-	if first == "" && last == "" {
-		first, last = SplitDisplayName(e.Name)
-	}
-	if first == "" {
-		first = strings.TrimSpace(e.Name)
-	}
+	org := strings.TrimSpace(e.Org)
+	first, last := CleanPersonNames(e.First, e.Last, e.Name, org, e.Emails)
+	e.First, e.Last = first, last
 	if first == "" {
 		return false, fmt.Errorf("person missing name")
 	}
-	if last == "" {
-		last = "-"
-	}
+	e.Name = strings.TrimSpace(first + " " + strings.Trim(last, "-"))
 
 	var p map[string]any
 	var err error
@@ -144,21 +137,27 @@ func applyPerson(ctx context.Context, client *onlyoffice.Client, e *Entry) (bool
 	}
 	created := false
 	companyID := 0
-	if e.Org != "" {
-		if co, ferr := client.FindCompany(ctx, e.Org); ferr == nil && co != nil {
+	if org != "" {
+		if co, ferr := client.FindCompany(ctx, org); ferr == nil && co != nil {
 			companyID, _ = strconv.Atoi(contactIDString(co))
 		}
 	}
 	if p == nil {
 		about := ""
-		if e.Org != "" {
-			about = "org: " + e.Org
+		if org != "" {
+			about = "org: " + org
 		}
 		p, err = client.CreatePerson(ctx, first, last, companyID, "", about)
 		if err != nil {
 			return false, err
 		}
 		created = true
+	} else {
+		// Repair names + ensure company link (never encode company in lastName).
+		id := contactIDString(p)
+		if _, err := client.UpdatePerson(ctx, id, first, last, companyID, "", ""); err != nil {
+			return false, fmt.Errorf("update person %s: %w", id, err)
+		}
 	}
 	id := contactIDString(p)
 	e.OOID = id
