@@ -9,12 +9,14 @@ require (
 	github.com/charmbracelet/glamour v0.8.0
 	github.com/charmbracelet/lipgloss v0.12.1
 	github.com/charmbracelet/x/ansi v0.1.4
+	github.com/emersion/go-vcard v0.0.0-20260618161152-d854b7e0e2d3
 	github.com/eslider/go-xls/v2 v2.1.0
 	github.com/google/go-querystring v1.2.0
 	github.com/joho/godotenv v1.5.1
 	github.com/mattn/go-runewidth v0.0.15
 	github.com/muesli/termenv v0.16.0
 	github.com/spf13/cobra v1.10.2
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
