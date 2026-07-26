@@ -126,8 +126,7 @@ func contactEmails(c map[string]any) []string {
 		out = append(out, em)
 	}
 	for _, row := range onlyoffice.ContactInfoRows(c) {
-		t := strings.ToLower(fmt.Sprint(row["infoType"]))
-		if t != "email" {
+		if onlyoffice.NormalizeContactInfoType(fmt.Sprint(row["infoType"])) != "email" {
 			continue
 		}
 		data := strings.TrimSpace(fmt.Sprint(row["data"]))

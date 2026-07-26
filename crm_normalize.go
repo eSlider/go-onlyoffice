@@ -92,8 +92,53 @@ func FixDealTitle(s string) string {
 }
 
 // ContactInfoKey groups contact info rows by type and normalized value.
+// ContactInfoKey builds a dedupe key for a contact-info row.
 func ContactInfoKey(infoType, value string) string {
-	return strings.ToLower(strings.TrimSpace(infoType)) + "|" + strings.ToLower(strings.TrimSpace(value))
+	return NormalizeContactInfoType(infoType) + "|" + strings.ToLower(strings.TrimSpace(value))
+}
+
+// NormalizeContactInfoType maps OO numeric infoType codes and string labels to
+// a canonical lowercase label (email, phone, …).
+func NormalizeContactInfoType(infoType string) string {
+	t := strings.ToLower(strings.TrimSpace(infoType))
+	switch t {
+	case "1", "email":
+		return "email"
+	case "2", "phone":
+		return "phone"
+	case "3", "website":
+		return "website"
+	case "4", "skype":
+		return "skype"
+	case "5", "twitter":
+		return "twitter"
+	case "6", "linkedin":
+		return "linkedin"
+	case "7", "facebook":
+		return "facebook"
+	case "8", "address":
+		return "address"
+	case "9", "livejournal":
+		return "livejournal"
+	case "10", "myspace":
+		return "myspace"
+	case "11", "gmail":
+		return "gmail"
+	case "12", "blogger":
+		return "blogger"
+	case "13", "yahoo":
+		return "yahoo"
+	case "14", "msn":
+		return "msn"
+	case "15", "icq":
+		return "icq"
+	case "16", "jabber":
+		return "jabber"
+	case "17", "aim":
+		return "aim"
+	default:
+		return t
+	}
 }
 
 // MemberDisplayKey normalizes a member displayName for duplicate detection.
