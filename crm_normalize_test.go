@@ -65,6 +65,10 @@ func TestCompanyGroupingKey(t *testing.T) {
 	if a != b {
 		t.Fatalf("%q != %q", a, b)
 	}
+	if CompanyGroupingKey("WhereGroup") != CompanyGroupingKey("WhereGroup GmbH & Co. KG,") {
+		t.Fatalf("legal suffix should not change grouping key: %q vs %q",
+			CompanyGroupingKey("WhereGroup"), CompanyGroupingKey("WhereGroup GmbH & Co. KG,"))
+	}
 }
 
 func TestOpportunityTitlesMatchSlogan(t *testing.T) {

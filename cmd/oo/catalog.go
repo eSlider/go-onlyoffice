@@ -88,12 +88,14 @@ func catalogScanProjectsCmd() *cobra.Command {
 
 func catalogScanThunderbirdCmd() *cobra.Command {
 	var outPath string
+	var mboxHeaders bool
 	cmd := &cobra.Command{
 		Use:   "scan-thunderbird",
 		Short: "Thunderbird profiles: abook/history.mab + Gloda SQLite contacts",
 		Long: `Walk a directory tree for Thunderbird profiles and extract person rows from:
   - *.mab address books (email regex)
   - global-messages-db.sqlite Gloda contacts/identities
+  - optional --mbox-headers: From/To/Cc/Reply-To from mbox folder files (no bodies)
 
 Noisy senders (noreply, Amazon marketplace, GitHub reply, …) are skipped.
 Default zone is private; known work domains (e.g. wheregroup.com) get zone=warm role=work.`,
@@ -102,7 +104,7 @@ Default zone is private; known work domains (e.g. wheregroup.com) get zone=warm 
 			if root == "" {
 				return fmt.Errorf("--root is required")
 			}
-			doc, err := catalog.ScanThunderbirdRoot(root)
+			doc, err := catalog.ScanThunderbirdRootOpts(root, catalog.ScanOptions{MboxHeaders: mboxHeaders})
 			if err != nil {
 				return err
 			}
@@ -110,6 +112,7 @@ Default zone is private; known work domains (e.g. wheregroup.com) get zone=warm 
 		},
 	}
 	cmd.Flags().String("root", "", "Thunderbird profile or parent directory (local path)")
+	cmd.Flags().BoolVar(&mboxHeaders, "mbox-headers", false, "also extract emails from mbox From/To/Cc headers")
 	cmd.Flags().StringVarP(&outPath, "out", "O", "", "write YAML to this path")
 	_ = cmd.MarkFlagRequired("root")
 	return cmd

@@ -19,9 +19,21 @@ type ApplyResult struct {
 }
 
 // ApplyApproved creates/updates OO contacts for entries with approve=true.
+// Companies are applied before persons so Org links resolve in the same run.
 func ApplyApproved(ctx context.Context, client *onlyoffice.Client, doc *Document, dryRun bool) (*ApplyResult, error) {
 	res := &ApplyResult{DryRun: dryRun}
-	for i := range doc.Entries {
+	order := make([]int, 0, len(doc.Entries))
+	for i, e := range doc.Entries {
+		if e.Kind == "company" {
+			order = append(order, i)
+		}
+	}
+	for i, e := range doc.Entries {
+		if e.Kind != "company" {
+			order = append(order, i)
+		}
+	}
+	for _, i := range order {
 		e := &doc.Entries[i]
 		if !e.Approve {
 			res.Skipped++

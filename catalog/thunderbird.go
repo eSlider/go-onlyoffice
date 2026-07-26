@@ -2,9 +2,7 @@ package catalog
 
 import (
 	"database/sql"
-	"fmt"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 
@@ -26,11 +24,24 @@ func noisyEmail(email string) bool {
 	noiseLocal := []string{
 		"noreply", "no-reply", "donotreply", "mailer-daemon", "postmaster",
 		"bounce", "notifications", "newsletter", "unsubscribe",
+		"root", "admin", "abuse", "webmaster", "hostmaster",
 	}
 	for _, p := range noiseLocal {
-		if strings.Contains(local, p) {
+		if local == p || strings.Contains(local, p) {
 			return true
 		}
+	}
+	// role / shared mailboxes (keep human dotted names)
+	roleExact := map[string]struct{}{
+		"info": {}, "alle": {}, "all": {}, "office": {}, "office@": {},
+		"wartung": {}, "starface": {}, "gitlab": {}, "pl": {}, "gf": {},
+		"umsetzung": {}, "support": {}, "sales": {}, "billing": {},
+	}
+	if _, ok := roleExact[local]; ok {
+		return true
+	}
+	if strings.HasSuffix(local, "-request") || strings.HasSuffix(local, "-owner") {
+		return true
 	}
 	noiseDomain := []string{
 		"marketplace.amazon.", "reply.github.com", "users.noreply.github.com",
@@ -51,78 +62,6 @@ func noisyEmail(email string) bool {
 		}
 	}
 	return false
-}
-
-// ScanThunderbirdRoot finds Thunderbird profiles under root and emits person rows
-// from address books (*.mab) and Gloda global-messages-db.sqlite.
-func ScanThunderbirdRoot(root string) (*Document, error) {
-	root = filepath.Clean(root)
-	st, err := os.Stat(root)
-	if err != nil {
-		return nil, err
-	}
-	if !st.IsDir() {
-		return nil, fmt.Errorf("not a directory: %s", root)
-	}
-
-	var entries []Entry
-	seenDB := map[string]struct{}{}
-	seenMAB := map[string]struct{}{}
-
-	err = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		name := d.Name()
-		if d.IsDir() {
-			switch name {
-			case "Cache", "cache2", "startupCache", "OfflineCache", "minidumps",
-				"crashes", "safebrowsing", "thumbnails", "chrome", "extensions",
-				"node_modules", ".git":
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		lower := strings.ToLower(name)
-		switch {
-		case lower == "global-messages-db.sqlite":
-			if _, ok := seenDB[path]; ok {
-				return nil
-			}
-			seenDB[path] = struct{}{}
-			parsed, perr := parseGlodaContacts(path)
-			if perr != nil {
-				entries = append(entries, Entry{
-					ID:      EntryID("person", "", filepath.Base(path)),
-					Kind:    "person",
-					Name:    "gloda",
-					Sources: []string{path},
-					Zone:    "private",
-					Role:    "unknown",
-					Notes:   "gloda_parse_error: " + perr.Error(),
-					Status:  "new",
-				})
-				return nil
-			}
-			entries = append(entries, parsed...)
-		case strings.HasSuffix(lower, ".mab"):
-			if _, ok := seenMAB[path]; ok {
-				return nil
-			}
-			seenMAB[path] = struct{}{}
-			parsed, perr := parseMABEmails(path)
-			if perr != nil {
-				return nil
-			}
-			entries = append(entries, parsed...)
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return MergeDocs(&Document{Entries: entries}), nil
 }
 
 func parseMABEmails(path string) ([]Entry, error) {
