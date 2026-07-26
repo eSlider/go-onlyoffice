@@ -144,8 +144,7 @@ func contactEmailValues(p map[string]any) []string {
 		}
 	}
 	for _, row := range ContactInfoRows(p) {
-		t := strings.ToLower(fmt.Sprint(row["infoType"]))
-		if t != "email" {
+		if NormalizeContactInfoType(fmt.Sprint(row["infoType"])) != "email" {
 			continue
 		}
 		data := strings.TrimSpace(fmt.Sprint(row["data"]))
@@ -186,6 +185,24 @@ func (c *Client) CreatePerson(ctx context.Context, first, last string, companyID
 		fields.Set("about", about)
 	}
 	return c.postFormObject(ctx, "/api/2.0/crm/contact/person.json", fields)
+}
+
+// UpdatePerson updates first/last name and optional company link on a person.
+// companyID == 0 leaves the company association unchanged.
+func (c *Client) UpdatePerson(ctx context.Context, personID, first, last string, companyID int, jobTitle, about string) (map[string]any, error) {
+	fields := url.Values{}
+	fields.Set("firstName", first)
+	fields.Set("lastName", last)
+	if companyID != 0 {
+		fields.Set("companyId", strconv.Itoa(companyID))
+	}
+	if jobTitle != "" {
+		fields.Set("jobTitle", jobTitle)
+	}
+	if about != "" {
+		fields.Set("about", about)
+	}
+	return c.putFormObject(ctx, fmt.Sprintf("/api/2.0/crm/contact/person/%s.json", url.PathEscape(personID)), fields)
 }
 
 // AddContactInfo attaches an email/website/phone/etc. to a contact.

@@ -3,8 +3,10 @@ package main
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	onlyoffice "github.com/eslider/go-onlyoffice"
+	"github.com/eslider/go-onlyoffice/catalog"
 	"github.com/spf13/cobra"
 )
 
@@ -39,12 +41,14 @@ func init() {
 	contactsCmd.AddCommand(contactsListCmd(nil))
 	contactsCmd.AddCommand(contactsGetCmd())
 	contactsCmd.AddCommand(contactsDeleteCmd())
+	contactsCmd.AddCommand(contactsMergeCmd())
 	contactsCmd.AddCommand(contactsInfoAddCmd())
 	contactsCmd.AddCommand(contactsDedupeInfoCmd())
 
 	only := true
 	personsCmd.AddCommand(contactsListCmd(&only)) // persons only
 	personsCmd.AddCommand(personsCreateCmd())
+	personsCmd.AddCommand(personsFixNamesCmd())
 	personsCmd.AddCommand(contactsDeleteCmd())
 	personsCmd.AddCommand(personsDedupeCmd())
 
@@ -146,6 +150,26 @@ func contactsDeleteCmd() *cobra.Command {
 	}
 }
 
+func contactsMergeCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "merge FROM_ID INTO_ID",
+		Short: "Merge FROM contact into INTO (FROM is removed)",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			out, err := c.MergeContacts(cmd.Context(), args[1], args[0])
+			if err != nil {
+				return err
+			}
+			printObject(out)
+			return nil
+		},
+	}
+}
+
 func contactsInfoAddCmd() *cobra.Command {
 	var infoType, value, category string
 	var isPrimary bool
@@ -215,6 +239,111 @@ func personsCreateCmd() *cobra.Command {
 	cmd.Flags().StringVar(&email, "email", "", "primary email (adds ContactInfo)")
 	cmd.Flags().StringVar(&linkedin, "linkedin", "", "linkedin url (adds ContactInfo)")
 	return cmd
+}
+
+func personsFixNamesCmd() *cobra.Command {
+	var companyID int
+	var dryRun bool
+	var orgHint string
+	cmd := &cobra.Command{
+		Use:   "fix-names",
+		Short: "Strip company annotations from last names; keep companyId link",
+		Long: `Repairs CRM persons whose lastName embeds a company ("Thomsen (Acme)")
+or whose firstName is an email. Company belongs on companyId, not in the name.
+
+With --company-id, only persons linked to that company are scanned.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			ctx := cmd.Context()
+			var list []map[string]any
+			if companyID > 0 {
+				list, err = c.ListCompanyPersons(ctx, strconv.Itoa(companyID))
+			} else {
+				all, err2 := c.ListAllContacts(ctx)
+				err = err2
+				for _, row := range all {
+					if isCo, _ := row["isCompany"].(bool); !isCo {
+						list = append(list, row)
+					}
+				}
+			}
+			if err != nil {
+				return err
+			}
+			fixed, skipped := 0, 0
+			for _, p := range list {
+				id := fmt.Sprint(p["id"])
+				// List payloads often omit contactInfos; refresh when name looks like email.
+				fn := strings.TrimSpace(fmt.Sprint(p["firstName"]))
+				if strings.Contains(fn, "@") || fn == "" {
+					if full, gerr := c.GetContact(ctx, id); gerr == nil && full != nil {
+						p = full
+					}
+				}
+				fn = strings.TrimSpace(fmt.Sprint(p["firstName"]))
+				ln := strings.TrimSpace(fmt.Sprint(p["lastName"]))
+				dn := strings.TrimSpace(fmt.Sprint(p["displayName"]))
+				org := orgHint
+				if org == "" {
+					if co, ok := p["company"].(map[string]any); ok {
+						org = strings.TrimSpace(fmt.Sprint(co["displayName"]))
+					}
+				}
+				emails := contactEmailsFromMap(p)
+				for _, row := range onlyoffice.ContactInfoRows(p) {
+					if onlyoffice.NormalizeContactInfoType(fmt.Sprint(row["infoType"])) == "email" {
+						if data := strings.TrimSpace(fmt.Sprint(row["data"])); data != "" {
+							emails = append(emails, data)
+						}
+					}
+				}
+				cf, cl := catalog.CleanPersonNames(fn, ln, dn, org, emails)
+				needName := cf != fn || cl != ln
+				linkID := companyID
+				if linkID == 0 {
+					if co, ok := p["company"].(map[string]any); ok {
+						linkID = int(flexIDFloat(co["id"]))
+					}
+				}
+				if !needName {
+					skipped++
+					continue
+				}
+				row := map[string]any{
+					"id": id, "from": fn + " / " + ln, "to": cf + " / " + cl, "companyId": linkID,
+				}
+				if dryRun {
+					printObject(row)
+					fixed++
+					continue
+				}
+				if _, err := c.UpdatePerson(ctx, id, cf, cl, linkID, "", ""); err != nil {
+					return fmt.Errorf("update %s: %w", id, err)
+				}
+				printObject(row)
+				fixed++
+			}
+			printObject(map[string]any{"fixed": fixed, "skipped": skipped, "dry_run": dryRun})
+			return nil
+		},
+	}
+	cmd.Flags().IntVar(&companyID, "company-id", 0, "limit to persons of this company")
+	cmd.Flags().StringVar(&orgHint, "org", "", "org name hint for stripping suffixes")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print planned renames only")
+	return cmd
+}
+
+func contactEmailsFromMap(p map[string]any) []string {
+	var out []string
+	for _, k := range []string{"email", "primaryEmail"} {
+		if v := strings.TrimSpace(fmt.Sprint(p[k])); v != "" && v != "<nil>" {
+			out = append(out, v)
+		}
+	}
+	return out
 }
 
 func companiesCreateCmd() *cobra.Command {
