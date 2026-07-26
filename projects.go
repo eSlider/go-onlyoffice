@@ -193,16 +193,26 @@ func (c *Client) DeleteProject(id int) (*Project, error) {
 }
 
 // UpdateProject updates project fields.
+// OnlyOffice requires responsibleId on PUT; callers should set ResponsibleID
+// (the CLI fills it from the current project when omitted).
 func (c *Client) UpdateProject(req ProjectUpdateRequest) (*Project, error) {
-	p := &Project{}
-	return p, c.Query(Request{
+	p := new(Project)
+	body := map[string]any{
+		"title":         req.Title,
+		"description":   req.Description,
+		"responsibleId": req.ResponsibleID,
+	}
+	err := c.Query(Request{
 		Uri:    fmt.Sprintf("/api/2.0/project/%d.json", req.ID),
 		Method: "PUT",
-		Body:   req,
-	},
-		&struct {
-			Response *Project `json:"response"`
-		}{p})
+		Body:   body,
+	}, &struct {
+		Response *Project `json:"response"`
+	}{Response: p})
+	if err != nil {
+		return p, err
+	}
+	return p, nil
 }
 
 // UpdateProjectStatus sets project lifecycle status (open, paused, closed).

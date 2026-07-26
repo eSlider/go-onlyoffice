@@ -3,8 +3,10 @@ package main
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	onlyoffice "github.com/eslider/go-onlyoffice"
+	"github.com/eslider/go-onlyoffice/catalog"
 	"github.com/spf13/cobra"
 )
 
@@ -116,17 +118,32 @@ func prjMilestonesCmd() *cobra.Command {
 
 func prjCreateCmd() *cobra.Command {
 	var desc, resp string
+	var country, company string
 	cmd := &cobra.Command{
 		Use:   "create TITLE",
 		Short: "Create a new project",
-		Args:  cobra.ExactArgs(1),
+		Long: `Create a project. Prefer canonical titles:
+
+  CC | Company | Title
+
+Examples:
+  oo projects create "Mapbender" --country DE --company "Stadt Mainz"
+  oo projects create "DE | Acme | Geo Engineer"
+
+When --country and --company are set, TITLE is only the third segment and the
+full title is composed as "CC | Company | Title".`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := newOO(cmd)
 			if err != nil {
 				return err
 			}
+			title := args[0]
+			if country != "" || company != "" {
+				title = catalog.FormatProjectTitle(country, company, args[0])
+			}
 			p, err := c.CreateProject(onlyoffice.NewProjectRequest{
-				Title:         args[0],
+				Title:         title,
 				Description:   desc,
 				ResponsibleID: resp,
 			})
@@ -142,6 +159,8 @@ func prjCreateCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&desc, "description", "", "project description")
 	cmd.Flags().StringVar(&resp, "responsible", "", "responsible user id (default: self)")
+	cmd.Flags().StringVar(&country, "country", "", "country/region code (DE, TF, UA, …)")
+	cmd.Flags().StringVar(&company, "company", "", "CRM company / engagement org name")
 	return cmd
 }
 
@@ -160,6 +179,25 @@ func prjUpdateCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("project id must be integer: %w", err)
 			}
+			// OO update requires responsibleId; reuse current when not passed.
+			if resp == "" {
+				cur, gerr := c.GetProjectByID(cmd.Context(), args[0])
+				if gerr != nil {
+					return gerr
+				}
+				if r, ok := cur["responsible"].(map[string]any); ok {
+					resp = fmt.Sprint(r["id"])
+				}
+				if resp == "" || resp == "<nil>" {
+					resp = strings.TrimSpace(fmt.Sprint(cur["responsibleId"]))
+				}
+				if title == "" {
+					title = strings.TrimSpace(fmt.Sprint(cur["title"]))
+				}
+				if desc == "" {
+					desc = strings.TrimSpace(fmt.Sprint(cur["description"]))
+				}
+			}
 			p, err := c.UpdateProject(onlyoffice.ProjectUpdateRequest{
 				ID:            id,
 				Title:         title,
@@ -173,6 +211,11 @@ func prjUpdateCmd() *cobra.Command {
 				"id":    derefInt(p.ID),
 				"title": p.String(),
 			})
+			// Confirm via GET — some OO builds return an empty body on PUT.
+			got, gerr := c.GetProjectByID(cmd.Context(), args[0])
+			if gerr == nil && got != nil {
+				printObject(map[string]any{"confirmed_title": got["title"], "confirmed_id": got["id"]})
+			}
 			return nil
 		},
 	}
