@@ -4,6 +4,26 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0](https://github.com/eSlider/go-onlyoffice/compare/v0.8.3...v0.9.0) (2026-07-26)
+
+
+### Features
+
+* **catalog:** mbox header scan, company legal-suffix match, apply order ([8b29be2](https://github.com/eSlider/go-onlyoffice/commit/8b29be2d9bb71154d473f780ad247c5c440c6021))
+* **catalog:** scan Thunderbird address books and Gloda contacts ([502b373](https://github.com/eSlider/go-onlyoffice/commit/502b373e3726ded8b9c50e061ff30aea83205a34))
+* **oo:** catalog scan/match/apply for CRM clients and contacts ([547f063](https://github.com/eSlider/go-onlyoffice/commit/547f063f7fe922fe784358093a89730f9aaf0683))
+* **oo:** catalog scan/match/apply for CRM clients and contacts ([c32e4dd](https://github.com/eSlider/go-onlyoffice/commit/c32e4dd6116f0b8df67e93c5b589a417dfee59aa))
+* **projects:** CRM contacts + git author linking ([457c589](https://github.com/eSlider/go-onlyoffice/commit/457c589abdc2c9fe8edd42b4b7445581976cc5a2))
+* **projects:** link CRM companies and git authors to projects ([5a8735e](https://github.com/eSlider/go-onlyoffice/commit/5a8735e2898cf53e330e183250cf3c5d3c84da55))
+
+
+### Bug Fixes
+
+* **catalog:** oo_projects field + safer match ([8d5ca67](https://github.com/eSlider/go-onlyoffice/commit/8d5ca67d64da83c70d8ae293f4c7c23f9f9f59d3))
+* **catalog:** preserve oo_id on match; add oo_projects field ([d873cb7](https://github.com/eSlider/go-onlyoffice/commit/d873cb748adf4458369d8a2167abd8da987737c5))
+* **crm:** clean person names; canonical project titles ([b9591f5](https://github.com/eSlider/go-onlyoffice/commit/b9591f5fc3efc13b78dbe932ff32c2f2905e18fc))
+* **crm:** person names + CC | Company | Title projects ([6305135](https://github.com/eSlider/go-onlyoffice/commit/6305135bd799efe42dbb900a694e82aeae9f9e58))
+
 ## [0.8.3](https://github.com/eSlider/go-onlyoffice/compare/v0.8.2...v0.8.3) (2026-07-23)
 
 
