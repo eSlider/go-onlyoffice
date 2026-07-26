@@ -27,7 +27,7 @@ func MatchAgainstOO(ctx context.Context, client *onlyoffice.Client, doc *Documen
 			byEmail[NormalizeEmail(em)] = c
 		}
 		if isCo {
-			key := NormalizeName(fmt.Sprint(c["displayName"]))
+			key := onlyoffice.CompanyGroupingKey(fmt.Sprint(c["displayName"]))
 			if key != "" {
 				byCompanyName[key] = c
 			}
@@ -63,7 +63,7 @@ func MatchAgainstOO(ctx context.Context, client *onlyoffice.Client, doc *Documen
 		}
 		if !matched {
 			if e.Kind == "company" {
-				if c, ok := byCompanyName[NormalizeName(e.Name)]; ok {
+				if c, ok := byCompanyName[onlyoffice.CompanyGroupingKey(e.Name)]; ok {
 					oo = c
 					matched = true
 				}
@@ -90,6 +90,12 @@ func MatchAgainstOO(ctx context.Context, client *onlyoffice.Client, doc *Documen
 		if matched && oo != nil {
 			e.Status = "exists"
 			e.OOID = contactIDString(oo)
+			continue
+		}
+		// Keep a previously applied oo_id (list payloads often omit emails,
+		// so email match can miss persons that already exist in CRM).
+		if strings.TrimSpace(e.OOID) != "" {
+			e.Status = "exists"
 			continue
 		}
 		e.Status = "new"

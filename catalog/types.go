@@ -25,12 +25,15 @@ type Entry struct {
 	Sources []string `yaml:"sources,omitempty"`
 	Zone    string   `yaml:"zone"`
 	Role    string   `yaml:"role"`
-	OOID    string   `yaml:"oo_id,omitempty"`
-	Approve bool     `yaml:"approve"`
-	Status  string   `yaml:"status,omitempty"` // new | exists | conflict | applied | skipped
-	Notes   string   `yaml:"notes,omitempty"`
-	Remote  string   `yaml:"remote,omitempty"`
-	GitRoot string   `yaml:"git_root,omitempty"`
+	OOID       string `yaml:"oo_id,omitempty"`
+	Approve    bool   `yaml:"approve"`
+	Status     string `yaml:"status,omitempty"` // new | exists | conflict | applied | skipped
+	Notes      string `yaml:"notes,omitempty"`
+	// OOProjects are OnlyOffice Project IDs linked in the catalog (not written to CRM API).
+	// Kept separate from Notes because apply overwrites Notes with created|updated.
+	OOProjects []int  `yaml:"oo_projects,omitempty"`
+	Remote     string `yaml:"remote,omitempty"`
+	GitRoot    string `yaml:"git_root,omitempty"`
 }
 
 // Document is the on-disk catalog file.
@@ -174,6 +177,25 @@ func mergeEntry(dst, src *Entry) {
 	if dst.Status == "" {
 		dst.Status = src.Status
 	}
+	dst.OOProjects = mergeIntIDs(dst.OOProjects, src.OOProjects)
+}
+
+func mergeIntIDs(a, b []int) []int {
+	seen := map[int]struct{}{}
+	var out []int
+	for _, xs := range [][]int{a, b} {
+		for _, n := range xs {
+			if n <= 0 {
+				continue
+			}
+			if _, ok := seen[n]; ok {
+				continue
+			}
+			seen[n] = struct{}{}
+			out = append(out, n)
+		}
+	}
+	return out
 }
 
 func uniqueEmails(in []string) []string {

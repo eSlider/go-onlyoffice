@@ -68,6 +68,21 @@ func TestMergeDocs(t *testing.T) {
 	}
 }
 
+func TestMergeDocsOOProjects(t *testing.T) {
+	a := &Document{Entries: []Entry{{
+		ID: "company:wg", Kind: "company", Name: "WhereGroup", Zone: "warm", Role: "work",
+		OOProjects: []int{28},
+	}}}
+	b := &Document{Entries: []Entry{{
+		ID: "company:wg", Kind: "company", Name: "WhereGroup", Zone: "warm", Role: "work",
+		OOProjects: []int{28, 99},
+	}}}
+	e := MergeDocs(a, b).Entries[0]
+	if len(e.OOProjects) != 2 || e.OOProjects[0] != 28 || e.OOProjects[1] != 99 {
+		t.Fatalf("oo_projects=%v", e.OOProjects)
+	}
+}
+
 func TestScanContactsRoot(t *testing.T) {
 	root := t.TempDir()
 	vcfDir := filepath.Join(root, "Contacts VCF's")
