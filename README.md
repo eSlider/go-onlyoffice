@@ -635,7 +635,7 @@ oo tasks files detach 208 12345
 | `cases` | `list`, `create`, `delete`, `member-add` |
 | `crm-tasks` | `list`, `create`, `delete`, `categories` |
 | `applications` | `sync` |
-| `catalog` | `scan-contacts`, `scan-projects`, `merge`, `match`, `apply` |
+| `catalog` | `scan-contacts`, `scan-projects`, `scan-thunderbird`, `merge`, `match`, `apply` |
 
 The CLI reads only `.env` from the current working directory (godotenv is a
 CLI-only concern — the library itself never loads dotfiles).
@@ -743,7 +743,8 @@ starts sparse. You need a reviewable inventory before writes.
 ```bash
 oo catalog scan-contacts --root /path/to/contacts -O /tmp/contacts.yaml
 oo catalog scan-projects --root ~/work -O /tmp/projects.yaml
-oo catalog merge -i /tmp/contacts.yaml -i /tmp/projects.yaml -O clients-contacts.yaml
+oo catalog scan-thunderbird --root /path/to/thunderbird-profile -O /tmp/thunderbird.yaml
+oo catalog merge -i /tmp/contacts.yaml -i /tmp/projects.yaml -i /tmp/thunderbird.yaml -O clients-contacts.yaml
 oo catalog match -i clients-contacts.yaml
 # set approve: true on pilot rows in the YAML
 oo catalog apply --dry-run -i clients-contacts.yaml
