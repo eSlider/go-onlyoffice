@@ -10,6 +10,9 @@ var multiSpace = regexp.MustCompile(`\s+`)
 // sloganSeparators split a company name from a trailing tagline/slogan.
 var sloganSeparators = []string{" — ", " – ", " - ", "—", "–"}
 
+// companyLegalSuffix matches trailing legal-form tokens (GmbH, & Co. KG, …).
+var companyLegalSuffix = regexp.MustCompile(`(?i)[\s,]*(&\s*co\.?\s*kg\.?|co\.?\s*kg\.?|gmbh|ag|ltd\.?|llc\.?|inc\.?|plc\.?|s\.?l\.?|sarl|b\.?v\.?)\s*$`)
+
 // StripSloganSuffix returns the part before an em/en dash tagline, e.g.
 // "Affirm — Fraud Engineering" → "Affirm".
 func StripSloganSuffix(s string) string {
@@ -22,9 +25,23 @@ func StripSloganSuffix(s string) string {
 	return s
 }
 
-// CompanyGroupingKey normalizes a company name for dedupe (ignores slogans).
+// StripCompanyLegalSuffix removes trailing GmbH / & Co. KG / Ltd / … tokens.
+func StripCompanyLegalSuffix(s string) string {
+	s = strings.TrimSpace(s)
+	s = strings.TrimRight(s, ",; ")
+	for {
+		next := companyLegalSuffix.ReplaceAllString(s, "")
+		next = strings.TrimRight(strings.TrimSpace(next), ",; ")
+		if next == s || next == "" {
+			return s
+		}
+		s = next
+	}
+}
+
+// CompanyGroupingKey normalizes a company name for dedupe (ignores slogans and legal suffixes).
 func CompanyGroupingKey(s string) string {
-	return NormalizeCompanyName(StripSloganSuffix(s))
+	return NormalizeCompanyName(StripCompanyLegalSuffix(StripSloganSuffix(s)))
 }
 
 // NormalizeCompanyName lowercases and collapses whitespace for grouping.
