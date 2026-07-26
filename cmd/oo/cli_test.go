@@ -11,7 +11,7 @@ func TestRootRegistersSubjects(t *testing.T) {
 	want := []string{
 		"calendar", "projects", "tasks", "users", "whoami",
 		"contacts", "persons", "companies",
-		"opportunities", "cases", "crm-tasks", "applications", "crm", "mails",
+		"opportunities", "cases", "crm-tasks", "applications", "crm", "mails", "catalog",
 	}
 	got := make(map[string]bool, len(rootCmd.Commands()))
 	for _, c := range rootCmd.Commands() {
