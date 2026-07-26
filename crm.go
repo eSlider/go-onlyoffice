@@ -46,9 +46,12 @@ func (c *Client) GetContact(ctx context.Context, contactID string) (map[string]a
 }
 
 // FindCompany searches for a company contact with an exact (case-insensitive)
-// displayName match. Returns nil when not found.
+// displayName match after slogan/legal-suffix normalization. Returns nil when not found.
 func (c *Client) FindCompany(ctx context.Context, name string) (map[string]any, error) {
 	needle := CompanyGroupingKey(name)
+	if needle == "" {
+		return nil, nil
+	}
 	const page = 50
 	for start := 0; ; start += page {
 		items, total, err := c.ListContacts(ctx, page, start, name)
@@ -65,6 +68,19 @@ func (c *Client) FindCompany(ctx context.Context, name string) (map[string]any, 
 		}
 		if start+page >= total || len(items) == 0 {
 			break
+		}
+	}
+	// Search filter may miss longer legal names; fall back to a full company scan.
+	all, err := c.ListAllContacts(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, co := range all {
+		if !isCompany(co) {
+			continue
+		}
+		if CompanyGroupingKey(fmt.Sprint(co["displayName"])) == needle {
+			return co, nil
 		}
 	}
 	return nil, nil
@@ -94,6 +110,53 @@ func (c *Client) FindPerson(ctx context.Context, first, last string) (map[string
 		}
 	}
 	return nil, nil
+}
+
+// FindPersonByEmail finds a person whose primary or contact-info email matches
+// (case-insensitive). Companies are skipped. Returns nil when not found.
+func (c *Client) FindPersonByEmail(ctx context.Context, email string) (map[string]any, error) {
+	needle := strings.ToLower(strings.TrimSpace(email))
+	if needle == "" {
+		return nil, nil
+	}
+	all, err := c.ListAllContacts(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, p := range all {
+		if isCompany(p) {
+			continue
+		}
+		for _, em := range contactEmailValues(p) {
+			if strings.ToLower(strings.TrimSpace(em)) == needle {
+				return p, nil
+			}
+		}
+	}
+	return nil, nil
+}
+
+func contactEmailValues(p map[string]any) []string {
+	var out []string
+	for _, key := range []string{"email", "primaryEmail"} {
+		if v := strings.TrimSpace(fmt.Sprint(p[key])); v != "" && v != "<nil>" {
+			out = append(out, v)
+		}
+	}
+	for _, row := range ContactInfoRows(p) {
+		t := strings.ToLower(fmt.Sprint(row["infoType"]))
+		if t != "email" {
+			continue
+		}
+		data := strings.TrimSpace(fmt.Sprint(row["data"]))
+		if data == "" || data == "<nil>" {
+			data = strings.TrimSpace(fmt.Sprint(row["value"]))
+		}
+		if data != "" {
+			out = append(out, data)
+		}
+	}
+	return out
 }
 
 func isCompany(m map[string]any) bool {
