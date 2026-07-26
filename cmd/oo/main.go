@@ -15,7 +15,7 @@
 //	oo crm           cleanup
 //	oo mails         accounts | folders | list | get | delete
 //	oo applications  sync
-//	oo catalog       scan-contacts | scan-projects | merge | match | apply
+//	oo catalog       scan-contacts | scan-projects | scan-thunderbird | merge | match | apply
 //
 // Every list supports `--output/-o json|table` (table is the default).
 //
