@@ -623,15 +623,13 @@ oo tasks files detach 208 12345
 | `projects` | `list`, `get`, `milestones`, `create`, `update`, `delete`, **`files`** (`list`, `upload`, `download`, `rename`, `delete`) |
 | `tasks` | `list`, `get`, `create`, `update`, `delete`, `subtask add`, **`files`** (`list`, `upload`, `detach`) |
 | `users` | `list`, `self` (alias: `oo whoami`) |
-| `contacts` | `list`, `get`, `delete`, `info-add` |
-| `persons` | `list` (filtered), `create`, `delete` |
-| `companies` | `list` (filtered), `create`, `delete` |
-| `contacts` | `list`, `get`, `delete`, `info-add`, `dedupe-info` |
+| `contacts` | `list`, `get`, `delete`, `info-add`, `merge`, `dedupe-info` |
 | `persons` | `list`, `create`, `delete`, `dedupe` |
 | `companies` | `list`, `create`, `delete`, `dedupe`, `dedupe-persons` |
 | `opportunities` | `list`, `get`, `create`, `delete`, `stages`, `member-add`, `dedupe`, `dedupe-members`, `fix-titles` |
+| `invoices` | `list`, `get`, `create`, `update`, `pdf`, `pdf-cleanup`, `status`, `delete`, `items …` |
 | `crm` | `cleanup` |
-| `mails` | `accounts`, `folders`, `list`, `get`, `delete` |
+| `mails` | `accounts`, `folders`, `list`, `get`, `draft`, `attach`, `draft-invoice`, `delete` |
 | `cases` | `list`, `create`, `delete`, `member-add` |
 | `crm-tasks` | `list`, `create`, `delete`, `categories` |
 | `applications` | `sync` |
@@ -716,6 +714,32 @@ oo opportunities dedupe-members
 
 # Titles like " @ contoso" or extra whitespace
 oo opportunities fix-titles
+```
+
+Merge two known company ids (keeps `INTO`):
+
+```bash
+oo contacts merge FROM_ID INTO_ID
+```
+
+Company ↔ person ↔ deal ↔ project ↔ invoice ↔ mail rules and OO quirks:
+[docs/crm-associations.md](docs/crm-associations.md).
+
+### Invoices (`oo invoices`)
+
+**Problem:** Bill a client deal as Draft, regenerate PDF, prune duplicate PDF
+attachments, prepare OnlyOffice Mail — without inventing a second bill-to company.
+
+```bash
+# Always pass --opportunity at create (update --opportunity often HTTP 400)
+oo invoices create --number INV-2026-01 --contact COMPANY_ID --item ITEM_ID \
+  --price 300 --opportunity DEAL_ID --language de-DE \
+  --line-description "…" --terms $'…' --description $'…' --po "Deal #DEAL_ID"
+
+oo invoices pdf 41 --force
+oo invoices pdf-cleanup INVOICE_ID
+oo invoices status INVOICE_ID --status draft
+oo mails draft-invoice --invoice INVOICE_ID --to info@client.de
 ```
 
 **Deal grouping flag** — when the same role at the same company created
@@ -821,7 +845,20 @@ oo mails get 5664 -o json | jq '{subject, from, to, date}'
 # Remove one or more messages (server moves to trash or deletes per Mail rules)
 oo mails delete 5664
 oo mails delete 5664 5663 5661
+
+# Create / update a draft (HTML body field is API "body"; plain text is wrapped)
+oo mails draft --to client@example.com --subject "Rechnung INV-2026-01" \
+  --body "Guten Tag,\n\nanbei die Rechnung.\n\nMit freundlichen Grüßen"
+
+# Attach an OnlyOffice Files document (e.g. invoice PDF file id) to a draft
+oo mails attach 7301 --file-id 12345
+
+# Regenerate invoice PDF (force) + draft + attach (does not send)
+oo mails draft-invoice --invoice 16 --to info@example.com
 ```
+
+Matrix / chat URLs in signatures: use plain text
+`chat: https://matrix.to/#/@user:server` — HTML `<a href="…#…">` truncates at `#`.
 
 **Table output** splits the `from` header into `fromName` and `fromAddress`
 (e.g. `Bitfinex` + `no-reply@bitfinex.com`). **JSON output** returns the raw
