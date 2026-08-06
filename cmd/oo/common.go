@@ -20,7 +20,7 @@ var outputFormat = "table"
 var rootCmd = &cobra.Command{
 	Use:           "oo",
 	Short:         "OnlyOffice Workspace CLI — subject-based command tree",
-	Long:          "oo is a thin CLI over github.com/eslider/go-onlyoffice.\nCommands are grouped by OnlyOffice subject (calendar, projects, tasks, users, persons, companies, opportunities, cases, crm-tasks, applications, catalog).",
+	Long:          "oo is a thin CLI over github.com/eslider/go-onlyoffice.\nCommands are grouped by OnlyOffice subject (calendar, projects, tasks, users, persons, companies, opportunities, cases, crm-tasks, applications, catalog, invoices).",
 	Version:       version,
 	SilenceUsage:  true,
 	SilenceErrors: false,

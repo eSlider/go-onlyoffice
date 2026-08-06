@@ -6,16 +6,19 @@
 //	oo projects      list | get | milestones | create | update | delete | files (list|upload|download|rename|delete)
 //	oo tasks         list | get | create | update | delete | subtask add | files (list|upload|detach)
 //	oo users         list | self            (alias: oo whoami)
-//	oo contacts      list | get | delete | info-add | dedupe-info
+//	oo contacts      list | get | delete | info-add | merge | dedupe-info
 //	oo persons       list | create | delete | dedupe
 //	oo companies     list | create | delete | dedupe | dedupe-persons
 //	oo opportunities list | get | create | delete | stages | member-add | dedupe | dedupe-members | fix-titles
 //	oo cases         list | create | delete | member-add
 //	oo crm-tasks     list | create | delete | categories
 //	oo crm           cleanup
-//	oo mails         accounts | folders | list | get | delete
+//	oo mails         accounts | folders | list | get | draft | attach | draft-invoice | delete
+//	oo invoices      list | get | create | update | pdf | pdf-cleanup | status | delete | items …
 //	oo applications  sync
 //	oo catalog       scan-contacts | scan-projects | scan-thunderbird | merge | match | apply
+//
+// CRM association rules: docs/crm-associations.md
 //
 // Every list supports `--output/-o json|table` (table is the default).
 //
