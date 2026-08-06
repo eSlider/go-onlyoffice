@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -11,7 +12,7 @@ import (
 var mailsCmd = &cobra.Command{
 	Use:     "mails",
 	Aliases: []string{"mail"},
-	Short:   "OnlyOffice Workspace mail — list, read, delete",
+	Short:   "OnlyOffice Workspace mail — list, read, draft, delete",
 }
 
 func init() {
@@ -20,6 +21,9 @@ func init() {
 	mailsCmd.AddCommand(mailsFoldersCmd())
 	mailsCmd.AddCommand(mailsListCmd())
 	mailsCmd.AddCommand(mailsGetCmd())
+	mailsCmd.AddCommand(mailsDraftCmd())
+	mailsCmd.AddCommand(mailsAttachCmd())
+	mailsCmd.AddCommand(mailsDraftInvoiceCmd())
 	mailsCmd.AddCommand(mailsDeleteCmd())
 }
 
@@ -124,6 +128,176 @@ func mailsGetCmd() *cobra.Command {
 			return nil
 		},
 	}
+}
+
+func mailsDraftCmd() *cobra.Command {
+	var from, to, cc, bcc, subject, body, html string
+	var id int64
+	cmd := &cobra.Command{
+		Use:   "draft",
+		Short: "Create or update a mail draft (OnlyOffice Mail)",
+		Long: `Save a draft in /addons/mail (PUT /api/2.0/mail/drafts/save).
+
+  oo mails draft --to a@b.com --subject "…" --body "<p>…</p>"
+  oo mails draft --id 123 --to a@b.com --subject "…" --html "<p>…</p>"
+`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if to == "" {
+				return fmt.Errorf("--to is required")
+			}
+			htmlBody := body
+			if html != "" {
+				htmlBody = html
+			}
+			if htmlBody == "" {
+				return fmt.Errorf("--body or --html is required")
+			}
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			out, err := c.SaveMailDraft(cmd.Context(), onlyoffice.SaveMailDraftParams{
+				ID:      id,
+				From:    from,
+				To:      to,
+				Cc:      cc,
+				Bcc:     bcc,
+				Subject: subject,
+				Body:    onlyoffice.PlainTextToMailHTML(htmlBody),
+			})
+			if err != nil {
+				return err
+			}
+			printObject(out)
+			return nil
+		},
+	}
+	cmd.Flags().Int64Var(&id, "id", 0, "existing draft id (0 = create)")
+	cmd.Flags().StringVar(&from, "from", "", "from address (default: first enabled mailbox)")
+	cmd.Flags().StringVar(&to, "to", "", "recipient (required)")
+	cmd.Flags().StringVar(&cc, "cc", "", "cc")
+	cmd.Flags().StringVar(&bcc, "bcc", "", "bcc")
+	cmd.Flags().StringVar(&subject, "subject", "", "subject")
+	cmd.Flags().StringVar(&body, "body", "", "plain text or HTML body")
+	cmd.Flags().StringVar(&html, "html", "", "HTML body (alias of --body when set)")
+	return cmd
+}
+
+func mailsAttachCmd() *cobra.Command {
+	var fileID int64
+	cmd := &cobra.Command{
+		Use:   "attach MESSAGE_ID",
+		Short: "Attach an OnlyOffice Files document to a draft/message",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if fileID <= 0 {
+				return fmt.Errorf("--file-id is required")
+			}
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			out, err := c.AttachMailDocument(cmd.Context(), args[0], fileID)
+			if err != nil {
+				return err
+			}
+			printObject(out)
+			return nil
+		},
+	}
+	cmd.Flags().Int64Var(&fileID, "file-id", 0, "OnlyOffice file id (e.g. invoice PDF)")
+	return cmd
+}
+
+func mailsDraftInvoiceCmd() *cobra.Command {
+	var to, from, subject, body string
+	var invoiceID int
+	cmd := &cobra.Command{
+		Use:   "draft-invoice",
+		Short: "Create a mail draft with regenerated invoice PDF attached",
+		Long: `Regenerate the CRM invoice PDF, save an OnlyOffice Mail draft, and attach the PDF.
+
+Does not send. Open /addons/mail/#drafts to review.
+
+  oo mails draft-invoice --invoice 16 --to info@example.com
+`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if invoiceID <= 0 || to == "" {
+				return fmt.Errorf("--invoice and --to are required")
+			}
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			pdf, err := c.InvoicePDFFile(cmd.Context(), strconv.Itoa(invoiceID))
+			if err != nil {
+				return err
+			}
+			fileID := onlyoffice.Int64FromMap(pdf, "id")
+			if fileID <= 0 {
+				return fmt.Errorf("invoice PDF has no file id: %+v", pdf)
+			}
+			inv, err := c.GetInvoice(cmd.Context(), strconv.Itoa(invoiceID))
+			if err != nil {
+				return err
+			}
+			number := strings.TrimSpace(fmt.Sprint(inv["number"]))
+			cost := formatInvoiceCostEUR(inv["cost"])
+			if subject == "" {
+				subject = fmt.Sprintf("Rechnung %s — VM Setup-Paket (%s EUR)", number, cost)
+			}
+			if body == "" {
+				body = fmt.Sprintf(`Guten Tag,
+
+anbei übersende ich die Rechnung %s über %s EUR
+für das VM Setup-Paket (Tiny11 inkl. Backup, Monitoring, RustDesk,
+gemeinsamem Datenträger und Netzwerkzugriff).
+
+Zahlungsziel: 14 Tage netto.
+Steuerhinweis: siehe Notizen auf der Rechnung (Reverse Charge / § 13b UStG).
+
+Mit freundlichen Grüßen
+Andriy Oblivantsev`, number, cost)
+			}
+			draft, err := c.SaveMailDraft(cmd.Context(), onlyoffice.SaveMailDraftParams{
+				From:    from,
+				To:      to,
+				Subject: subject,
+				Body:    onlyoffice.PlainTextToMailHTML(body),
+			})
+			if err != nil {
+				return err
+			}
+			mid := fmt.Sprint(draft["id"])
+			att, err := c.AttachMailDocument(cmd.Context(), mid, fileID)
+			if err != nil {
+				return fmt.Errorf("draft %s created but attach failed: %w", mid, err)
+			}
+			if outputFormat == "json" {
+				printObject(map[string]any{"draft": draft, "attachment": att, "pdfFileId": fileID})
+				return nil
+			}
+			fmt.Printf("draft %s  to=%s  subject=%q  pdfFileId=%d\n", mid, to, subject, fileID)
+			fmt.Printf("open: https://office.produktor.io/addons/mail/#drafts\n")
+			return nil
+		},
+	}
+	cmd.Flags().IntVar(&invoiceID, "invoice", 0, "CRM invoice id")
+	cmd.Flags().StringVar(&to, "to", "", "recipient")
+	cmd.Flags().StringVar(&from, "from", "", "from address (default mailbox)")
+	cmd.Flags().StringVar(&subject, "subject", "", "override subject")
+	cmd.Flags().StringVar(&body, "body", "", "override plain-text body")
+	return cmd
+}
+
+func formatInvoiceCostEUR(v any) string {
+	s := strings.TrimSpace(fmt.Sprint(v))
+	s = strings.TrimSuffix(s, ".00")
+	s = strings.TrimSuffix(s, ".0")
+	if s == "" || s == "<nil>" {
+		return "?"
+	}
+	return s
 }
 
 func mailsDeleteCmd() *cobra.Command {

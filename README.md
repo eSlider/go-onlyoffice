@@ -631,7 +631,7 @@ oo tasks files detach 208 12345
 | `companies` | `list`, `create`, `delete`, `dedupe`, `dedupe-persons` |
 | `opportunities` | `list`, `get`, `create`, `delete`, `stages`, `member-add`, `dedupe`, `dedupe-members`, `fix-titles` |
 | `crm` | `cleanup` |
-| `mails` | `accounts`, `folders`, `list`, `get`, `delete` |
+| `mails` | `accounts`, `folders`, `list`, `get`, `draft`, `attach`, `draft-invoice`, `delete` |
 | `cases` | `list`, `create`, `delete`, `member-add` |
 | `crm-tasks` | `list`, `create`, `delete`, `categories` |
 | `applications` | `sync` |
@@ -821,6 +821,16 @@ oo mails get 5664 -o json | jq '{subject, from, to, date}'
 # Remove one or more messages (server moves to trash or deletes per Mail rules)
 oo mails delete 5664
 oo mails delete 5664 5663 5661
+
+# Create / update a draft (HTML body field is API "body"; plain text is wrapped)
+oo mails draft --to client@example.com --subject "Rechnung P-2026-02" \
+  --body "Guten Tag,\n\nanbei die Rechnung.\n\nMit freundlichen Grüßen"
+
+# Attach an OnlyOffice Files document (e.g. invoice PDF file id) to a draft
+oo mails attach 7301 --file-id 12345
+
+# Regenerate invoice PDF + draft + attach (does not send)
+oo mails draft-invoice --invoice 16 --to info@example.com
 ```
 
 **Table output** splits the `from` header into `fromName` and `fromAddress`
