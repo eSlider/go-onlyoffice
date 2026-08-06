@@ -14,6 +14,7 @@
 //	oo crm-tasks     list | create | delete | categories
 //	oo crm           cleanup
 //	oo mails         accounts | folders | list | get | delete
+//	oo invoices      list | get | create | delete | items (list|create|delete)
 //	oo applications  sync
 //	oo catalog       scan-contacts | scan-projects | scan-thunderbird | merge | match | apply
 //
