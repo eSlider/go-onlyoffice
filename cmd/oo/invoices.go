@@ -20,6 +20,7 @@ func init() {
 	invoicesCmd.AddCommand(invoiceListCmd())
 	invoicesCmd.AddCommand(invoiceGetCmd())
 	invoicesCmd.AddCommand(invoiceCreateCmd())
+	invoicesCmd.AddCommand(invoiceUpdateCmd())
 	invoicesCmd.AddCommand(invoiceDeleteCmd())
 	invoicesCmd.AddCommand(invoiceItemsCmd())
 }
@@ -77,7 +78,7 @@ func invoiceGetCmd() *cobra.Command {
 func invoiceCreateCmd() *cobra.Command {
 	var (
 		number, issueDate, dueDate, language, currency, terms, description, po string
-		contactID, itemID                                                      int64
+		contactID, itemID, opportunityID                                       int64
 		price, qty                                                             float64
 		lineDesc                                                               string
 	)
@@ -88,7 +89,7 @@ func invoiceCreateCmd() *cobra.Command {
 
 Example:
   oo invoices create --number INV-2026-01 --contact 123 --item 10 \
-    --price 300 --description "Service package" \
+    --price 300 --opportunity OPPORTUNITY_ID --line-description "Service package" \
     --terms "…payment terms…"
 `,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -117,6 +118,8 @@ Example:
 				IssueDate:           issueDate,
 				DueDate:             dueDate,
 				ContactID:           contactID,
+				EntityID:            opportunityID,
+				EntityType:          0, // Opportunity
 				Language:            language,
 				Currency:            currency,
 				ExchangeRate:        1,
@@ -140,6 +143,7 @@ Example:
 	}
 	cmd.Flags().StringVar(&number, "number", "", "invoice number (e.g. INV-2026-01)")
 	cmd.Flags().Int64Var(&contactID, "contact", 0, "bill-to contact id (company preferred)")
+	cmd.Flags().Int64Var(&opportunityID, "opportunity", 0, "link to CRM opportunity/deal id")
 	cmd.Flags().Int64Var(&itemID, "item", 0, "catalog invoice item id")
 	cmd.Flags().Float64Var(&price, "price", 0, "line price")
 	cmd.Flags().Float64Var(&qty, "qty", 1, "line quantity")
@@ -151,6 +155,35 @@ Example:
 	cmd.Flags().StringVar(&terms, "terms", "", "payment terms / footer")
 	cmd.Flags().StringVar(&description, "description", "", "invoice description")
 	cmd.Flags().StringVar(&po, "po", "", "purchase order number")
+	return cmd
+}
+
+func invoiceUpdateCmd() *cobra.Command {
+	var opportunityID int64
+	cmd := &cobra.Command{
+		Use:   "update INVOICE_ID",
+		Short: "Update invoice (link to opportunity)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if opportunityID == 0 {
+				return fmt.Errorf("--opportunity is required")
+			}
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			out, err := c.UpdateInvoice(cmd.Context(), args[0], onlyoffice.UpdateInvoiceParams{
+				EntityID:   opportunityID,
+				EntityType: 0,
+			})
+			if err != nil {
+				return err
+			}
+			printObject(out)
+			return nil
+		},
+	}
+	cmd.Flags().Int64Var(&opportunityID, "opportunity", 0, "CRM opportunity/deal id to link")
 	return cmd
 }
 
