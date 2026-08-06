@@ -160,21 +160,26 @@ Example:
 
 func invoiceUpdateCmd() *cobra.Command {
 	var opportunityID int64
+	var description, po string
 	cmd := &cobra.Command{
 		Use:   "update INVOICE_ID",
-		Short: "Update invoice (link to opportunity)",
+		Short: "Update invoice (opportunity link, notes, PO)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if opportunityID == 0 {
-				return fmt.Errorf("--opportunity is required")
+			if opportunityID == 0 && !cmd.Flags().Changed("description") && !cmd.Flags().Changed("po") {
+				return fmt.Errorf("set --opportunity and/or --description and/or --po")
 			}
 			c, err := newOO(cmd)
 			if err != nil {
 				return err
 			}
 			out, err := c.UpdateInvoice(cmd.Context(), args[0], onlyoffice.UpdateInvoiceParams{
-				EntityID:   opportunityID,
-				EntityType: 0,
+				EntityID:         opportunityID,
+				EntityType:       0,
+				Description:      description,
+				DescriptionSet:   cmd.Flags().Changed("description"),
+				PurchaseOrder:    po,
+				PurchaseOrderSet: cmd.Flags().Changed("po"),
 			})
 			if err != nil {
 				return err
@@ -184,6 +189,8 @@ func invoiceUpdateCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().Int64Var(&opportunityID, "opportunity", 0, "CRM opportunity/deal id to link")
+	cmd.Flags().StringVar(&description, "description", "", "invoice notes (Notizen); use \\n for line breaks")
+	cmd.Flags().StringVar(&po, "po", "", "purchase order number")
 	return cmd
 }
 

@@ -115,11 +115,15 @@ func (c *Client) CreateInvoice(ctx context.Context, p CreateInvoiceParams) (map[
 }
 
 // UpdateInvoiceParams are fields for PUT /api/2.0/crm/invoice/{id}.
-// Loads the current invoice and merges non-zero entity / contact updates.
+// Loads the current invoice and merges non-zero / set fields.
 type UpdateInvoiceParams struct {
-	EntityID   int64 // link to opportunity; 0 = leave unchanged
-	EntityType int
-	ContactID  int64 // 0 = leave unchanged
+	EntityID        int64 // link to opportunity; 0 = leave unchanged
+	EntityType      int
+	ContactID       int64  // 0 = leave unchanged
+	Description     string // invoice notes; empty + DescriptionSet=false keeps existing
+	DescriptionSet  bool
+	PurchaseOrder   string
+	PurchaseOrderSet bool
 }
 
 // UpdateInvoice PUTs a full invoice body (OnlyOffice requires complete payload).
@@ -195,6 +199,12 @@ func (c *Client) UpdateInvoice(ctx context.Context, id string, p UpdateInvoicePa
 		"templateType":        int(flexInt(inv["templateType"])),
 		"status":              statusID,
 		"invoiceLines":        lines,
+	}
+	if p.DescriptionSet {
+		body["description"] = p.Description
+	}
+	if p.PurchaseOrderSet {
+		body["purchaseOrderNumber"] = p.PurchaseOrder
 	}
 	if p.EntityID != 0 {
 		body["entityId"] = p.EntityID
