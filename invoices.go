@@ -30,6 +30,8 @@ type CreateInvoiceParams struct {
 	DueDate             string // ISO-8601
 	ContactID           int64
 	ConsigneeID         int64 // 0 = omit
+	EntityID            int64 // 0 = omit; link to opportunity/case
+	EntityType          int   // OnlyOffice EntityType; 0 = Opportunity
 	Language            string
 	Currency            string
 	ExchangeRate        float64
@@ -105,7 +107,113 @@ func (c *Client) CreateInvoice(ctx context.Context, p CreateInvoiceParams) (map[
 	if p.ConsigneeID != 0 {
 		body["consigneeId"] = p.ConsigneeID
 	}
+	if p.EntityID != 0 {
+		body["entityId"] = p.EntityID
+		body["entityType"] = p.EntityType // 0 = Opportunity on this portal
+	}
 	return c.postJSONObject(ctx, "/api/2.0/crm/invoice", body)
+}
+
+// UpdateInvoiceParams are fields for PUT /api/2.0/crm/invoice/{id}.
+// Loads the current invoice and merges non-zero entity / contact updates.
+type UpdateInvoiceParams struct {
+	EntityID   int64 // link to opportunity; 0 = leave unchanged
+	EntityType int
+	ContactID  int64 // 0 = leave unchanged
+}
+
+// UpdateInvoice PUTs a full invoice body (OnlyOffice requires complete payload).
+func (c *Client) UpdateInvoice(ctx context.Context, id string, p UpdateInvoiceParams) (map[string]any, error) {
+	inv, err := c.GetInvoice(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	contactID := int64(0)
+	if m, ok := inv["contact"].(map[string]any); ok {
+		contactID = flexInt(m["id"])
+	}
+	if p.ContactID != 0 {
+		contactID = p.ContactID
+	}
+	cur := "EUR"
+	if m, ok := inv["currency"].(map[string]any); ok {
+		if a := stringField(m, "abbreviation"); a != "" {
+			cur = a
+		}
+	}
+	statusID := 1
+	if m, ok := inv["status"].(map[string]any); ok {
+		statusID = int(flexInt(m["id"]))
+	}
+	var lines []map[string]any
+	switch raw := inv["invoiceLines"].(type) {
+	case []any:
+		for _, row := range raw {
+			m, ok := row.(map[string]any)
+			if !ok {
+				continue
+			}
+			lines = append(lines, map[string]any{
+				"id":            flexInt(m["id"]),
+				"invoiceItemID": flexInt(m["invoiceItemID"]),
+				"invoiceTax1ID": flexInt(m["invoiceTax1ID"]),
+				"invoiceTax2ID": flexInt(m["invoiceTax2ID"]),
+				"description":   stringField(m, "description"),
+				"quantity":      floatField(m, "quantity"),
+				"price":         floatField(m, "price"),
+				"discount":      floatField(m, "discount"),
+				"sortOrder":     int(flexInt(m["sortOrder"])),
+			})
+		}
+	case []map[string]any:
+		for _, m := range raw {
+			lines = append(lines, map[string]any{
+				"id":            flexInt(m["id"]),
+				"invoiceItemID": flexInt(m["invoiceItemID"]),
+				"invoiceTax1ID": flexInt(m["invoiceTax1ID"]),
+				"invoiceTax2ID": flexInt(m["invoiceTax2ID"]),
+				"description":   stringField(m, "description"),
+				"quantity":      floatField(m, "quantity"),
+				"price":         floatField(m, "price"),
+				"discount":      floatField(m, "discount"),
+				"sortOrder":     int(flexInt(m["sortOrder"])),
+			})
+		}
+	}
+	body := map[string]any{
+		"id":                  flexInt(inv["id"]),
+		"number":              stringField(inv, "number"),
+		"issueDate":           stringField(inv, "issueDate"),
+		"dueDate":             stringField(inv, "dueDate"),
+		"contactId":           contactID,
+		"language":            stringField(inv, "language"),
+		"currency":            cur,
+		"exchangeRate":        floatField(inv, "exchangeRate"),
+		"purchaseOrderNumber": stringField(inv, "purchaseOrderNumber"),
+		"terms":               stringField(inv, "terms"),
+		"description":         stringField(inv, "description"),
+		"templateType":        int(flexInt(inv["templateType"])),
+		"status":              statusID,
+		"invoiceLines":        lines,
+	}
+	if p.EntityID != 0 {
+		body["entityId"] = p.EntityID
+		body["entityType"] = p.EntityType
+	} else if ent, ok := inv["entity"].(map[string]any); ok && ent != nil {
+		body["entityId"] = flexInt(ent["entityId"])
+		// API returns entityType as string ("opportunity"); create/update want int.
+		switch v := ent["entityType"].(type) {
+		case float64:
+			body["entityType"] = int(v)
+		case int:
+			body["entityType"] = v
+		case string:
+			if strings.EqualFold(v, "opportunity") {
+				body["entityType"] = 0
+			}
+		}
+	}
+	return c.putJSONObject(ctx, fmt.Sprintf("/api/2.0/crm/invoice/%s", url.PathEscape(id)), body)
 }
 
 // DeleteInvoice removes an invoice by id.
