@@ -129,6 +129,9 @@ type UpdateInvoiceParams struct {
 }
 
 // UpdateInvoice PUTs a full invoice body (OnlyOffice requires complete payload).
+//
+// Linking an opportunity via EntityID on an existing invoice often returns HTTP 400
+// on this portal — prefer CreateInvoice with EntityID set. See docs/crm-associations.md.
 func (c *Client) UpdateInvoice(ctx context.Context, id string, p UpdateInvoiceParams) (map[string]any, error) {
 	inv, err := c.GetInvoice(ctx, id)
 	if err != nil {
@@ -234,6 +237,161 @@ func (c *Client) UpdateInvoice(ctx context.Context, id string, p UpdateInvoicePa
 // DeleteInvoice removes an invoice by id.
 func (c *Client) DeleteInvoice(ctx context.Context, id string) (map[string]any, error) {
 	return c.deleteObject(ctx, fmt.Sprintf("/api/2.0/crm/invoice/%s.json", url.PathEscape(id)))
+}
+
+// Invoice status ids used by OnlyOffice CRM on produktor.io.
+const (
+	InvoiceStatusDraft    = 1
+	InvoiceStatusBilled   = 2
+	InvoiceStatusRejected = 3
+	InvoiceStatusPaid     = 4
+)
+
+// SetInvoiceStatus sets CRM invoice status for one or more invoice ids
+// (PUT /api/2.0/crm/invoice/status/{statusId} with invoiceids).
+// Note: Billed→Draft often does not stick; recreate Draft instead (see docs/crm-associations.md).
+func (c *Client) SetInvoiceStatus(ctx context.Context, statusID int, invoiceIDs ...int64) (map[string]any, error) {
+	if statusID <= 0 {
+		return nil, fmt.Errorf("status id is required")
+	}
+	if len(invoiceIDs) == 0 {
+		return nil, fmt.Errorf("at least one invoice id is required")
+	}
+	ids := make([]string, 0, len(invoiceIDs))
+	for _, id := range invoiceIDs {
+		ids = append(ids, strconv.FormatInt(id, 10))
+	}
+	fields := url.Values{}
+	fields.Set("invoiceids", strings.Join(ids, ","))
+	return c.putFormObject(ctx, fmt.Sprintf("/api/2.0/crm/invoice/status/%d", statusID), fields)
+}
+
+// InvoicePDFFile returns invoice PDF file metadata (id, title, viewUrl).
+// Without force, OnlyOffice may return a cached fileID with stale layout.
+func (c *Client) InvoicePDFFile(ctx context.Context, invoiceID string) (map[string]any, error) {
+	id := strings.TrimSpace(invoiceID)
+	if id == "" {
+		return nil, fmt.Errorf("InvoicePDFFile: invoice id is required")
+	}
+	return c.ResponseObject(ctx, fmt.Sprintf("/api/2.0/crm/invoice/%s/pdf", url.PathEscape(id)))
+}
+
+// ForceRegenerateInvoicePDF clears the cached PDF (Draft touch) then requests a new file.
+// No-op touch when the invoice is not editable (e.g. Billed) — falls back to GET /pdf.
+func (c *Client) ForceRegenerateInvoicePDF(ctx context.Context, invoiceID string) (map[string]any, error) {
+	id := strings.TrimSpace(invoiceID)
+	if id == "" {
+		return nil, fmt.Errorf("ForceRegenerateInvoicePDF: invoice id is required")
+	}
+	inv, err := c.GetInvoice(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	canEdit := true
+	if v, ok := inv["canEdit"].(bool); ok {
+		canEdit = v
+	}
+	if canEdit {
+		desc := stringField(inv, "description")
+		// Append/remove a trailing space so PUT clears fileID without visible change.
+		touch := desc + " "
+		if strings.HasSuffix(desc, " ") {
+			touch = strings.TrimSuffix(desc, " ")
+		}
+		if _, err := c.UpdateInvoice(ctx, id, UpdateInvoiceParams{
+			Description:    touch,
+			DescriptionSet: true,
+		}); err != nil {
+			return nil, fmt.Errorf("ForceRegenerateInvoicePDF: clear cache: %w", err)
+		}
+	}
+	return c.InvoicePDFFile(ctx, id)
+}
+
+// ListCRMContactFiles lists Documents attached on a CRM contact card (#files).
+func (c *Client) ListCRMContactFiles(ctx context.Context, contactID string) ([]map[string]any, error) {
+	return c.ResponseArray(ctx, fmt.Sprintf("/api/2.0/crm/contact/%s/files.json", url.PathEscape(contactID)))
+}
+
+// ListOpportunityFiles lists Documents attached on a CRM opportunity.
+func (c *Client) ListOpportunityFiles(ctx context.Context, opportunityID string) ([]map[string]any, error) {
+	return c.ResponseArray(ctx, fmt.Sprintf("/api/2.0/crm/opportunity/%s/files.json", url.PathEscape(opportunityID)))
+}
+
+// PurgeStaleInvoicePDFs deletes older P-*.pdf copies on the invoice contact (and linked
+// opportunity) while keeping the invoice's current fileID. Returns deleted file ids.
+func (c *Client) PurgeStaleInvoicePDFs(ctx context.Context, invoiceID string) ([]int, error) {
+	inv, err := c.GetInvoice(ctx, invoiceID)
+	if err != nil {
+		return nil, err
+	}
+	keep := flexInt(inv["fileID"])
+	number := strings.TrimSpace(stringField(inv, "number"))
+	base := number
+	for strings.HasSuffix(base, "b") || strings.HasSuffix(base, "B") {
+		base = base[:len(base)-1]
+	}
+	if base == "" {
+		base = "P-"
+	}
+
+	seen := map[int]struct{}{}
+	var candidates []int
+	addFiles := func(files []map[string]any) {
+		for _, f := range files {
+			title := stringField(f, "title")
+			id := int(flexInt(f["id"]))
+			if id == 0 || id == int(keep) {
+				continue
+			}
+			if !strings.HasPrefix(title, "P-") {
+				continue
+			}
+			if !strings.HasPrefix(title, base) {
+				continue
+			}
+			if _, ok := seen[id]; ok {
+				continue
+			}
+			seen[id] = struct{}{}
+			candidates = append(candidates, id)
+		}
+	}
+
+	if m, ok := inv["contact"].(map[string]any); ok {
+		cid := strconv.FormatInt(flexInt(m["id"]), 10)
+		if cid != "0" {
+			files, err := c.ListCRMContactFiles(ctx, cid)
+			if err != nil {
+				return nil, err
+			}
+			addFiles(files)
+		}
+	}
+	if ent, ok := inv["entity"].(map[string]any); ok && ent != nil {
+		if strings.EqualFold(fmt.Sprint(ent["entityType"]), "opportunity") || flexInt(ent["entityType"]) == 0 {
+			oid := strconv.FormatInt(flexInt(ent["entityId"]), 10)
+			if oid != "0" {
+				files, err := c.ListOpportunityFiles(ctx, oid)
+				if err != nil {
+					return nil, err
+				}
+				addFiles(files)
+			}
+		}
+	}
+
+	if len(candidates) == 0 {
+		return nil, nil
+	}
+	if err := c.DeleteFiles(ctx, candidates); err != nil {
+		return nil, err
+	}
+	// CRM may still list deleted files briefly; also try CRM unlink.
+	for _, fid := range candidates {
+		_, _ = c.deleteObject(ctx, fmt.Sprintf("/api/2.0/crm/files/%d.json", fid))
+	}
+	return candidates, nil
 }
 
 // ListInvoiceItems returns catalog invoice items.
