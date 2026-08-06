@@ -201,7 +201,7 @@ func contactsInfoAddCmd() *cobra.Command {
 }
 
 func personsCreateCmd() *cobra.Command {
-	var first, last, email, linkedin string
+	var first, last, email, linkedin, phone string
 	var companyID int
 	var jobTitle, about string
 	cmd := &cobra.Command{
@@ -224,6 +224,9 @@ func personsCreateCmd() *cobra.Command {
 			if email != "" {
 				_, _ = c.AddContactInfo(cmd.Context(), pid, "Email", email, "Work", true)
 			}
+			if phone != "" {
+				_, _ = c.AddContactInfo(cmd.Context(), pid, "Phone", phone, "Work", true)
+			}
 			if linkedin != "" {
 				_, _ = c.AddContactInfo(cmd.Context(), pid, "LinkedIn", linkedin, "Work", false)
 			}
@@ -237,6 +240,7 @@ func personsCreateCmd() *cobra.Command {
 	cmd.Flags().StringVar(&jobTitle, "job-title", "", "")
 	cmd.Flags().StringVar(&about, "about", "", "about / bio")
 	cmd.Flags().StringVar(&email, "email", "", "primary email (adds ContactInfo)")
+	cmd.Flags().StringVar(&phone, "phone", "", "primary phone (adds ContactInfo)")
 	cmd.Flags().StringVar(&linkedin, "linkedin", "", "linkedin url (adds ContactInfo)")
 	return cmd
 }
@@ -347,7 +351,7 @@ func contactEmailsFromMap(p map[string]any) []string {
 }
 
 func companiesCreateCmd() *cobra.Command {
-	var name, email, website string
+	var name, email, website, phone, about, street, city, state, zip, country string
 	cmd := &cobra.Command{
 		Use:     "create",
 		Aliases: []string{"add"},
@@ -365,11 +369,33 @@ func companiesCreateCmd() *cobra.Command {
 				return err
 			}
 			cid := strconv.Itoa(int(flexIDFloat(out["id"])))
+			if about != "" || street != "" {
+				aboutText := about
+				if street != "" {
+					addr := strings.TrimSpace(strings.Join([]string{street, zip, city, state, country}, ", "))
+					if aboutText != "" {
+						aboutText = aboutText + "\n" + addr
+					} else {
+						aboutText = "Billing address: " + addr
+					}
+				}
+				if updated, err := c.UpdateCompany(cmd.Context(), cid, name, aboutText); err == nil {
+					out = updated
+				}
+			}
 			if email != "" {
 				_, _ = c.AddContactInfo(cmd.Context(), cid, "Email", email, "Work", true)
 			}
 			if website != "" {
 				_, _ = c.AddContactInfo(cmd.Context(), cid, "Website", website, "Work", false)
+			}
+			if phone != "" {
+				_, _ = c.AddContactInfo(cmd.Context(), cid, "Phone", phone, "Work", true)
+			}
+			if street != "" {
+				if _, err := c.AddContactAddress(cmd.Context(), cid, street, city, state, zip, country, "Billing", true); err != nil {
+					fmt.Fprintf(cmd.ErrOrStderr(), "warning: address API failed (stored in about): %v\n", err)
+				}
 			}
 			printObject(out)
 			return nil
@@ -378,6 +404,13 @@ func companiesCreateCmd() *cobra.Command {
 	cmd.Flags().StringVar(&name, "name", "", "company name")
 	cmd.Flags().StringVar(&email, "email", "", "primary email (adds ContactInfo)")
 	cmd.Flags().StringVar(&website, "website", "", "website url (adds ContactInfo)")
+	cmd.Flags().StringVar(&phone, "phone", "", "primary phone (adds ContactInfo)")
+	cmd.Flags().StringVar(&about, "about", "", "about / notes")
+	cmd.Flags().StringVar(&street, "street", "", "billing street")
+	cmd.Flags().StringVar(&city, "city", "", "billing city")
+	cmd.Flags().StringVar(&state, "state", "", "billing state")
+	cmd.Flags().StringVar(&zip, "zip", "", "billing zip")
+	cmd.Flags().StringVar(&country, "country", "", "billing country")
 	return cmd
 }
 
