@@ -229,7 +229,7 @@ Does not send. Open /addons/mail/#drafts to review.
 			if err != nil {
 				return err
 			}
-			pdf, err := c.InvoicePDFFile(cmd.Context(), strconv.Itoa(invoiceID))
+			pdf, err := c.ForceRegenerateInvoicePDF(cmd.Context(), strconv.Itoa(invoiceID))
 			if err != nil {
 				return err
 			}

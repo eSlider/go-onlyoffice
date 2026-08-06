@@ -21,6 +21,9 @@ func init() {
 	invoicesCmd.AddCommand(invoiceGetCmd())
 	invoicesCmd.AddCommand(invoiceCreateCmd())
 	invoicesCmd.AddCommand(invoiceUpdateCmd())
+	invoicesCmd.AddCommand(invoicePDFCmd())
+	invoicesCmd.AddCommand(invoicePDFCleanupCmd())
+	invoicesCmd.AddCommand(invoiceStatusCmd())
 	invoicesCmd.AddCommand(invoiceDeleteCmd())
 	invoicesCmd.AddCommand(invoiceItemsCmd())
 }
@@ -78,7 +81,7 @@ func invoiceGetCmd() *cobra.Command {
 func invoiceCreateCmd() *cobra.Command {
 	var (
 		number, issueDate, dueDate, language, currency, terms, description, po string
-		contactID, itemID, opportunityID                                       int64
+		contactID, consigneeID, itemID, opportunityID                          int64
 		price, qty                                                             float64
 		lineDesc                                                               string
 	)
@@ -87,8 +90,11 @@ func invoiceCreateCmd() *cobra.Command {
 		Short: "Create a draft invoice with one line",
 		Long: `Create a CRM invoice (Draft) with a single line.
 
+Always pass --opportunity when a deal exists (entity link at create). Updating
+--opportunity later often fails with HTTP 400 — see docs/crm-associations.md.
+
 Example:
-  oo invoices create --number P-2026-02 --contact 123 --item 10 \
+  oo invoices create --number P-2026-02 --contact 1328 --item 12 \
     --price 300 --opportunity 1031 --line-description "VM Setup-Paket" \
     --terms "…payment terms…"
 `,
@@ -118,6 +124,7 @@ Example:
 				IssueDate:           issueDate,
 				DueDate:             dueDate,
 				ContactID:           contactID,
+				ConsigneeID:         consigneeID,
 				EntityID:            opportunityID,
 				EntityType:          0, // Opportunity
 				Language:            language,
@@ -142,8 +149,9 @@ Example:
 		},
 	}
 	cmd.Flags().StringVar(&number, "number", "", "invoice number (e.g. P-2026-02)")
-	cmd.Flags().Int64Var(&contactID, "contact", 0, "bill-to contact id (company preferred)")
-	cmd.Flags().Int64Var(&opportunityID, "opportunity", 0, "link to CRM opportunity/deal id")
+	cmd.Flags().Int64Var(&contactID, "contact", 0, "bill-to company contact id (canonical company, not a PDF-only clone)")
+	cmd.Flags().Int64Var(&consigneeID, "consignee", 0, "optional Empfänger person/contact id")
+	cmd.Flags().Int64Var(&opportunityID, "opportunity", 0, "link to CRM opportunity/deal id (set at create)")
 	cmd.Flags().Int64Var(&itemID, "item", 0, "catalog invoice item id")
 	cmd.Flags().Float64Var(&price, "price", 0, "line price")
 	cmd.Flags().Float64Var(&qty, "qty", 1, "line quantity")
@@ -163,8 +171,13 @@ func invoiceUpdateCmd() *cobra.Command {
 	var description, po, terms string
 	cmd := &cobra.Command{
 		Use:   "update INVOICE_ID",
-		Short: "Update invoice (opportunity link, notes, PO, terms)",
-		Args:  cobra.ExactArgs(1),
+		Short: "Update invoice (notes, PO, terms; opportunity link unreliable)",
+		Long: `Update Draft invoice fields.
+
+--opportunity often returns HTTP 400 on existing invoices. Prefer
+oo invoices create … --opportunity, or delete+recreate. See docs/crm-associations.md.
+`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if opportunityID == 0 && !cmd.Flags().Changed("description") && !cmd.Flags().Changed("po") && !cmd.Flags().Changed("terms") {
 				return fmt.Errorf("set --opportunity and/or --description and/or --po and/or --terms")
@@ -190,11 +203,127 @@ func invoiceUpdateCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().Int64Var(&opportunityID, "opportunity", 0, "CRM opportunity/deal id to link")
+	cmd.Flags().Int64Var(&opportunityID, "opportunity", 0, "CRM opportunity/deal id (may 400 — prefer create)")
 	cmd.Flags().StringVar(&description, "description", "", "invoice notes (Notizen); use \\n for line breaks")
 	cmd.Flags().StringVar(&po, "po", "", "purchase order number")
 	cmd.Flags().StringVar(&terms, "terms", "", "payment terms / footer (Bedingungen)")
 	return cmd
+}
+
+func invoicePDFCmd() *cobra.Command {
+	var force bool
+	cmd := &cobra.Command{
+		Use:   "pdf INVOICE_ID",
+		Short: "Return / regenerate invoice PDF file metadata",
+		Long: `GET /api/2.0/crm/invoice/{id}/pdf.
+
+With --force, touches the Draft to clear cached fileID first (layout changes).
+`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			var out map[string]any
+			if force {
+				out, err = c.ForceRegenerateInvoicePDF(cmd.Context(), args[0])
+			} else {
+				out, err = c.InvoicePDFFile(cmd.Context(), args[0])
+			}
+			if err != nil {
+				return err
+			}
+			printObject(out)
+			return nil
+		},
+	}
+	cmd.Flags().BoolVar(&force, "force", false, "clear PDF cache then regenerate")
+	return cmd
+}
+
+func invoicePDFCleanupCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "pdf-cleanup INVOICE_ID",
+		Short: "Delete older P-*.pdf copies on company/deal; keep invoice.fileID",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			deleted, err := c.PurgeStaleInvoicePDFs(cmd.Context(), args[0])
+			if err != nil {
+				return err
+			}
+			if outputFormat == "json" {
+				printObject(map[string]any{"deleted": deleted})
+				return nil
+			}
+			fmt.Printf("deleted %d stale PDF file(s): %v\n", len(deleted), deleted)
+			return nil
+		},
+	}
+}
+
+func invoiceStatusCmd() *cobra.Command {
+	var status string
+	cmd := &cobra.Command{
+		Use:   "status INVOICE_ID [INVOICE_ID...]",
+		Short: "Set invoice status (draft|billed|rejected|paid)",
+		Long: `PUT /api/2.0/crm/invoice/status/{id}.
+
+Billed invoices are not content-editable. Billed→Draft often does not work —
+recreate as Draft instead (docs/crm-associations.md).
+`,
+		Args: cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			statusID, err := parseInvoiceStatus(status)
+			if err != nil {
+				return err
+			}
+			ids := make([]int64, 0, len(args))
+			for _, a := range args {
+				var id int64
+				if _, err := fmt.Sscan(a, &id); err != nil || id <= 0 {
+					return fmt.Errorf("invalid invoice id %q", a)
+				}
+				ids = append(ids, id)
+			}
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			out, err := c.SetInvoiceStatus(cmd.Context(), statusID, ids...)
+			if err != nil {
+				return err
+			}
+			printObject(out)
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&status, "status", "draft", "draft|billed|rejected|paid or numeric id")
+	return cmd
+}
+
+func parseInvoiceStatus(s string) (int, error) {
+	s = strings.TrimSpace(strings.ToLower(s))
+	switch s {
+	case "", "draft", "1":
+		return onlyoffice.InvoiceStatusDraft, nil
+	case "billed", "2":
+		return onlyoffice.InvoiceStatusBilled, nil
+	case "rejected", "3":
+		return onlyoffice.InvoiceStatusRejected, nil
+	case "paid", "4":
+		return onlyoffice.InvoiceStatusPaid, nil
+	default:
+		var n int
+		if _, err := fmt.Sscan(s, &n); err != nil || n <= 0 {
+			return 0, fmt.Errorf("unknown status %q (draft|billed|rejected|paid)", s)
+		}
+		return n, nil
+	}
 }
 
 func invoiceDeleteCmd() *cobra.Command {
