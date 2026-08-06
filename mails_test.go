@@ -1,6 +1,9 @@
 package onlyoffice
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestResolveMailFolder(t *testing.T) {
 	tests := []struct {
@@ -68,5 +71,29 @@ func TestMailMessagesAsTableRows(t *testing.T) {
 	rows := MailMessagesAsTableRows(msgs)
 	if rows[0]["id"] != "42" || rows[0]["fromName"] != "Acme" || rows[0]["fromAddress"] != "a@b.com" {
 		t.Fatalf("got %+v", rows[0])
+	}
+}
+
+func TestPlainTextToMailHTML(t *testing.T) {
+	got := PlainTextToMailHTML("Hello\n\nWorld\nline2")
+	if !strings.Contains(got, "<p>Hello</p>") || !strings.Contains(got, "World<br/>line2") {
+		t.Fatalf("got %q", got)
+	}
+	html := "<p>Already</p>"
+	if PlainTextToMailHTML(html) != html {
+		t.Fatalf("html passthrough failed")
+	}
+	spaced := MailHTMLWithBlankParagraphs("<p>A</p>\n<p>B</p>")
+	if spaced != "<p>A</p>\n<p>&nbsp;</p>\n<p>B</p>" {
+		t.Fatalf("spaced: %q", spaced)
+	}
+}
+
+func TestInt64FromMap(t *testing.T) {
+	if Int64FromMap(map[string]any{"id": float64(99)}, "id") != 99 {
+		t.Fatal("float64")
+	}
+	if Int64FromMap(map[string]any{"id": "42"}, "id") != 42 {
+		t.Fatal("string")
 	}
 }

@@ -19,6 +19,7 @@ func init() {
 	opportunitiesCmd.AddCommand(oppListCmd())
 	opportunitiesCmd.AddCommand(oppGetCmd())
 	opportunitiesCmd.AddCommand(oppCreateCmd())
+	opportunitiesCmd.AddCommand(oppUpdateCmd())
 	opportunitiesCmd.AddCommand(oppDeleteCmd())
 	opportunitiesCmd.AddCommand(oppStagesCmd())
 	opportunitiesCmd.AddCommand(oppMemberAddCmd())
@@ -115,6 +116,40 @@ func oppCreateCmd() *cobra.Command {
 	cmd.Flags().StringVar(&responsible, "responsible", "", "responsible user id")
 	cmd.Flags().StringVar(&desc, "description", "", "description")
 	cmd.Flags().StringSliceVar(&contacts, "contact", nil, "contact id to add as member (repeatable)")
+	return cmd
+}
+
+func oppUpdateCmd() *cobra.Command {
+	var title, desc string
+	var stage int64
+	var bid float64
+	cmd := &cobra.Command{
+		Use:   "update OPPORTUNITY_ID",
+		Short: "Update opportunity title, description, stage, or bid",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			out, err := c.UpdateOpportunity(cmd.Context(), args[0], onlyoffice.UpdateOpportunityParams{
+				Title:       title,
+				Description: desc,
+				StageID:     stage,
+				BidValue:    bid,
+				BidValueSet: cmd.Flags().Changed("bid"),
+			})
+			if err != nil {
+				return err
+			}
+			printObject(out)
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&title, "title", "", "new title")
+	cmd.Flags().StringVar(&desc, "description", "", "new description")
+	cmd.Flags().Int64Var(&stage, "stage", 0, "pipeline stage id")
+	cmd.Flags().Float64Var(&bid, "bid", 0, "bid value")
 	return cmd
 }
 
