@@ -231,6 +231,16 @@ func PlainTextToMailHTML(s string) string {
 	return b.String()
 }
 
+// MailHTMLWithBlankParagraphs inserts empty paragraphs between blocks
+// (German Geschäftsbrief-style vertical spacing in OnlyOffice Mail).
+func MailHTMLWithBlankParagraphs(html string) string {
+	html = strings.TrimSpace(html)
+	if html == "" {
+		return ""
+	}
+	return strings.ReplaceAll(html, "</p>\n<p>", "</p>\n<p>&nbsp;</p>\n<p>")
+}
+
 // Int64FromMap coerces OnlyOffice numeric id fields (float64/int/string) to int64.
 func Int64FromMap(m map[string]any, key string) int64 {
 	switch v := m[key].(type) {

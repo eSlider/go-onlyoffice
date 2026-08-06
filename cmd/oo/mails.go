@@ -254,16 +254,19 @@ für das Service package (OS image inkl. Backup, Monitoring, RustDesk,
 gemeinsamem Datenträger und Netzwerkzugriff).
 
 Zahlungsziel: 14 Tage netto.
-Steuerhinweis: siehe Notizen auf der Rechnung (Reverse Charge / § 13b UStG).
+
+Steuerhinweis: siehe Notizen auf der Rechnung
+(Reverse Charge / § 13b UStG).
 
 Mit freundlichen Grüßen
+
 Example Author`, number, cost)
 			}
 			draft, err := c.SaveMailDraft(cmd.Context(), onlyoffice.SaveMailDraftParams{
 				From:    from,
 				To:      to,
 				Subject: subject,
-				Body:    onlyoffice.PlainTextToMailHTML(body),
+				Body:    onlyoffice.MailHTMLWithBlankParagraphs(onlyoffice.PlainTextToMailHTML(body)),
 			})
 			if err != nil {
 				return err

@@ -83,6 +83,10 @@ func TestPlainTextToMailHTML(t *testing.T) {
 	if PlainTextToMailHTML(html) != html {
 		t.Fatalf("html passthrough failed")
 	}
+	spaced := MailHTMLWithBlankParagraphs("<p>A</p>\n<p>B</p>")
+	if spaced != "<p>A</p>\n<p>&nbsp;</p>\n<p>B</p>" {
+		t.Fatalf("spaced: %q", spaced)
+	}
 }
 
 func TestInt64FromMap(t *testing.T) {
