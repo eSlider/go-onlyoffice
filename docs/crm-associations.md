@@ -74,9 +74,10 @@ Status ids commonly used on this portal: `1` Draft, `2` Billed, `3` Rejected, `4
 
 | Symptom | Workaround |
 |---------|------------|
+| Signature / body doubles Matrix URL | Put chat in **one** place only. UI drafts: signature. API send: body (API **does not** append signature). |
 | Signature / body cuts Matrix URL at `#` | Plain text `chat: https://matrix.to/#/@user:server` — avoid `<a href="…#…">` (or encode `#` as `%23` in href) |
 | German letter spacing | Blank `<p>&nbsp;</p>` between blocks (`MailHTMLWithBlankParagraphs`) |
-| Send | Never auto-send; draft only until the human confirms |
+| Send | `PUT /api/2.0/mail/messages/send.json` with `id/from/to/subject/body`; omit empty `cc`/`bcc`. Never auto-send; draft only until the human confirms |
 
 Prefer OnlyOffice Mail (`/addons/mail/#drafts`) over Gmail MCP for invoice delivery.
 
