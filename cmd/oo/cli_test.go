@@ -11,7 +11,7 @@ func TestRootRegistersSubjects(t *testing.T) {
 	want := []string{
 		"calendar", "projects", "tasks", "users", "whoami",
 		"contacts", "persons", "companies",
-		"opportunities", "cases", "crm-tasks", "applications", "crm", "mails", "catalog",
+		"opportunities", "cases", "crm-tasks", "applications", "crm", "mails", "catalog", "invoices",
 	}
 	got := make(map[string]bool, len(rootCmd.Commands()))
 	for _, c := range rootCmd.Commands() {
@@ -38,7 +38,7 @@ func TestRootHelpListsSubjects(t *testing.T) {
 		t.Fatal(err)
 	}
 	help := out.String()
-	for _, snippet := range []string{"calendar", "projects", "tasks", "users", "opportunities"} {
+	for _, snippet := range []string{"calendar", "projects", "tasks", "users", "opportunities", "invoices"} {
 		if !strings.Contains(help, snippet) {
 			t.Fatalf("help missing %q", snippet)
 		}
