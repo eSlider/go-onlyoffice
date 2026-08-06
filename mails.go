@@ -198,15 +198,6 @@ func (c *Client) AttachMailDocument(ctx context.Context, messageID string, fileI
 	return c.postFormObject(ctx, fmt.Sprintf("/api/2.0/mail/messages/%s/document", url.PathEscape(id)), fields)
 }
 
-// InvoicePDFFile regenerates/returns the invoice PDF file metadata (id, title, viewUrl).
-func (c *Client) InvoicePDFFile(ctx context.Context, invoiceID string) (map[string]any, error) {
-	id := strings.TrimSpace(invoiceID)
-	if id == "" {
-		return nil, fmt.Errorf("InvoicePDFFile: invoice id is required")
-	}
-	return c.ResponseObject(ctx, fmt.Sprintf("/api/2.0/crm/invoice/%s/pdf", url.PathEscape(id)))
-}
-
 // PlainTextToMailHTML turns plain text into simple HTML paragraphs for drafts.
 // If s already looks like HTML, it is returned unchanged.
 func PlainTextToMailHTML(s string) string {
