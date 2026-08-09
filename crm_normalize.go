@@ -69,7 +69,7 @@ func StripCompanySuffix(title string) string {
 }
 
 // FixDealTitle strips a leading @, normalizes separator spacing, and collapses
-// empty-position titles like " @ contoso" to "contoso".
+// empty-position titles like " @ Acme" to "Acme".
 func FixDealTitle(s string) string {
 	s = strings.TrimSpace(s)
 	for strings.HasPrefix(s, "@") {

@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	onlyoffice "github.com/eslider/go-onlyoffice"
-	"github.com/eslider/go-onlyoffice/catalog"
 	"github.com/spf13/cobra"
 )
 
@@ -143,7 +142,7 @@ full title is composed as "CC | Company | Title".`,
 			}
 			title := args[0]
 			if country != "" || company != "" {
-				title = catalog.FormatProjectTitle(country, company, args[0])
+				title = onlyoffice.FormatProjectTitle(country, company, args[0])
 			}
 			p, err := c.CreateProject(onlyoffice.NewProjectRequest{
 				Title:         title,
@@ -381,9 +380,9 @@ func prjContactsLinkGitCmd() *cobra.Command {
 		Short: "Link CRM persons matched from git shortlog (+ optional companies)",
 		Long: `Runs git shortlog -sne --all in --git-root, matches author emails to CRM
 persons (FindPersonByEmail), and links found contacts to the project.
-Does not create new persons — approve/apply them via catalog first.
+Does not create new persons — create/link them in CRM first.
 
-Also links --company-id contacts (e.g. Acme + end-client company).`,
+Also links --company-id contacts (employer and/or client company).`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if gitRoot == "" && len(companyIDs) == 0 {
@@ -425,10 +424,8 @@ func prjContactsLinkAuthorsCmd() *cobra.Command {
 		Long: `Same as link-git, but reads authors from a file produced by:
 
   git shortlog -sne --all > authors.txt
-  # or via ssh:
-  ssh ops-host 'git -C /path shortlog -sne --all' > authors.txt
 
-Then: oo projects contacts link-authors 59 --from authors.txt --company-id 9`,
+Then: oo projects contacts link-authors 59 --from authors.txt --company-id COMPANY_ID`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if authorsFile == "" && len(companyIDs) == 0 {

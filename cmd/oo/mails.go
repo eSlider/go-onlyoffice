@@ -244,23 +244,16 @@ Does not send. Open /addons/mail/#drafts to review.
 			number := strings.TrimSpace(fmt.Sprint(inv["number"]))
 			cost := formatInvoiceCostEUR(inv["cost"])
 			if subject == "" {
-				subject = fmt.Sprintf("Rechnung %s — Service package (%s EUR)", number, cost)
+				subject = fmt.Sprintf("Invoice %s (%s EUR)", number, cost)
 			}
 			if body == "" {
-				body = fmt.Sprintf(`Guten Tag,
+				body = fmt.Sprintf(`Hello,
 
-anbei übersende ich die Rechnung %s über %s EUR
-für das Service package (OS image inkl. Backup, Monitoring, RustDesk,
-gemeinsamem Datenträger und Netzwerkzugriff).
+please find attached invoice %s for %s EUR.
 
-Zahlungsziel: 14 Tage netto.
+Payment terms: see invoice notes.
 
-Steuerhinweis: siehe Notizen auf der Rechnung
-(Reverse Charge / § 13b UStG).
-
-Mit freundlichen Grüßen
-
-Example Author`, number, cost)
+Best regards`, number, cost)
 			}
 			draft, err := c.SaveMailDraft(cmd.Context(), onlyoffice.SaveMailDraftParams{
 				From:    from,
