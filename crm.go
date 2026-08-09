@@ -2,7 +2,7 @@ package onlyoffice
 
 // Minimal CRM helpers: contacts, opportunities, cases, tasks, and history notes.
 // These expose untyped maps for flexibility — they are primarily consumed by
-// cmd/oo and the applications-sync workflow.
+// cmd/oo and CRM sync tooling.
 
 import (
 	"context"
@@ -663,7 +663,7 @@ func (c *Client) CreateCRMTask(ctx context.Context, title, deadline string, cate
 		deadline = time.Now().Add(14 * 24 * time.Hour).Format("2006-01-02T15:04:05")
 	}
 	if categoryID == 0 {
-		categoryID = 2 // Opportunity — matches applications sync
+		categoryID = 2 // Opportunity (default CRM task category)
 	}
 	uid, err := c.SelfUserID(ctx)
 	if err != nil {

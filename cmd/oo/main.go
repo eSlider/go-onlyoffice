@@ -15,8 +15,6 @@
 //	oo crm           cleanup
 //	oo mails         accounts | folders | list | get | draft | attach | draft-invoice | delete
 //	oo invoices      list | get | create | update | pdf | pdf-cleanup | status | delete | items …
-//	oo applications  sync
-//	oo catalog       scan-contacts | scan-projects | scan-thunderbird | merge | match | apply
 //
 // CRM association rules: docs/crm-associations.md
 //

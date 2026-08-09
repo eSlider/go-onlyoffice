@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	onlyoffice "github.com/eslider/go-onlyoffice"
-	"github.com/eslider/go-onlyoffice/catalog"
 	"github.com/spf13/cobra"
 )
 
@@ -361,7 +360,7 @@ With --company-id, only persons linked to that company are scanned.`,
 						}
 					}
 				}
-				cf, cl := catalog.CleanPersonNames(fn, ln, dn, org, emails)
+				cf, cl := onlyoffice.CleanPersonNames(fn, ln, dn, org, emails)
 				needName := cf != fn || cl != ln
 				linkID := companyID
 				if linkID == 0 {
