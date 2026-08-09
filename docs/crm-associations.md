@@ -22,7 +22,7 @@ Company (#CONTACT_ID)
 | Layer | CLI | Must link |
 |-------|-----|-----------|
 | Company | `oo companies create` | website, email, phone, **one** Billing address |
-| Person | `oo persons create --company-id` | job title; never encode employer in `lastName` |
+| Person | `oo persons create --company-id` / `oo persons update ID` | job title; never encode employer in `lastName`; **update uses JSON** (form PUT ignores `companyId`/`about`) |
 | Deal | `oo opportunities create` + `member-add` | company **and** person as members |
 | Project | `oo projects create` + `contacts add` | same company + person |
 | Invoice | `oo invoices create --contact COMPANY --opportunity DEAL` | `entityId` at **create** |
@@ -35,6 +35,9 @@ UI checks (same company card):
 - `#projects` → hub project  
 - `#invoices` on the **deal** → invoice (needs `entity`)  
 - `#files` → preferably **one** current `P-….pdf`
+
+**Project Team ≠ Project Contacts.** Team = portal users. CRM people/companies
+show under the project **Contacts** tab (`oo projects contacts list`).
 
 ## Hard rules
 
