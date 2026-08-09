@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -274,7 +275,7 @@ Best regards`, number, cost)
 				return nil
 			}
 			fmt.Printf("draft %s  to=%s  subject=%q  pdfFileId=%d\n", mid, to, subject, fileID)
-			fmt.Printf("open: https://office.example.com/addons/mail/#drafts\n")
+			fmt.Printf("open: %s/addons/mail/#drafts\n", strings.TrimRight(os.Getenv("ONLYOFFICE_URL"), "/"))
 			return nil
 		},
 	}
