@@ -44,10 +44,16 @@ func init() {
 	contactsCmd.AddCommand(contactsMergeCmd())
 	contactsCmd.AddCommand(contactsInfoAddCmd())
 	contactsCmd.AddCommand(contactsDedupeInfoCmd())
+	contactsCmd.AddCommand(contactsTagsCmd())
+	contactsCmd.AddCommand(contactsTagCreateCmd())
+	contactsCmd.AddCommand(contactsTagAddCmd())
+	contactsCmd.AddCommand(contactsTagRemoveCmd())
+	contactsCmd.AddCommand(contactsByTagCmd())
 
 	only := true
 	personsCmd.AddCommand(contactsListCmd(&only)) // persons only
 	personsCmd.AddCommand(personsCreateCmd())
+	personsCmd.AddCommand(personsUpdateCmd())
 	personsCmd.AddCommand(personsFixNamesCmd())
 	personsCmd.AddCommand(contactsDeleteCmd())
 	personsCmd.AddCommand(personsDedupeCmd())
@@ -242,6 +248,57 @@ func personsCreateCmd() *cobra.Command {
 	cmd.Flags().StringVar(&email, "email", "", "primary email (adds ContactInfo)")
 	cmd.Flags().StringVar(&phone, "phone", "", "primary phone (adds ContactInfo)")
 	cmd.Flags().StringVar(&linkedin, "linkedin", "", "linkedin url (adds ContactInfo)")
+	return cmd
+}
+
+func personsUpdateCmd() *cobra.Command {
+	var first, last string
+	var companyID int
+	var jobTitle, about string
+	cmd := &cobra.Command{
+		Use:   "update PERSON_ID",
+		Short: "Update a person (name, company, job title, about)",
+		Long: `Updates CRM person fields via PUT /crm/contact/person/{id}.
+
+--company-id 0 leaves the employer association unchanged.
+Omit --first/--last to keep current names (fetched first).`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			pid := args[0]
+			cur, err := c.GetContact(cmd.Context(), pid)
+			if err != nil {
+				return err
+			}
+			if first == "" {
+				if v, ok := cur["firstName"].(string); ok {
+					first = v
+				}
+			}
+			if last == "" {
+				if v, ok := cur["lastName"].(string); ok {
+					last = v
+				}
+			}
+			if first == "" || last == "" {
+				return fmt.Errorf("first and last name required (pass --first/--last or ensure contact has them)")
+			}
+			out, err := c.UpdatePerson(cmd.Context(), pid, first, last, companyID, jobTitle, about)
+			if err != nil {
+				return err
+			}
+			printObject(out)
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&first, "first", "", "first name (default: current)")
+	cmd.Flags().StringVar(&last, "last", "", "last name (default: current)")
+	cmd.Flags().IntVar(&companyID, "company-id", 0, "employer company id (0 = leave unchanged)")
+	cmd.Flags().StringVar(&jobTitle, "job-title", "", "job title")
+	cmd.Flags().StringVar(&about, "about", "", "about / bio")
 	return cmd
 }
 
@@ -472,4 +529,107 @@ func contactsDedupeInfoCmd() *cobra.Command {
 			return nil
 		}),
 	}
+}
+
+func contactsTagsCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "tags",
+		Short: "List CRM contact tags",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			list, err := c.ListContactTags(cmd.Context())
+			if err != nil {
+				return err
+			}
+			printTable([]string{"title", "relativeItemsCount"}, list)
+			return nil
+		},
+	}
+}
+
+func contactsTagCreateCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "tag-create TAG",
+		Short: "Create a CRM contact tag",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			if err := c.CreateContactTag(cmd.Context(), args[0]); err != nil {
+				return err
+			}
+			fmt.Println(args[0])
+			return nil
+		},
+	}
+}
+
+func contactsTagAddCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "tag-add CONTACT_ID TAG",
+		Short: "Attach a tag to a contact",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			if err := c.AddContactTag(cmd.Context(), args[0], args[1]); err != nil {
+				return err
+			}
+			fmt.Printf("%s ← %s\n", args[0], args[1])
+			return nil
+		},
+	}
+}
+
+func contactsTagRemoveCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "tag-remove CONTACT_ID TAG",
+		Short: "Remove a tag from a contact",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			if err := c.RemoveContactTag(cmd.Context(), args[0], args[1]); err != nil {
+				return err
+			}
+			fmt.Printf("%s ✕ %s\n", args[0], args[1])
+			return nil
+		},
+	}
+}
+
+func contactsByTagCmd() *cobra.Command {
+	var count, offset int
+	cmd := &cobra.Command{
+		Use:   "by-tag TAG",
+		Short: "List contacts with a given CRM tag (ignore-list = tag ignore)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			list, total, err := c.ListContactsByTag(cmd.Context(), args[0], count, offset)
+			if err != nil {
+				return err
+			}
+			if outputFormat == "table" {
+				fmt.Printf("tag=%s total: %d (shown: %d)\n", args[0], total, len(list))
+			}
+			printTable([]string{"id", "displayName", "isCompany", "title", "about"}, list)
+			return nil
+		},
+	}
+	cmd.Flags().IntVar(&count, "count", 50, "")
+	cmd.Flags().IntVar(&offset, "offset", 0, "")
+	return cmd
 }
