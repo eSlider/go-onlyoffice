@@ -16,6 +16,31 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 * Document that invoice→deal must be set at create (`update --opportunity` often HTTP 400)
 
+## [0.10.0](https://github.com/eSlider/go-onlyoffice/compare/v0.9.0...v0.10.0) (2026-08-09)
+
+
+### Features
+
+* **crm:** add invoices CLI and opportunity update ([36f760c](https://github.com/eSlider/go-onlyoffice/commit/36f760c184371c641fc8c66512434da26486a156))
+* **crm:** allow updating invoice terms via oo ([4205672](https://github.com/eSlider/go-onlyoffice/commit/4205672e0a6a661409e2aa1ef983d899f1b9037e))
+* **crm:** invoice update notes and PO fields ([b6293b4](https://github.com/eSlider/go-onlyoffice/commit/b6293b48c329646d55fca62c38383be86935171b))
+* **crm:** invoices CLI and opportunity update ([3a6b9c2](https://github.com/eSlider/go-onlyoffice/commit/3a6b9c28a03ee0b5fd74793f463e789e9f635263))
+* **mail:** draft, attach, and draft-invoice CLI ([f9ab3f8](https://github.com/eSlider/go-onlyoffice/commit/f9ab3f84b1c68dfb5192661564f5fb1859c09b73))
+
+
+### Bug Fixes
+
+* **crm:** JSON person update and oo persons update CLI ([62ecca9](https://github.com/eSlider/go-onlyoffice/commit/62ecca99d228ea5ace3259f36b3ba07ca5422887))
+* **crm:** link invoices to opportunities ([3f74ddc](https://github.com/eSlider/go-onlyoffice/commit/3f74ddc13652996813402b98bc3ee65f24d9768e))
+* **mail:** German spacing for invoice draft template ([8d11a0b](https://github.com/eSlider/go-onlyoffice/commit/8d11a0b5a7aa59dbd50f2edb48e68e640d8bfe59))
+
+
+### Documentation
+
+* **crm:** capture association graph and invoice/mail quirks ([8809427](https://github.com/eSlider/go-onlyoffice/commit/8809427f61efdeef171c0ab40bfc2a7eddf22f3b))
+* **crm:** clarify mail API send vs signature for chat links ([5f56ae8](https://github.com/eSlider/go-onlyoffice/commit/5f56ae8178e0f7448ba8895cadb5391f3398b28a))
+* **crm:** Team vs Contacts and persons update note ([e38fdd4](https://github.com/eSlider/go-onlyoffice/commit/e38fdd4f4d72e19d471c796d8da30d1ca9e39ddd))
+
 ## [0.9.0](https://github.com/eSlider/go-onlyoffice/compare/v0.8.3...v0.9.0) (2026-07-26)
 
 
