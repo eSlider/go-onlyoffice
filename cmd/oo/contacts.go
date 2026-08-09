@@ -308,7 +308,7 @@ func personsFixNamesCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "fix-names",
 		Short: "Strip company annotations from last names; keep companyId link",
-		Long: `Repairs CRM persons whose lastName embeds a company ("Thomsen (Acme)")
+		Long: `Repairs CRM persons whose lastName embeds a company ("Doe (Acme)")
 or whose firstName is an email. Company belongs on companyId, not in the name.
 
 With --company-id, only persons linked to that company are scanned.`,

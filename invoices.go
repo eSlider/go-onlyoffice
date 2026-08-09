@@ -239,7 +239,7 @@ func (c *Client) DeleteInvoice(ctx context.Context, id string) (map[string]any, 
 	return c.deleteObject(ctx, fmt.Sprintf("/api/2.0/crm/invoice/%s.json", url.PathEscape(id)))
 }
 
-// Invoice status ids used by OnlyOffice CRM on produktor.io.
+// Invoice status ids used by OnlyOffice CRM.
 const (
 	InvoiceStatusDraft    = 1
 	InvoiceStatusBilled   = 2
