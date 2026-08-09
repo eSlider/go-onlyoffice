@@ -188,21 +188,41 @@ func (c *Client) CreatePerson(ctx context.Context, first, last string, companyID
 }
 
 // UpdatePerson updates first/last name and optional company link on a person.
-// companyID == 0 leaves the company association unchanged.
+// companyID == 0 leaves the company association unchanged (re-sends current
+// company id when present). OnlyOffice ignores companyId/about on form-encoded
+// PUT and may unlink the company when companyId is omitted — use JSON body.
 func (c *Client) UpdatePerson(ctx context.Context, personID, first, last string, companyID int, jobTitle, about string) (map[string]any, error) {
-	fields := url.Values{}
-	fields.Set("firstName", first)
-	fields.Set("lastName", last)
+	body := map[string]any{
+		"firstName": first,
+		"lastName":  last,
+	}
 	if companyID != 0 {
-		fields.Set("companyId", strconv.Itoa(companyID))
+		body["companyId"] = companyID
+	} else {
+		// Preserve existing employer: omitted companyId unlinks on this API.
+		if cur, err := c.GetContact(ctx, personID); err == nil {
+			if co, ok := cur["company"].(map[string]any); ok {
+				if id := flexInt(co["id"]); id != 0 {
+					body["companyId"] = id
+				}
+			}
+		}
 	}
 	if jobTitle != "" {
-		fields.Set("jobTitle", jobTitle)
+		body["jobTitle"] = jobTitle
 	}
 	if about != "" {
-		fields.Set("about", about)
+		body["about"] = about
 	}
-	return c.putFormObject(ctx, fmt.Sprintf("/api/2.0/crm/contact/person/%s.json", url.PathEscape(personID)), fields)
+	out, err := c.putJSONObject(ctx, fmt.Sprintf("/api/2.0/crm/contact/person/%s.json", url.PathEscape(personID)), body)
+	if err != nil {
+		return out, err
+	}
+	// PUT response body is often stale; re-fetch for authoritative fields.
+	if fresh, gerr := c.GetContact(ctx, personID); gerr == nil && fresh != nil {
+		out = fresh
+	}
+	return out, nil
 }
 
 // AddContactInfo attaches an email/website/phone/etc. to a contact.
@@ -221,6 +241,69 @@ func (c *Client) AddContactInfo(ctx context.Context, contactID, infoType, dataVa
 // DeleteContact removes a CRM contact by id.
 func (c *Client) DeleteContact(ctx context.Context, contactID string) (map[string]any, error) {
 	return c.deleteObject(ctx, fmt.Sprintf("/api/2.0/crm/contact/%s.json", url.PathEscape(contactID)))
+}
+
+// ListContactTags returns all CRM contact tags (title + relativeItemsCount).
+func (c *Client) ListContactTags(ctx context.Context) ([]map[string]any, error) {
+	return c.ResponseArray(ctx, "/api/2.0/crm/contact/tag.json")
+}
+
+// CreateContactTag creates a contact tag by name. Idempotent: "already exists" is OK.
+func (c *Client) CreateContactTag(ctx context.Context, tagName string) error {
+	fields := url.Values{}
+	fields.Set("tagName", tagName)
+	_, err := c.postFormObject(ctx, "/api/2.0/crm/contact/tag.json", fields)
+	if err != nil && strings.Contains(err.Error(), "already exists") {
+		return nil
+	}
+	return err
+}
+
+// AddContactTag attaches tagName to a contact.
+func (c *Client) AddContactTag(ctx context.Context, contactID, tagName string) error {
+	fields := url.Values{}
+	fields.Set("tagName", tagName)
+	_, err := c.postFormObject(ctx, fmt.Sprintf("/api/2.0/crm/contact/%s/tag.json", url.PathEscape(contactID)), fields)
+	return err
+}
+
+// RemoveContactTag removes tagName from a contact.
+func (c *Client) RemoveContactTag(ctx context.Context, contactID, tagName string) error {
+	fields := url.Values{}
+	fields.Set("tagName", tagName)
+	raw, err := c.deleteForm(ctx, fmt.Sprintf("/api/2.0/crm/contact/%s/tag.json", url.PathEscape(contactID)), fields)
+	if err != nil {
+		return err
+	}
+	_, err = unmarshalResponseObject(raw)
+	return err
+}
+
+// ListContactsByTag returns contacts filtered by a single CRM tag name.
+func (c *Client) ListContactsByTag(ctx context.Context, tagName string, count, startIndex int) ([]map[string]any, int, error) {
+	if count <= 0 {
+		count = 50
+	}
+	q := url.Values{}
+	q.Set("count", strconv.Itoa(count))
+	q.Set("startIndex", strconv.Itoa(startIndex))
+	q.Set("tags", tagName)
+	raw, err := c.getJSON(ctx, "/api/2.0/crm/contact/filter.json?"+q.Encode())
+	if err != nil {
+		return nil, 0, err
+	}
+	var env struct {
+		Response []map[string]any `json:"response"`
+		Total    int              `json:"total"`
+	}
+	if err := json.Unmarshal(raw, &env); err != nil {
+		return nil, 0, err
+	}
+	total := env.Total
+	if total == 0 && len(env.Response) > 0 {
+		total = len(env.Response)
+	}
+	return env.Response, total, nil
 }
 
 // ListAllContacts paginates through every CRM contact.
