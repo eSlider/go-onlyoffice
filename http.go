@@ -181,6 +181,11 @@ func (c *Client) putForm(ctx context.Context, path string, fields url.Values) (j
 	return c.formRequest(ctx, http.MethodPut, path, fields)
 }
 
+// deleteForm issues an authenticated DELETE with application/x-www-form-urlencoded body.
+func (c *Client) deleteForm(ctx context.Context, path string, fields url.Values) (json.RawMessage, error) {
+	return c.formRequest(ctx, http.MethodDelete, path, fields)
+}
+
 func (c *Client) formRequest(ctx context.Context, method, path string, fields url.Values) (json.RawMessage, error) {
 	auth, err := c.authHeader()
 	if err != nil {
