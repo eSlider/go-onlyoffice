@@ -94,7 +94,7 @@ Always pass --opportunity when a deal exists (entity link at create). Updating
 --opportunity later often fails with HTTP 400 — see docs/crm-associations.md.
 
 Example:
-  oo invoices create --number INV-2026-01 --contact CONTACT_ID --item 12 \
+  oo invoices create --number INV-2026-01 --contact CONTACT_ID --item ITEM_ID \
     --price 300 --opportunity OPPORTUNITY_ID --line-description "Service package" \
     --terms "…payment terms…"
 `,

@@ -14,13 +14,12 @@ Canonical Go client for OnlyOffice Workspace (Projects + Calendar + CRM) and the
 - **CLI — `cmd/oo/` as `package main`.** Cobra wrapper that loads `.env` via `godotenv` at startup. **Subject-based command tree** mirroring [`tea`](https://gitea.com/gitea/tea):
   - `main.go` — entry point (docstring lists the command tree).
   - `common.go` — `rootCmd`, `newOO`, `printTable`/`printObject`, `--output table|json` flag.
-  - `calendar.go`, `projects.go`, `projects_files.go`, `tasks.go`, `tasks_files.go`, `users.go`, `contacts.go`, `opportunities.go`, `cases.go`, `crm_tasks.go`, `apps.go`, `catalog.go` — one file per subject (or per subject facet), each registers in `init()`.
+  - `calendar.go`, `projects.go`, `projects_files.go`, `tasks.go`, `tasks_files.go`, `users.go`, `contacts.go`, `opportunities.go`, `cases.go`, `crm_tasks.go`, `mails.go`, `invoices.go` — one file per subject (or per subject facet), each registers in `init()`.
   - CLI-only deps (`spf13/cobra`, `joho/godotenv`) stay out of the library.
-- **Catalog inventory — `catalog/` package.** Filesystem VCF/project scan → YAML → match/apply against CRM. Used by `oo catalog`; not part of the flat `*Client` surface (uses Client as a dependency).
 - **TUI — `cmd/office/` as `package main`.** Bubble Tea three-pane browser (module tree, selectable list, markdown preview). Reuses `cmd/internal/bootstrap` for env/auth and the root `onlyoffice` library for all API calls. UI logic in `cmd/office/ui/`; preview/formatting in `cmd/office/preview/`; list loaders in `cmd/office/fetch/`.
   - **List table (`DataTable`)** — `cmd/office/ui/table*.go`. Column layout policies live in `cmd/office/model/table_layout.go` (`TableFlexLayoutFor`); cell rendering uses the bubbles/table inline pattern in `table_render.go` (`renderTableCell`, `padANSIWidth`). See `.cursor/skills/office-tui-table/SKILL.md` before changing center-pane tables.
 - **Shared bootstrap — `cmd/internal/bootstrap/`.** `LoadEnv()` + `NewClient(ctx)` extracted from `oo`; both binaries import it.
-- **Applications sync — `cmd/oo/applications/`.** README→CRM bridge, CV-specific; kept under `cmd/oo/` so it's clear it's internal to the binary, not a library feature.
+- **Personal ops tooling** (disk inventory, dossier→CRM sync, SearXNG) lives in private [`eSlider/oo-workspace`](https://git.produktor.io/eSlider/oo-workspace) (`oow`), not in this public tree.
 
 ## Rules
 

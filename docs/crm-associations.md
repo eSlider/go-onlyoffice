@@ -1,7 +1,7 @@
 # CRM associations (company ↔ person ↔ deal ↔ project ↔ invoice ↔ mail)
 
-Operational rules learned from real billing work (AcmeClient INV-2026-01, AcmeProject INV-2026-01).
-Tooling: `oo` CLI + this library. Business SSOT remains OnlyOffice (`ASR-0002`).
+Operational rules for the `oo` CLI and this library. Business SSOT remains
+OnlyOffice Workspace CRM + Projects.
 
 ## Canonical graph
 
@@ -9,8 +9,8 @@ One **legal company** owns the relationship. Do not invent a second “bill-to�
 company just for PDF layout.
 
 ```text
-Company (#CONTACT_ID)
-├── Person (GF / buyer contact)     oo persons create --company-id
+Company
+├── Person (buyer contact)          oo persons create --company-id
 ├── Opportunity / Deal              oo opportunities … ; member-add company + person
 ├── Project (hub)                   oo projects … ; contacts add company + person
 │     └── Epic + subtasks
@@ -34,7 +34,7 @@ UI checks (same company card):
 - `#deals` → opportunity  
 - `#projects` → hub project  
 - `#invoices` on the **deal** → invoice (needs `entity`)  
-- `#files` → preferably **one** current `P-….pdf`
+- `#files` → preferably **one** current invoice PDF
 
 **Project Team ≠ Project Contacts.** Team = portal users. CRM people/companies
 show under the project **Contacts** tab (`oo projects contacts list`).
@@ -57,7 +57,7 @@ show under the project **Contacts** tab (`oo projects contacts list`).
    **does not work** — delete + recreate Draft instead.
 5. **Do not regenerate PDF in a loop** without cleanup. Each
    `GET …/crm/invoice/{id}/pdf` attaches a new file to the company (and often
-   the deal). Keep `invoice.fileID`; delete older `P-*.pdf` with
+   the deal). Keep `invoice.fileID`; delete older PDFs with
    `oo invoices pdf-cleanup ID` / Documents `fileops/delete`.
 
 ## Invoice PDF quirks
@@ -69,24 +69,24 @@ show under the project **Contacts** tab (`oo projects contacts list`).
 | Separate bill-to company for newlines | **Forbidden** — merge back to the real company |
 | Invoice **number** won’t change on PUT | Delete Draft and recreate with the desired number |
 | Notizen / Bedingungen spacing | Leading `\n` and blank lines only — no HTML (tags print literally) |
-| Issuer NIE / street lines | Organisation profile address (`street` with `\n`), not only terms |
+| Issuer street lines | Organisation profile address (`street` with `\n`), not only terms |
 
-Status ids commonly used on this portal: `1` Draft, `2` Billed, `3` Rejected, `4` Paid.
+Status ids commonly used: `1` Draft, `2` Billed, `3` Rejected, `4` Paid.
 
 ## Mail quirks
 
 | Symptom | Workaround |
 |---------|------------|
-| Signature / body doubles Matrix URL | Put chat in **one** place only. UI drafts: signature. API send: body (API **does not** append signature). |
-| Signature / body cuts Matrix URL at `#` | Plain text `chat: https://matrix.to/#/@user:server` — avoid `<a href="…#…">` (or encode `#` as `%23` in href) |
+| Signature / body doubles chat URL | Put chat in **one** place only. UI drafts: signature. API send: body (API **does not** append signature). |
+| Signature / body cuts URL at `#` | Plain text URLs — avoid `<a href="…#…">` (or encode `#` as `%23` in href) |
 | German letter spacing | Blank `<p>&nbsp;</p>` between blocks (`MailHTMLWithBlankParagraphs`) |
 | Send | `PUT /api/2.0/mail/messages/send.json` with `id/from/to/subject/body`; omit empty `cc`/`bcc`. Never auto-send; draft only until the human confirms |
 
-Prefer OnlyOffice Mail (`/addons/mail/#drafts`) over Gmail MCP for invoice delivery.
+Prefer OnlyOffice Mail (`/addons/mail/#drafts`) for invoice delivery until confirmed.
 
 ## Project / task quirks
 
-- Hub title: `CC | Company` (e.g. `DE | AcmeClient Ambulanter Pflegedienst GmbH`).
+- Hub title: `CC | Company` (e.g. `DE | Acme GmbH`).
 - Streams = epics/tasks under the hub, not a third title segment (unless the
   project itself is a named delivery stream).
 - Closing a **subtask**:  
@@ -99,26 +99,26 @@ Prefer OnlyOffice Mail (`/addons/mail/#drafts`) over Gmail MCP for invoice deliv
 ## Merge / cleanup cheat sheet
 
 ```bash
-# Keep the human-created company (INTO), drop the duplicate (FROM)
-oo contacts merge 1334 1328
+# Keep the preferred company (INTO), drop the duplicate (FROM)
+oo contacts merge FROM_ID INTO_ID
 
 # Or by normalized name (careful — whole CRM)
 oo companies dedupe
 
 # Invoice ↔ deal must exist at create
-oo invoices create --number P-YYYY-NN --contact CONTACT_ID --item N \
-  --price 300 --opportunity OPPORTUNITY_ID --language de-DE …
+oo invoices create --number P-YYYY-NN --contact COMPANY_ID --item ITEM_ID \
+  --price 300 --opportunity DEAL_ID --language de-DE …
 
-# Fresh PDF + prune older P-*.pdf on company/deal
-oo invoices pdf 41 --force
+# Fresh PDF + prune older PDFs on company/deal
+oo invoices pdf INVOICE_ID --force
 oo invoices pdf-cleanup INVOICE_ID
 
 # Mail draft (no send)
-oo mails draft-invoice --invoice INVOICE_ID --to info@client.de
+oo mails draft-invoice --invoice INVOICE_ID --to billing@example.com
 ```
 
 ## Related
 
 - README § invoices / mail / CRM cleanup  
-- Skill `oo-clients-projects` (Cursor)  
-- inventar ASR-0014 / `ops/oo-clients-contacts-sync.md`
+- Personal workspace tooling (disk inventory, dossier sync): private
+  `git.produktor.io/eSlider/oo-workspace` (`oow` CLI)

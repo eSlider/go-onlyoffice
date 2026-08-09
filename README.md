@@ -533,7 +533,7 @@ deals, total, _ := client.ListOpportunities(ctx, 50, 0)
 company, _ := client.FindCompany(ctx, "ACME")
 
 // Subtasks (form-encoded)
-client.AddSubtask(ctx, "4242", "Prepare CV")
+client.AddSubtask(ctx, "4242", "Prepare notes")
 ```
 
 ### oo (bundled CLI)
@@ -552,14 +552,13 @@ oo calendar events --start 2026-04-24 --end 2026-05-01
 oo projects list
 oo projects get 33
 oo tasks list --all --verbose
-oo tasks subtask add 4242 "Prepare CV"
+oo tasks subtask add 4242 "Prepare notes"
 oo persons create --first Jane --last Doe --email jane@example.com
 oo companies create --name "Acme GmbH" --website https://acme.com
 oo opportunities list
 oo opportunities stages
 oo cases list
 oo crm-tasks categories
-oo applications sync --path ./applications/2026 --apply
 ```
 
 ### office (TUI)
@@ -613,7 +612,7 @@ oo projects files download 12345 --to ./copy.md
 oo projects files rename 12345 notes-v2.md
 oo projects files delete 12345
 oo tasks files list 208
-oo tasks files upload 208 ./cv.pdf
+oo tasks files upload 208 ./notes.pdf
 oo tasks files detach 208 12345
 ```
 
@@ -632,23 +631,19 @@ oo tasks files detach 208 12345
 | `mails` | `accounts`, `folders`, `list`, `get`, `draft`, `attach`, `draft-invoice`, `delete` |
 | `cases` | `list`, `create`, `delete`, `member-add` |
 | `crm-tasks` | `list`, `create`, `delete`, `categories` |
-| `applications` | `sync` |
-| `catalog` | `scan-contacts`, `scan-projects`, `scan-thunderbird`, `merge`, `match`, `apply` |
 
 The CLI reads only `.env` from the current working directory (godotenv is a
 CLI-only concern — the library itself never loads dotfiles).
 
-Canonical `ONLYOFFICE_*` variables win over aliases. For produktor.io operator
-files, `OO_URL` / `OO_USER` / `OO_PASS` are accepted as CLI-only aliases for
-`ONLYOFFICE_URL` / `ONLYOFFICE_USER` / `ONLYOFFICE_PASS`.
+Canonical `ONLYOFFICE_*` variables win over aliases. Optional CLI-only aliases:
+`OO_URL` / `OO_USER` / `OO_PASS` → `ONLYOFFICE_URL` / `ONLYOFFICE_USER` / `ONLYOFFICE_PASS`.
 
 Run `oo --help` or `oo <subject> --help` for the full command reference.
 
 > **0.5.0 migration note:** the command tree was flattened per-subject. Old
-> flat names (`oo cal-events`, `oo task-list`, `oo crm-contacts`,
-> `oo applications-sync`, …) were replaced by subject-based equivalents
-> (`oo calendar events`, `oo tasks list`, `oo contacts list`,
-> `oo applications sync`). Flags on leaf commands are unchanged.
+> flat names (`oo cal-events`, `oo task-list`, `oo crm-contacts`, …) were
+> replaced by subject-based equivalents (`oo calendar events`, `oo tasks list`,
+> `oo contacts list`). Flags on leaf commands are unchanged.
 
 ## oo CLI use cases
 
@@ -670,7 +665,7 @@ Every list command accepts `-o table` (default) or `-o json` for scripting.
 ### CRM cleanup after imports or sync drift
 
 **Problem:** Duplicate companies (`Acme` / `ACME GmbH`), persons created twice,
-the same email on a contact three times, deals titled ` @ contoso`, or the same
+the same email on a contact three times, deals titled ` @ Acme`, or the same
 HR contact linked to a deal twice.
 
 **One-shot fix** — runs every dedupe pass in order:
@@ -709,10 +704,10 @@ oo contacts dedupe-info
 # Two deals with the same title
 oo opportunities dedupe
 
-# Same contact attached twice to one deal (common after applications sync)
+# Same contact attached twice to one deal
 oo opportunities dedupe-members
 
-# Titles like " @ contoso" or extra whitespace
+# Titles like " @ Acme" or extra whitespace
 oo opportunities fix-titles
 ```
 
@@ -736,10 +731,10 @@ oo invoices create --number INV-2026-01 --contact COMPANY_ID --item ITEM_ID \
   --price 300 --opportunity DEAL_ID --language de-DE \
   --line-description "…" --terms $'…' --description $'…' --po "Deal #DEAL_ID"
 
-oo invoices pdf 41 --force
+oo invoices pdf INVOICE_ID --force
 oo invoices pdf-cleanup INVOICE_ID
 oo invoices status INVOICE_ID --status draft
-oo mails draft-invoice --invoice INVOICE_ID --to info@client.de
+oo mails draft-invoice --invoice INVOICE_ID --to billing@example.com
 ```
 
 **Deal grouping flag** — when the same role at the same company created
@@ -753,66 +748,11 @@ oo crm cleanup --ignore-company-suffix
 **Inspect before/after:**
 
 ```bash
-oo opportunities list --count 200 | grep -i contoso
-oo contacts get 857 -o json
+oo opportunities list --count 200
+oo contacts get CONTACT_ID -o json
 oo crm cleanup -o json
 ```
 
-### Clients/contacts inventory (`catalog`)
-
-**Problem:** Contacts live as VCF/folders on disk and project trees under
-`~/work` / ops-host; OnlyOffice CRM is the SSOT for persons/companies but
-starts sparse. You need a reviewable inventory before writes.
-
-```bash
-oo catalog scan-contacts --root /path/to/contacts -O /tmp/contacts.yaml
-oo catalog scan-projects --root ~/work -O /tmp/projects.yaml
-oo catalog scan-thunderbird --root /path/to/thunderbird-profile -O /tmp/thunderbird.yaml
-oo catalog merge -i /tmp/contacts.yaml -i /tmp/projects.yaml -i /tmp/thunderbird.yaml -O clients-contacts.yaml
-oo catalog match -i clients-contacts.yaml
-# set approve: true on pilot rows in the YAML
-oo catalog apply --dry-run -i clients-contacts.yaml
-oo catalog apply --apply -i clients-contacts.yaml
-oo crm cleanup
-```
-
-YAML schema and ops runbook live in the inventar repo under `docs/catalog/` and
-`docs/ops/oo-clients-contacts-sync.md`. Library helper: `FindPersonByEmail`.
-
-### Job applications → CRM (`applications sync`)
-
-**Problem:** You keep CVs in a folder tree (`applications/2026/Acme/README.md`)
-and want companies, persons, deals, and history notes in OnlyOffice without
-re-typing.
-
-**Dry-run first** (default — prints what would happen, writes nothing):
-
-```bash
-oo applications sync --path ./applications/2026 --verbose
-```
-
-**Apply** when the preview looks right:
-
-```bash
-oo applications sync --path ./applications/2026 --apply --verbose
-```
-
-Each dossier `README.md` is parsed for company, role, email, phone, LinkedIn, etc.
-Discovery walks `--path` and **skips** junk trees (`node_modules`, `tools`, `.venv`,
-`pdfs`, …). Only folders that look like CV application slugs (`source-NNN-…`, or
-long hyphenated dossiers) are synced — not npm package READMEs.
-
-The sync creates or finds contacts, opens a deal, adds members, and appends a
-history note. Re-running is safe: duplicate members and duplicate deal titles
-are skipped when already present.
-
-**After a large sync**, run CRM cleanup to collapse duplicates introduced by
-repeated runs or manual edits:
-
-```bash
-oo applications sync --path ./applications/2026 --apply
-oo crm cleanup -o json
-```
 
 ### Workspace mail (`oo mails`)
 
@@ -899,8 +839,8 @@ oo calendar events --start 2026-06-24 --end 2026-07-01
 # Schedule interview block
 oo calendar add "Technical interview" 2026-06-26T10:00:00Z 2026-06-26T11:00:00Z
 
-# Attach CV to a hiring task
-oo tasks files upload 208 ./cv.pdf
+# Attach a file to a task
+oo tasks files upload 208 ./notes.pdf
 oo projects files list 33
 ```
 
@@ -908,7 +848,7 @@ oo projects files list 33
 
 | When | Command |
 |------|---------|
-| After `applications sync --apply` | `oo crm cleanup` |
+| After bulk CRM imports | `oo crm cleanup` |
 | After bulk CSV import into CRM | `oo crm cleanup` |
 | Weekly inbox triage | `oo mails list --folder inbox --limit 100` |
 | Before exec reporting | `oo opportunities list` + `oo projects list` |
@@ -922,9 +862,9 @@ oo projects files list 33
 | `ONLYOFFICE_PASS` (or `ONLYOFFICE_PASSWORD`) | Password |
 | `ONLYOFFICE_CALENDAR_ID` | Default calendar id used when omitted (default `1`) |
 | `ONLYOFFICE_PROJECT_ID` | Default project id used when omitted (default `33`) |
-| `OO_URL`, `OO_USER`, `OO_PASS` | CLI-only produktor.io aliases mapped to `ONLYOFFICE_URL`, `ONLYOFFICE_USER`, `ONLYOFFICE_PASS` |
+| `OO_URL`, `OO_USER`, `OO_PASS` | Optional CLI-only aliases for `ONLYOFFICE_*` |
 
-Mail, CRM cleanup, and applications sync are documented in [oo CLI use cases](#oo-cli-use-cases) above.
+Mail and CRM cleanup are documented in [oo CLI use cases](#oo-cli-use-cases) above. Personal disk inventory / dossier sync lives in the private `oo-workspace` (`oow`) tooling.
 
 ### CI / releases
 
