@@ -2,7 +2,11 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"strconv"
+	"time"
 
+	onlyoffice "github.com/eslider/go-onlyoffice"
 	"github.com/spf13/cobra"
 )
 
@@ -82,11 +86,12 @@ func taskGetCmd() *cobra.Command {
 }
 
 func taskCreateCmd() *cobra.Command {
-	var project, desc, deadline, prio string
+	var project, desc, deadline, start, prio string
+	var milestone int64
 	cmd := &cobra.Command{
 		Use:     "create TITLE",
 		Aliases: []string{"add"},
-		Short:   "Create a project task",
+		Short:   "Create a project task (Gantt bar when --start/--deadline/--milestone set)",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := newOO(cmd)
@@ -100,6 +105,51 @@ func taskCreateCmd() *cobra.Command {
 			case "low":
 				p = -1
 			}
+			if start != "" || milestone != 0 {
+				pid, err := strconv.Atoi(project)
+				if err != nil && project != "" {
+					return fmt.Errorf("project id: %w", err)
+				}
+				if project == "" {
+					pid, err = strconv.Atoi(os.Getenv("OO_PROJECT_ID"))
+					if err != nil {
+						return fmt.Errorf("--project or OO_PROJECT_ID required")
+					}
+				}
+				req := onlyoffice.NewProjectTaskRequest{
+					ProjectId:   pid,
+					Title:       args[0],
+					Description: desc,
+					Priority:    p,
+					MilestoneId: int(milestone),
+				}
+				if deadline == "" {
+					deadline = time.Now().Add(14 * 24 * time.Hour).Format("2006-01-02")
+				}
+				d, err := time.Parse("2006-01-02", deadline)
+				if err != nil {
+					return fmt.Errorf("deadline: %w", err)
+				}
+				req.Deadline = onlyoffice.Time(d)
+				if start != "" {
+					s, err := time.Parse("2006-01-02", start)
+					if err != nil {
+						return fmt.Errorf("start: %w", err)
+					}
+					req.StartDate = onlyoffice.Time(s)
+				} else {
+					req.StartDate = onlyoffice.Time(time.Now())
+				}
+				task, err := c.CreateProjectTask(req)
+				if err != nil {
+					return err
+				}
+				printObject(map[string]any{
+					"id":    derefInt(task.ID),
+					"title": derefString(task.Title),
+				})
+				return nil
+			}
 			out, err := c.AddTask(cmd.Context(), project, args[0], desc, p, deadline)
 			if err != nil {
 				return err
@@ -110,7 +160,9 @@ func taskCreateCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&project, "project", "p", "", "project id (default $OO_PROJECT_ID)")
 	cmd.Flags().StringVar(&desc, "description", "", "description")
-	cmd.Flags().StringVar(&deadline, "deadline", "", "deadline YYYY-MM-DD (default now+14d; always assigned to you)")
+	cmd.Flags().StringVar(&deadline, "deadline", "", "deadline YYYY-MM-DD (default now+14d)")
+	cmd.Flags().StringVar(&start, "start", "", "start YYYY-MM-DD (uses CreateProjectTask / Gantt)")
+	cmd.Flags().Int64Var(&milestone, "milestone", 0, "milestone id (Gantt row)")
 	cmd.Flags().StringVar(&prio, "priority", "normal", "high|normal|low")
 	return cmd
 }

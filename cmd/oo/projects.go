@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	onlyoffice "github.com/eslider/go-onlyoffice"
 	"github.com/spf13/cobra"
@@ -22,6 +23,7 @@ func init() {
 	projectsCmd.AddCommand(prjListCmd())
 	projectsCmd.AddCommand(prjGetCmd())
 	projectsCmd.AddCommand(prjMilestonesCmd())
+	projectsCmd.AddCommand(prjMilestoneCreateCmd())
 	projectsCmd.AddCommand(prjCreateCmd())
 	projectsCmd.AddCommand(prjUpdateCmd())
 	projectsCmd.AddCommand(prjDeleteCmd())
@@ -116,6 +118,52 @@ func prjMilestonesCmd() *cobra.Command {
 			return nil
 		},
 	}
+}
+
+func prjMilestoneCreateCmd() *cobra.Command {
+	var deadline, desc string
+	var key bool
+	cmd := &cobra.Command{
+		Use:   "milestone-create PROJECT_ID TITLE",
+		Short: "Create a project milestone (Gantt row)",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			pid, err := strconv.Atoi(args[0])
+			if err != nil {
+				return fmt.Errorf("project id must be integer: %w", err)
+			}
+			if deadline == "" {
+				return fmt.Errorf("--deadline YYYY-MM-DD is required")
+			}
+			day, err := time.Parse("2006-01-02", deadline)
+			if err != nil {
+				return fmt.Errorf("deadline: %w", err)
+			}
+			ms, err := c.CreateMilestone(onlyoffice.NewMilestoneRequest{
+				ProjectID:   pid,
+				Title:       args[1],
+				Deadline:    onlyoffice.Time(day),
+				Description: desc,
+				IsKey:       key,
+			})
+			if err != nil {
+				return err
+			}
+			printObject(map[string]any{
+				"id":    derefInt64(ms.ID),
+				"title": derefString(ms.Title),
+			})
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&deadline, "deadline", "", "deadline YYYY-MM-DD")
+	cmd.Flags().StringVar(&desc, "description", "", "description")
+	cmd.Flags().BoolVar(&key, "key", false, "mark as key milestone")
+	return cmd
 }
 
 func prjCreateCmd() *cobra.Command {

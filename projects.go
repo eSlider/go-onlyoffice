@@ -134,6 +134,51 @@ func (c *Client) GetProjectByID(ctx context.Context, projectID string) (map[stri
 	return c.ResponseObject(ctx, fmt.Sprintf("/api/2.0/project/%s.json", url.PathEscape(projectID)))
 }
 
+// NewMilestoneRequest is the payload for CreateMilestone.
+type NewMilestoneRequest struct {
+	ProjectID   int    `json:"-"`
+	Title       string `json:"title"`
+	Deadline    Time   `json:"deadline"`
+	Description string `json:"description,omitempty"`
+	IsKey       bool   `json:"isKey"`
+	IsNotify    bool   `json:"isNotify"`
+	Responsible string `json:"responsible,omitempty"`
+}
+
+// CreateMilestone creates a project milestone (Gantt row).
+// POST /api/2.0/project/{id}/milestone
+func (c *Client) CreateMilestone(req NewMilestoneRequest) (*Milestone, error) {
+	if req.Responsible == "" {
+		uid, err := c.SelfUserID(context.Background())
+		if err != nil {
+			return nil, fmt.Errorf("CreateMilestone: self: %w", err)
+		}
+		req.Responsible = uid
+	}
+	ms := new(Milestone)
+	err := c.Query(Request{
+		Uri:    fmt.Sprintf("/api/2.0/project/%d/milestone", req.ProjectID),
+		Method: "POST",
+		Body:   req,
+	}, &struct {
+		MetaResponse `json:",inline"`
+		Response     *Milestone `json:"response"`
+	}{Response: ms})
+	return ms, err
+}
+
+// DeleteMilestone removes a milestone by id.
+// DELETE /api/2.0/project/milestone/{id}
+func (c *Client) DeleteMilestone(id int64) error {
+	return c.Query(Request{
+		Uri:    fmt.Sprintf("/api/2.0/project/milestone/%d", id),
+		Method: "DELETE",
+	}, &struct {
+		MetaResponse `json:",inline"`
+		Response     *Milestone `json:"response"`
+	}{})
+}
+
 // GetProjectMilestones returns milestones for the given project.
 // https://api1.onlyoffice.com/portals/method/project/post/api/2.0/project/%7bid%7d/milestone
 func (c *Client) GetProjectMilestones(project *Project) ([]*Milestone, error) {
