@@ -139,6 +139,23 @@ func TestIntegrationProjectAndTaskLifecycle(t *testing.T) {
 
 	start := Time(time.Now().AddDate(0, 0, -2))
 	deadline := Time(time.Now().AddDate(0, 0, 2))
+	ms, err := c.CreateMilestone(NewMilestoneRequest{
+		ProjectID: *project.ID,
+		Title:     "integration milestone",
+		Deadline:  deadline,
+	})
+	if err != nil {
+		t.Fatalf("CreateMilestone: %v", err)
+	}
+	if ms == nil || ms.ID == nil {
+		t.Fatal("created milestone without id")
+	}
+	t.Cleanup(func() {
+		if err := c.DeleteMilestone(*ms.ID); err != nil {
+			t.Logf("cleanup DeleteMilestone: %v", err)
+		}
+	})
+
 	task, err := c.CreateProjectTask(NewProjectTaskRequest{
 		ProjectId:   *project.ID,
 		Title:       "integration parent task",
@@ -146,6 +163,7 @@ func TestIntegrationProjectAndTaskLifecycle(t *testing.T) {
 		StartDate:   start,
 		Deadline:    deadline,
 		Priority:    int(TaskPriorityNormal),
+		MilestoneId: int(*ms.ID),
 	})
 	if err != nil {
 		t.Fatalf("CreateProjectTask: %v", err)

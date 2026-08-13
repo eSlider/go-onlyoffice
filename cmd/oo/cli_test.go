@@ -53,6 +53,13 @@ func TestProjectsAlias(t *testing.T) {
 	if cmd.Name() != "projects" {
 		t.Fatalf("prj alias resolved to %q", cmd.Name())
 	}
+	ms, _, err := rootCmd.Find([]string{"projects", "milestone-create"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ms.Name() != "milestone-create" {
+		t.Fatalf("milestone-create resolved to %q", ms.Name())
+	}
 }
 
 func TestNewOOReturnsErrorWithoutCredentials(t *testing.T) {
