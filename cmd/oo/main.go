@@ -13,7 +13,7 @@
 //	oo cases         list | create | delete | member-add
 //	oo crm-tasks     list | create | delete | categories
 //	oo crm           cleanup
-//	oo mails         accounts | folders | list | get | draft | attach | draft-invoice | delete
+//	oo mails         accounts | folders | list | get | download-attachment | draft | attach | draft-invoice | delete
 //	oo invoices      list | get | create | update | pdf | pdf-cleanup | status | delete | items …
 //
 // CRM association rules: docs/crm-associations.md
