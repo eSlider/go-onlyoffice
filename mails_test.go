@@ -1,8 +1,13 @@
 package onlyoffice
 
 import (
+	"context"
+	"net/http"
+	"net/http/cookiejar"
+	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestResolveMailFolder(t *testing.T) {
@@ -95,5 +100,62 @@ func TestInt64FromMap(t *testing.T) {
 	}
 	if Int64FromMap(map[string]any{"id": "42"}, "id") != 42 {
 		t.Fatal("string")
+	}
+}
+
+func TestNewClientSetsCookieJar(t *testing.T) {
+	c := NewClient(Credentials{Url: "https://example.test", User: "u", Password: "p"})
+	if c.client == nil {
+		t.Fatal("client is nil")
+	}
+	if c.client.Jar == nil {
+		t.Fatal("cookie jar is nil")
+	}
+	if _, ok := c.client.Jar.(*cookiejar.Jar); !ok {
+		t.Fatalf("unexpected jar type %T", c.client.Jar)
+	}
+}
+
+func TestDownloadMailAttachmentUsesAuthCookie(t *testing.T) {
+	var gotAuth, gotCookie, gotPath string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/2.0/authentication.json":
+			http.SetCookie(w, &http.Cookie{Name: "sessionid", Value: "abc123", Path: "/"})
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"response":{"token":"tok","expires":"2099-01-01T00:00:00.0000000+00:00"}}`))
+		case "/addons/mail/httphandlers/download.ashx":
+			gotAuth = r.Header.Get("Authorization")
+			gotCookie = r.Header.Get("Cookie")
+			gotPath = r.URL.RequestURI()
+			if gotCookie == "" {
+				http.Error(w, "missing cookie", http.StatusUnauthorized)
+				return
+			}
+			_, _ = w.Write([]byte("payload"))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	c := NewClient(Credentials{Url: srv.URL, User: "u", Password: "p"})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	body, err := c.DownloadMailAttachment(ctx, "42")
+	if err != nil {
+		t.Fatalf("DownloadMailAttachment: %v", err)
+	}
+	if string(body) != "payload" {
+		t.Fatalf("body = %q", body)
+	}
+	if gotAuth != "tok" {
+		t.Fatalf("auth header = %q", gotAuth)
+	}
+	if !strings.Contains(gotCookie, "sessionid=abc123") {
+		t.Fatalf("cookie header = %q", gotCookie)
+	}
+	if gotPath != "/addons/mail/httphandlers/download.ashx?attachid=42" {
+		t.Fatalf("path = %q", gotPath)
 	}
 }
