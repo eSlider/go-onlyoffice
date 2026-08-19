@@ -22,6 +22,7 @@ func init() {
 	mailsCmd.AddCommand(mailsFoldersCmd())
 	mailsCmd.AddCommand(mailsListCmd())
 	mailsCmd.AddCommand(mailsGetCmd())
+	mailsCmd.AddCommand(mailsDownloadAttachmentCmd())
 	mailsCmd.AddCommand(mailsDraftCmd())
 	mailsCmd.AddCommand(mailsAttachCmd())
 	mailsCmd.AddCommand(mailsDraftInvoiceCmd())
@@ -129,6 +130,48 @@ func mailsGetCmd() *cobra.Command {
 			return nil
 		},
 	}
+}
+
+func mailsDownloadAttachmentCmd() *cobra.Command {
+	var outPath string
+	cmd := &cobra.Command{
+		Use:   "download-attachment ATTACHMENT_ID",
+		Short: "Download a mail attachment by attachment id",
+		Long: `Download a raw attachment from OnlyOffice Mail's download.ashx handler.
+
+Example:
+  oo mails download-attachment 12345 --out /tmp/attach.bin
+`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if strings.TrimSpace(outPath) == "" {
+				return fmt.Errorf("--out is required")
+			}
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			body, err := c.DownloadMailAttachment(cmd.Context(), args[0])
+			if err != nil {
+				return err
+			}
+			if err := writeMailAttachment(outPath, body); err != nil {
+				return err
+			}
+			if outputFormat == "json" {
+				printObject(map[string]any{
+					"attachmentId": args[0],
+					"bytes":        len(body),
+					"path":         outPath,
+				})
+				return nil
+			}
+			fmt.Printf("saved %d bytes to %s\n", len(body), outPath)
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&outPath, "out", "", "output file path")
+	return cmd
 }
 
 func mailsDraftCmd() *cobra.Command {
@@ -295,6 +338,13 @@ func formatInvoiceCostEUR(v any) string {
 		return "?"
 	}
 	return s
+}
+
+func writeMailAttachment(path string, body []byte) error {
+	if strings.TrimSpace(path) == "" {
+		return fmt.Errorf("attachment output path is required")
+	}
+	return os.WriteFile(path, body, 0o644)
 }
 
 func mailsDeleteCmd() *cobra.Command {
