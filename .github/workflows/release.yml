@@ -16,6 +16,7 @@ permissions:
 jobs:
   goreleaser:
     name: GoReleaser
+    if: github.server_url == 'https://github.com'
     runs-on: ubuntu-latest
     steps:
       # Always clone default branch first. workflow_dispatch often races with
