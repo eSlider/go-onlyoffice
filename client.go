@@ -11,6 +11,7 @@ package onlyoffice
 
 import (
 	"net/http"
+	"net/http/cookiejar"
 	"os"
 	"strings"
 )
@@ -35,8 +36,9 @@ type Client struct {
 
 // NewClient returns a new Client backed by http.DefaultClient.
 func NewClient(c Credentials) *Client {
+	jar, _ := cookiejar.New(nil)
 	return &Client{
-		client:      http.DefaultClient,
+		client:      &http.Client{Jar: jar},
 		credentials: &c,
 	}
 }
