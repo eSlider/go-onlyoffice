@@ -7,6 +7,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"net/mail"
 	"net/url"
 	"strconv"
@@ -96,6 +98,38 @@ func (c *Client) GetMailMessage(ctx context.Context, messageID string) (map[stri
 	return c.ResponseObject(ctx, "/api/2.0/mail/messages/"+url.PathEscape(id))
 }
 
+// DownloadMailAttachment fetches raw attachment bytes by mail attachment id via
+// the mail addon's download.ashx handler. This path relies on the session
+// cookie captured during authentication, so NewClient configures a cookie jar.
+func (c *Client) DownloadMailAttachment(ctx context.Context, attachmentID string) ([]byte, error) {
+	id := strings.TrimSpace(attachmentID)
+	if id == "" {
+		return nil, fmt.Errorf("DownloadMailAttachment: attachment id is required")
+	}
+	auth, err := c.authHeader()
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL()+"/addons/mail/httphandlers/download.ashx?attachid="+url.QueryEscape(id), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", auth)
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("DownloadMailAttachment %s: %d %s", id, resp.StatusCode, truncate(string(raw), 400))
+	}
+	return raw, nil
+}
+
 // RemoveMailMessages deletes messages by id (PUT /api/2.0/mail/messages/remove).
 // The API response "response" field may be a number or object; success is HTTP 2xx.
 func (c *Client) RemoveMailMessages(ctx context.Context, ids ...int) (map[string]any, error) {
@@ -157,6 +191,49 @@ func (c *Client) SaveMailDraft(ctx context.Context, p SaveMailDraftParams) (map[
 		"body":    p.Body,
 	}
 	return c.putJSONObject(ctx, "/api/2.0/mail/drafts/save", body)
+}
+
+// SendMailParams describes a message to send via PUT /api/2.0/mail/messages/send.
+// ID refers to an existing draft/message id; From falls back to the first enabled
+// mailbox. Cc/Bcc are omitted when empty (the API 400s on empty strings). Chat
+// line goes into Body (API send does not append the UI signature).
+type SendMailParams struct {
+	ID      int64
+	From    string
+	To      string
+	Cc      string
+	Bcc     string
+	Subject string
+	Body    string // HTML
+}
+
+// SendMail sends an existing draft (or a fresh message) via the OnlyOffice Mail
+// send endpoint. Returns the raw send response.
+func (c *Client) SendMail(ctx context.Context, p SendMailParams) (json.RawMessage, error) {
+	if strings.TrimSpace(p.To) == "" {
+		return nil, fmt.Errorf("SendMail: to is required")
+	}
+	if strings.TrimSpace(p.From) == "" {
+		from, err := c.defaultMailFrom(ctx)
+		if err != nil {
+			return nil, err
+		}
+		p.From = from
+	}
+	body := map[string]any{
+		"id":      p.ID,
+		"from":    p.From,
+		"to":      p.To,
+		"subject": p.Subject,
+		"body":    p.Body,
+	}
+	if strings.TrimSpace(p.Cc) != "" {
+		body["cc"] = p.Cc
+	}
+	if strings.TrimSpace(p.Bcc) != "" {
+		body["bcc"] = p.Bcc
+	}
+	return c.putJSON(ctx, "/api/2.0/mail/messages/send.json", body)
 }
 
 func (c *Client) defaultMailFrom(ctx context.Context) (string, error) {
