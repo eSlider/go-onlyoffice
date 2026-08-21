@@ -319,8 +319,18 @@ func (c *Client) resolveAPIURL(ref string) string {
 	if ref == "" {
 		return ref
 	}
-	if strings.HasPrefix(ref, "http://") || strings.HasPrefix(ref, "https://") {
-		return ref
+	// Rewrite any host to the configured API base so downloads stay on the
+	// internal network and keep the Authorization header (no cross-host
+	// redirect that would strip it). Scheme-relative URLs are handled too.
+	if strings.HasPrefix(ref, "//") {
+		ref = "http:" + ref
+	}
+	if u, err := url.Parse(ref); err == nil && u.IsAbs() {
+		if base, err2 := url.Parse(c.baseURL()); err2 == nil {
+			u.Scheme = base.Scheme
+			u.Host = base.Host
+			return u.String()
+		}
 	}
 	base := c.baseURL()
 	if strings.HasPrefix(ref, "/") {
