@@ -16,6 +16,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 * Document that invoice→deal must be set at create (`update --opportunity` often HTTP 400)
 
+## [0.12.0](https://github.com/eSlider/go-onlyoffice/compare/v0.11.0...v0.12.0) (2026-08-21)
+
+
+### Features
+
+* **crm:** contact email & person-opportunity indexes, history entity whitelist ([9c450a0](https://github.com/eSlider/go-onlyoffice/commit/9c450a0352c25f12ac16d91062744ab026ffe660))
+* **files:** add WebDAV-oriented Files operations ([ebbd5d5](https://github.com/eSlider/go-onlyoffice/commit/ebbd5d5373abfeca5f160312f201cbd683f55e42))
+* **mail:** oo mails send — SendMail + guard empty-by-id send ([dda2bd3](https://github.com/eSlider/go-onlyoffice/commit/dda2bd3ca5cea6ebb89e1ac02b785b9838727bda))
+* **mail:** oo mails send — SendMail client + guard empty-by-id ([ab7dfbd](https://github.com/eSlider/go-onlyoffice/commit/ab7dfbd8594de5724286e2b460e789f4acb114bc))
+
+
+### Bug Fixes
+
+* **files:** rewrite viewUrl host to API base on download ([ecf34ba](https://github.com/eSlider/go-onlyoffice/commit/ecf34ba51aae77f1626a60795f7329f25d9344e5))
+
 ## [0.11.0](https://github.com/eSlider/go-onlyoffice/compare/v0.10.0...v0.11.0) (2026-08-18)
 
 
