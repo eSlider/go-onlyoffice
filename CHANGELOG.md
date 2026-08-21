@@ -16,6 +16,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 * Document that invoice→deal must be set at create (`update --opportunity` often HTTP 400)
 
+## [0.11.0](https://github.com/eSlider/go-onlyoffice/compare/v0.10.0...v0.11.0) (2026-08-18)
+
+
+### Features
+
+* **catalog:** port oo catalog (scan/merge/match/apply) from legacy branch ([256864f](https://github.com/eSlider/go-onlyoffice/commit/256864f613f31570cf995dddc51255a9a91a38f8))
+
 ## [0.10.0](https://github.com/eSlider/go-onlyoffice/compare/v0.9.0...v0.10.0) (2026-08-13)
 
 
