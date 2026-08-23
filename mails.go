@@ -8,8 +8,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/mail"
 	"net/http"
+	"net/mail"
 	"net/url"
 	"strconv"
 	"strings"
@@ -191,6 +191,49 @@ func (c *Client) SaveMailDraft(ctx context.Context, p SaveMailDraftParams) (map[
 		"body":    p.Body,
 	}
 	return c.putJSONObject(ctx, "/api/2.0/mail/drafts/save", body)
+}
+
+// SendMailParams describes a message to send via PUT /api/2.0/mail/messages/send.
+// ID refers to an existing draft/message id; From falls back to the first enabled
+// mailbox. Cc/Bcc are omitted when empty (the API 400s on empty strings). Chat
+// line goes into Body (API send does not append the UI signature).
+type SendMailParams struct {
+	ID      int64
+	From    string
+	To      string
+	Cc      string
+	Bcc     string
+	Subject string
+	Body    string // HTML
+}
+
+// SendMail sends an existing draft (or a fresh message) via the OnlyOffice Mail
+// send endpoint. Returns the raw send response.
+func (c *Client) SendMail(ctx context.Context, p SendMailParams) (json.RawMessage, error) {
+	if strings.TrimSpace(p.To) == "" {
+		return nil, fmt.Errorf("SendMail: to is required")
+	}
+	if strings.TrimSpace(p.From) == "" {
+		from, err := c.defaultMailFrom(ctx)
+		if err != nil {
+			return nil, err
+		}
+		p.From = from
+	}
+	body := map[string]any{
+		"id":      p.ID,
+		"from":    p.From,
+		"to":      p.To,
+		"subject": p.Subject,
+		"body":    p.Body,
+	}
+	if strings.TrimSpace(p.Cc) != "" {
+		body["cc"] = p.Cc
+	}
+	if strings.TrimSpace(p.Bcc) != "" {
+		body["bcc"] = p.Bcc
+	}
+	return c.putJSON(ctx, "/api/2.0/mail/messages/send.json", body)
 }
 
 func (c *Client) defaultMailFrom(ctx context.Context) (string, error) {

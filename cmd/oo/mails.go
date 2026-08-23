@@ -26,6 +26,7 @@ func init() {
 	mailsCmd.AddCommand(mailsDraftCmd())
 	mailsCmd.AddCommand(mailsAttachCmd())
 	mailsCmd.AddCommand(mailsDraftInvoiceCmd())
+	mailsCmd.AddCommand(mailsSendCmd())
 	mailsCmd.AddCommand(mailsDeleteCmd())
 }
 
@@ -345,6 +346,71 @@ func writeMailAttachment(path string, body []byte) error {
 		return fmt.Errorf("attachment output path is required")
 	}
 	return os.WriteFile(path, body, 0o644)
+}
+
+func mailsSendCmd() *cobra.Command {
+	var from, to, cc, bcc, subject, body, html string
+	var id int64
+	cmd := &cobra.Command{
+		Use:   "send",
+		Short: "Send a mail message (OnlyOffice Mail)",
+		Long: `Send via PUT /api/2.0/mail/messages/send.json.
+
+  oo mails send --id 7803 --body "…"            # send referencing a draft id
+  oo mails send --to a@b.com --subject "…" --body "…"
+  oo mails send --id 7803 --to a@b.com --subject "…" --body "…" --cc x@y.com
+
+IMPORTANT: send.json does NOT copy subject/body from the referenced draft — the
+content must be in this request (--subject/--body). Cc/Bcc are omitted when empty
+(the API 400s on empty strings). The API send does not append the UI signature —
+put the chat line in --body if needed.
+`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if to == "" && id == 0 {
+				return fmt.Errorf("--to is required (or --id of an existing draft)")
+			}
+			htmlBody := body
+			if html != "" {
+				htmlBody = html
+			}
+			if htmlBody == "" && id != 0 {
+				// The send.json endpoint does NOT copy subject/body from the
+				// referenced draft — an empty body here sends an empty message.
+				// Warn instead of silently mailing an empty email.
+				return fmt.Errorf("--body/--html is required when sending by --id (send.json needs the content in the request)")
+			}
+			if htmlBody == "" && to == "" {
+				return fmt.Errorf("--body is required for a fresh message")
+			}
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			raw, err := c.SendMail(cmd.Context(), onlyoffice.SendMailParams{
+				ID:      id,
+				From:    from,
+				To:      to,
+				Cc:      cc,
+				Bcc:     bcc,
+				Subject: subject,
+				Body:    htmlBody,
+			})
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(raw))
+			return nil
+		},
+	}
+	cmd.Flags().Int64Var(&id, "id", 0, "existing draft id to send (0 = fresh message)")
+	cmd.Flags().StringVar(&from, "from", "", "from address (default: first enabled mailbox)")
+	cmd.Flags().StringVar(&to, "to", "", "recipient (required unless --id)")
+	cmd.Flags().StringVar(&cc, "cc", "", "cc")
+	cmd.Flags().StringVar(&bcc, "bcc", "", "bcc")
+	cmd.Flags().StringVar(&subject, "subject", "", "subject")
+	cmd.Flags().StringVar(&body, "body", "", "plain text or HTML body")
+	cmd.Flags().StringVar(&html, "html", "", "HTML body (alias of --body when set)")
+	return cmd
 }
 
 func mailsDeleteCmd() *cobra.Command {
