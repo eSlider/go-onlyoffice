@@ -2,6 +2,7 @@ package onlyoffice
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
@@ -49,9 +50,9 @@ func TestMailMessagesPath(t *testing.T) {
 
 func TestParseMailAddress(t *testing.T) {
 	tests := []struct {
-		raw          string
-		wantName     string
-		wantAddress  string
+		raw         string
+		wantName    string
+		wantAddress string
 	}{
 		{`"LinkedIn Jobbenachrichtigungen" <jobalerts-noreply@linkedin.com>`, "LinkedIn Jobbenachrichtigungen", "jobalerts-noreply@linkedin.com"},
 		{`"Bitfinex" <no-reply@bitfinex.com>`, "Bitfinex", "no-reply@bitfinex.com"},
@@ -157,5 +158,57 @@ func TestDownloadMailAttachmentUsesAuthCookie(t *testing.T) {
 	}
 	if gotPath != "/addons/mail/httphandlers/download.ashx?attachid=42" {
 		t.Fatalf("path = %q", gotPath)
+	}
+}
+
+func TestSendMailOmitsEmptyCcBcc(t *testing.T) {
+	var gotBody map[string]any
+	var gotPath string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/2.0/authentication.json":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"response":{"token":"tok","expires":"2099-01-01T00:00:00.0000000+00:00"}}`))
+		case "/api/2.0/mail/messages/send.json":
+			gotPath = r.URL.Path
+			dec := json.NewDecoder(r.Body)
+			_ = dec.Decode(&gotBody)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"response":{"id":1}}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	c := NewClient(Credentials{Url: srv.URL, User: "u", Password: "p"})
+	ctx := context.Background()
+	raw, err := c.SendMail(ctx, SendMailParams{
+		ID:      99,
+		From:    "me@x.com",
+		To:      "a@b.com",
+		Subject: "hi",
+		Body:    "<p>hello</p>",
+	})
+	if err != nil {
+		t.Fatalf("SendMail: %v", err)
+	}
+	if gotPath != "/api/2.0/mail/messages/send.json" {
+		t.Fatalf("path = %q", gotPath)
+	}
+	if _, hasCC := gotBody["cc"]; hasCC {
+		t.Fatalf("empty cc should be omitted: %v", gotBody)
+	}
+	if _, hasBcc := gotBody["bcc"]; hasBcc {
+		t.Fatalf("empty bcc should be omitted: %v", gotBody)
+	}
+	if gotBody["to"] != "a@b.com" {
+		t.Fatalf("to = %v", gotBody["to"])
+	}
+	if gotBody["id"] != float64(99) {
+		t.Fatalf("id = %v", gotBody["id"])
+	}
+	if !strings.Contains(string(raw), `"id"`) {
+		t.Fatalf("raw = %s", raw)
 	}
 }
