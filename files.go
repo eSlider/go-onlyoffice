@@ -281,6 +281,66 @@ func (c *Client) DeleteFiles(ctx context.Context, fileIDs []int) error {
 	return err
 }
 
+// ListFolder returns the Documents module listing for a folder id
+// (GET /api/2.0/files/{folderId}).
+func (c *Client) ListFolder(ctx context.Context, folderID string) (map[string]any, error) {
+	if folderID == "" {
+		return nil, fmt.Errorf("folder id is required")
+	}
+	out, err := c.ResponseObject(ctx, "/api/2.0/files/"+url.PathEscape(folderID)+".json")
+	if err != nil {
+		out, err = c.ResponseObject(ctx, "/api/2.0/files/"+url.PathEscape(folderID))
+	}
+	return out, err
+}
+
+// CreateFolder creates a subfolder under parentFolderID.
+func (c *Client) CreateFolder(ctx context.Context, parentFolderID, title string) (map[string]any, error) {
+	if parentFolderID == "" || title == "" {
+		return nil, fmt.Errorf("parent folder id and title are required")
+	}
+	body := map[string]any{"title": title}
+	out, err := c.postJSONObject(ctx, "/api/2.0/files/folder/"+url.PathEscape(parentFolderID)+".json", body)
+	if err != nil {
+		out, err = c.postJSONObject(ctx, "/api/2.0/files/folder/"+url.PathEscape(parentFolderID), body)
+	}
+	return out, err
+}
+
+// MoveFiles moves file ids into destFolderID (Documents fileops/move).
+func (c *Client) MoveFiles(ctx context.Context, destFolderID int, fileIDs []int) (map[string]any, error) {
+	if destFolderID == 0 || len(fileIDs) == 0 {
+		return nil, fmt.Errorf("dest folder and file ids are required")
+	}
+	body := map[string]any{
+		"folderIds":    []int{},
+		"fileIds":      fileIDs,
+		"destFolderId": destFolderID,
+	}
+	out, err := c.putJSONObject(ctx, "/api/2.0/files/fileops/move.json", body)
+	if err != nil {
+		out, err = c.putJSONObject(ctx, "/api/2.0/files/fileops/move", body)
+	}
+	return out, err
+}
+
+// UploadToFolder uploads a local file into an arbitrary Documents folder id.
+func (c *Client) UploadToFolder(ctx context.Context, folderID, localPath string) (*FileEntry, error) {
+	if folderID == "" || localPath == "" {
+		return nil, fmt.Errorf("folder id and local path are required")
+	}
+	uploadPath := fmt.Sprintf("/api/2.0/files/%s/upload.json", url.PathEscape(folderID))
+	raw, err := c.uploadMultipart(ctx, uploadPath, "file", localPath)
+	if err != nil {
+		uploadPath = fmt.Sprintf("/api/2.0/files/%s/upload", url.PathEscape(folderID))
+		raw, err = c.uploadMultipart(ctx, uploadPath, "file", localPath)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return decodeResponseFileEntry(raw)
+}
+
 // DownloadFile streams file bytes from the file's viewUrl using the same auth
 // as API calls. Writes into dst.
 func (c *Client) DownloadFile(ctx context.Context, fileID string, dst io.Writer) (int64, error) {
@@ -319,18 +379,8 @@ func (c *Client) resolveAPIURL(ref string) string {
 	if ref == "" {
 		return ref
 	}
-	// Rewrite any host to the configured API base so downloads stay on the
-	// internal network and keep the Authorization header (no cross-host
-	// redirect that would strip it). Scheme-relative URLs are handled too.
-	if strings.HasPrefix(ref, "//") {
-		ref = "http:" + ref
-	}
-	if u, err := url.Parse(ref); err == nil && u.IsAbs() {
-		if base, err2 := url.Parse(c.baseURL()); err2 == nil {
-			u.Scheme = base.Scheme
-			u.Host = base.Host
-			return u.String()
-		}
+	if strings.HasPrefix(ref, "http://") || strings.HasPrefix(ref, "https://") {
+		return ref
 	}
 	base := c.baseURL()
 	if strings.HasPrefix(ref, "/") {
