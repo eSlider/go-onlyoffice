@@ -263,22 +263,18 @@ func (c *Client) RenameFile(ctx context.Context, fileID, newTitle string) (*File
 	return decodeResponseFileEntry(raw)
 }
 
-type deleteFilesBody struct {
-	FileIDs   []int `json:"fileIds"`
-	FolderIDs []int `json:"folderIds"`
-}
-
 // DeleteFiles permanently deletes files by numeric id (Documents module).
+// Uses per-file DELETE (DeleteDavItems); fileops/delete returns 200 on some
+// portals (e.g. produktor.io) without removing the file.
 func (c *Client) DeleteFiles(ctx context.Context, fileIDs []int) error {
 	if len(fileIDs) == 0 {
 		return fmt.Errorf("no file ids to delete")
 	}
-	body := deleteFilesBody{FileIDs: fileIDs, FolderIDs: nil}
-	_, err := c.putJSON(ctx, "/api/2.0/files/fileops/delete.json", body)
-	if err != nil {
-		_, err = c.putJSON(ctx, "/api/2.0/files/fileops/delete", body)
+	strIDs := make([]string, len(fileIDs))
+	for i, id := range fileIDs {
+		strIDs[i] = strconv.Itoa(id)
 	}
-	return err
+	return c.DeleteDavItems(ctx, nil, strIDs)
 }
 
 // ListFolder returns the Documents module listing for a folder id
