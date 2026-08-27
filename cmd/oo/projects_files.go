@@ -24,7 +24,24 @@ func projectFilesCmd() *cobra.Command {
 	cmd.AddCommand(prjFilesDownloadCmd())
 	cmd.AddCommand(prjFilesRenameCmd())
 	cmd.AddCommand(prjFilesDeleteCmd())
+	// Convenience aliases into oo docs (md↔docx / OCR pipeline).
+	cmd.AddCommand(aliasDocsAsMD())
+	cmd.AddCommand(aliasDocsPutMD())
 	return cmd
+}
+
+func aliasDocsAsMD() *cobra.Command {
+	c := docsAsMDCmd()
+	c.Use = "as-md FILE_ID"
+	c.Short = "Alias of `oo docs as-md` — download OO file as Markdown (OCR if needed)"
+	return c
+}
+
+func aliasDocsPutMD() *cobra.Command {
+	c := docsPutMDCmd()
+	c.Use = "put-md PROJECT_ID MARKDOWN_PATH"
+	c.Short = "Alias of `oo docs put-md` — Markdown→DOCX upload into project"
+	return c
 }
 
 func prjFilesListCmd() *cobra.Command {

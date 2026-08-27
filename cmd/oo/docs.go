@@ -1,0 +1,314 @@
+package main
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
+	onlyoffice "github.com/eslider/go-onlyoffice"
+	"github.com/eslider/go-onlyoffice/internal/docpipe"
+	"github.com/spf13/cobra"
+)
+
+func init() {
+	rootCmd.AddCommand(docsCmd())
+}
+
+func docsCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "docs",
+		Short: "Local document pipeline: md↔docx, OCR→PDF, extract Markdown",
+		Long: `Agent-friendly conversions (requires pandoc / ocrmypdf / pdftotext on PATH).
+
+OnlyOffice Documents UI is poor for .md — keep Markdown in git, store .docx in OO.
+Upload Markdown as DOCX:  oo docs put-md PROJECT_ID file.md
+Read an OO file as MD:    oo docs as-md FILE_ID
+OCR a scan locally:       oo docs ocr scan.pdf --md out.md`,
+	}
+	cmd.AddCommand(docsConvertCmd())
+	cmd.AddCommand(docsOCRCmd())
+	cmd.AddCommand(docsAsMDCmd())
+	cmd.AddCommand(docsPutMDCmd())
+	cmd.AddCommand(docsToolsCmd())
+	return cmd
+}
+
+func docsToolsCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "tools",
+		Short: "Show which converter binaries are on PATH",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			t := docpipe.LookPath()
+			printObject(map[string]any{
+				"pandoc":    strOrNil(t.Pandoc),
+				"ocrmypdf":  strOrNil(t.OCRMyPDF),
+				"pdftotext": strOrNil(t.PDFToText),
+				"tesseract": strOrNil(t.Tesseract),
+			})
+			return nil
+		},
+	}
+}
+
+func strOrNil(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
+func docsConvertCmd() *cobra.Command {
+	var to string
+	cmd := &cobra.Command{
+		Use:   "convert PATH",
+		Short: "Convert a local file with pandoc (md↔docx by default)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			in := args[0]
+			t := docpipe.LookPath()
+			out := to
+			if out == "" {
+				switch docpipe.Ext(in) {
+				case ".md", ".markdown":
+					out = docpipe.SiblingDOCX(in)
+				case ".docx":
+					out = strings.TrimSuffix(in, docpipe.Ext(in)) + ".md"
+				default:
+					return fmt.Errorf("--to required for input type %s", docpipe.Ext(in))
+				}
+			}
+			if err := docpipe.EnsureDir(out); err != nil {
+				return err
+			}
+			if err := t.ConvertFile(in, out); err != nil {
+				return err
+			}
+			printObject(map[string]any{"in": in, "out": out})
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&to, "to", "", "output path (default: sibling .docx or .md)")
+	return cmd
+}
+
+func docsOCRCmd() *cobra.Command {
+	var out, mdOut, lang string
+	var force bool
+	var writeMD bool
+	cmd := &cobra.Command{
+		Use:   "ocr PATH",
+		Short: "OCR image/PDF → searchable PDF (and optional Markdown)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			in := args[0]
+			t := docpipe.LookPath()
+			if out == "" {
+				base := strings.TrimSuffix(filepath.Base(in), filepath.Ext(in))
+				out = filepath.Join(filepath.Dir(in), base+".ocr.pdf")
+			}
+			if err := docpipe.EnsureDir(out); err != nil {
+				return err
+			}
+			if err := t.OCRToPDF(in, out, force, lang); err != nil {
+				return err
+			}
+			res := map[string]any{"in": in, "pdf": out}
+			if writeMD || mdOut != "" {
+				if mdOut == "" {
+					mdOut = strings.TrimSuffix(out, filepath.Ext(out)) + ".md"
+				}
+				text, err := t.ExtractPDFText(out)
+				if err != nil {
+					return err
+				}
+				body := "# " + filepath.Base(in) + "\n\n" + strings.TrimSpace(text) + "\n"
+				if err := os.WriteFile(mdOut, []byte(body), 0o644); err != nil {
+					return err
+				}
+				res["md"] = mdOut
+			}
+			printObject(res)
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&out, "out", "", "output searchable PDF (default: <name>.ocr.pdf)")
+	cmd.Flags().StringVar(&mdOut, "md", "", "write Markdown extraction to this path")
+	cmd.Flags().BoolVar(&writeMD, "markdown", false, "also write sibling .md next to OCR PDF")
+	cmd.Flags().StringVar(&lang, "lang", "eng", "OCR language(s) for tesseract/ocrmypdf")
+	cmd.Flags().BoolVar(&force, "force", true, "force OCR even if a text layer exists")
+	return cmd
+}
+
+func docsAsMDCmd() *cobra.Command {
+	var to, lang string
+	var minChars int
+	var uploadOCR bool
+	cmd := &cobra.Command{
+		Use:   "as-md FILE_ID",
+		Short: "Download an OO Documents file and emit Markdown (OCR PDF/image if needed)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			ctx := cmd.Context()
+			meta, err := c.GetFile(ctx, args[0])
+			if err != nil {
+				return err
+			}
+			title := onlyoffice.FileEntryTitle(meta)
+			dir, err := os.MkdirTemp("", "oo-docs-as-md-*")
+			if err != nil {
+				return err
+			}
+			defer os.RemoveAll(dir)
+
+			local := filepath.Join(dir, onlyoffice.SafeLocalFileName(title))
+			f, err := os.Create(local)
+			if err != nil {
+				return err
+			}
+			if _, err := c.DownloadFile(ctx, args[0], f); err != nil {
+				_ = f.Close()
+				return err
+			}
+			_ = f.Close()
+
+			tools := docpipe.LookPath()
+			res, err := tools.ToMarkdown(local, dir, lang, minChars)
+			if err != nil {
+				return err
+			}
+			outPath := to
+			if outPath == "" {
+				base := strings.TrimSuffix(onlyoffice.SafeLocalFileName(title), filepath.Ext(onlyoffice.SafeLocalFileName(title)))
+				if base == "" || base == "download" {
+					base = "file-" + args[0]
+				}
+				outPath = base + ".md"
+			}
+			if err := docpipe.EnsureDir(outPath); err != nil {
+				return err
+			}
+			if err := os.WriteFile(outPath, []byte(res.Markdown), 0o644); err != nil {
+				return err
+			}
+
+			obj := map[string]any{
+				"file_id": args[0],
+				"title":   title,
+				"md":      outPath,
+				"did_ocr": res.DidOCR,
+			}
+			if res.OCRPDFPath != "" && uploadOCR {
+				folderID := onlyoffice.FileFolderID(meta)
+				upName := strings.TrimSuffix(onlyoffice.SafeLocalFileName(title), filepath.Ext(onlyoffice.SafeLocalFileName(title))) + ".ocr.pdf"
+				tmpUp := filepath.Join(dir, upName)
+				data, err := os.ReadFile(res.OCRPDFPath)
+				if err != nil {
+					return err
+				}
+				if err := os.WriteFile(tmpUp, data, 0o644); err != nil {
+					return err
+				}
+				if folderID == "" {
+					obj["ocr_pdf_local"] = res.OCRPDFPath
+					obj["note"] = "file has no folderId; OCR PDF left local — pass after moving into a folder"
+				} else {
+					ent, err := c.UploadToFolder(ctx, folderID, tmpUp)
+					if err != nil {
+						return err
+					}
+					obj["ocr_pdf_file_id"] = fileIDStr(ent)
+					obj["ocr_pdf_title"] = onlyoffice.FileEntryTitle(ent)
+				}
+			} else if res.OCRPDFPath != "" {
+				// Keep OCR PDF outside temp by copying beside md if requested via env-less default:
+				kept := strings.TrimSuffix(outPath, filepath.Ext(outPath)) + ".ocr.pdf"
+				if b, err := os.ReadFile(res.OCRPDFPath); err == nil {
+					_ = os.WriteFile(kept, b, 0o644)
+					obj["ocr_pdf_local"] = kept
+				} else {
+					obj["ocr_pdf_local"] = res.OCRPDFPath
+				}
+			}
+			printObject(obj)
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&to, "to", "", "write Markdown to this path (default: ./<title>.md)")
+	cmd.Flags().StringVar(&lang, "lang", "eng", "OCR language")
+	cmd.Flags().IntVar(&minChars, "min-chars", docpipe.DefaultMinTextChars, "OCR PDF if text layer shorter than this")
+	cmd.Flags().BoolVar(&uploadOCR, "upload-ocr", false, "upload searchable OCR PDF back into the same OO folder")
+	return cmd
+}
+
+func docsPutMDCmd() *cobra.Command {
+	var folderID string
+	var keepLocalDOCX string
+	cmd := &cobra.Command{
+		Use:   "put-md PROJECT_ID MARKDOWN_PATH",
+		Short: "Convert Markdown→DOCX and upload DOCX into a project (OO-friendly)",
+		Long:  `Agents edit .md locally; this uploads .docx so OnlyOffice can open/version it.`,
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			pid, mdPath := args[0], args[1]
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			tools := docpipe.LookPath()
+			dir, err := os.MkdirTemp("", "oo-docs-put-md-*")
+			if err != nil {
+				return err
+			}
+			defer os.RemoveAll(dir)
+			docxName := strings.TrimSuffix(filepath.Base(mdPath), filepath.Ext(mdPath)) + ".docx"
+			docxPath := filepath.Join(dir, docxName)
+			if err := tools.MDToDOCX(mdPath, docxPath); err != nil {
+				return err
+			}
+			if keepLocalDOCX != "" {
+				if err := docpipe.EnsureDir(keepLocalDOCX); err != nil {
+					return err
+				}
+				b, err := os.ReadFile(docxPath)
+				if err != nil {
+					return err
+				}
+				if err := os.WriteFile(keepLocalDOCX, b, 0o644); err != nil {
+					return err
+				}
+			}
+			ctx := cmd.Context()
+			if folderID != "" {
+				ent, err := c.UploadToFolder(ctx, folderID, docxPath)
+				if err != nil {
+					return err
+				}
+				printObject(map[string]any{
+					"project_id": pid,
+					"folder_id":  folderID,
+					"md":         mdPath,
+					"uploaded":   fileEntryToMap(ent),
+				})
+				return nil
+			}
+			ent, err := c.UploadProjectFile(ctx, pid, docxPath)
+			if err != nil {
+				return err
+			}
+			printObject(map[string]any{
+				"project_id": pid,
+				"md":         mdPath,
+				"uploaded":   fileEntryToMap(ent),
+			})
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&folderID, "folder", "", "Documents folder id (default: project root)")
+	cmd.Flags().StringVar(&keepLocalDOCX, "keep-docx", "", "also write the generated DOCX to this local path")
+	return cmd
+}
