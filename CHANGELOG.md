@@ -16,6 +16,35 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 * Document that invoice→deal must be set at create (`update --opportunity` often HTTP 400)
 
+## [0.14.0](https://github.com/eSlider/go-onlyoffice/compare/v0.13.0...v0.14.0) (2026-08-27)
+
+
+### Features
+
+* **crm:** contact email & person-opportunity indexes, history entity whitelist ([9c450a0](https://github.com/eSlider/go-onlyoffice/commit/9c450a0352c25f12ac16d91062744ab026ffe660))
+* **docs:** hOCR → Markdown via go-hocr ([e531de2](https://github.com/eSlider/go-onlyoffice/commit/e531de280f2c521a7411f75212803649b177db58))
+* **docs:** md↔docx convert, OCR→PDF, as-md/put-md for agents ([6ea2fba](https://github.com/eSlider/go-onlyoffice/commit/6ea2fbadf768d7d85f6c7a49a9bc1050e642bc56))
+* **docs:** md↔docx, OCR→PDF, as-md/put-md ([db9ef12](https://github.com/eSlider/go-onlyoffice/commit/db9ef12ff4096f8aadb557ca128b6edcb503028c))
+* **docs:** oo docs hocr — tesseract hOCR → go-hocr Markdown/YAML ([a264cbd](https://github.com/eSlider/go-onlyoffice/commit/a264cbd61c12be9098c8d16e7c1c1253eb460816))
+* **mail:** oo mails send — SendMail + guard empty-by-id send ([dda2bd3](https://github.com/eSlider/go-onlyoffice/commit/dda2bd3ca5cea6ebb89e1ac02b785b9838727bda))
+* **mail:** oo mails send — SendMail client + guard empty-by-id ([ab7dfbd](https://github.com/eSlider/go-onlyoffice/commit/ab7dfbd8594de5724286e2b460e789f4acb114bc))
+* **security:** secret-scan via gitleaks in CI + pre-push/pre-commit hooks ([#142](https://github.com/eSlider/go-onlyoffice/issues/142)) ([9ead554](https://github.com/eSlider/go-onlyoffice/commit/9ead554f5cc229687d3a27934a023fb1dddaef15))
+
+
+### Bug Fixes
+
+* **ci:** point gitleaks at /github/workspace in docker action ([2c0df0d](https://github.com/eSlider/go-onlyoffice/commit/2c0df0d55fb03555b60481695554d75dceffce48))
+* **docs:** put-md upsert — no duplicate folder files ([2b267d3](https://github.com/eSlider/go-onlyoffice/commit/2b267d36a8086b14a94706468f7e92e9179e62d4))
+* **docs:** put-md upsert by stem to avoid duplicate folder files ([50bd475](https://github.com/eSlider/go-onlyoffice/commit/50bd47570b6430cebde43641a7b1d2f8d54d32f2))
+* **files:** DeleteFiles actually removes files on produktor OO ([a8cb4e9](https://github.com/eSlider/go-onlyoffice/commit/a8cb4e97805226e8af694ec6a64ee3ac6a5e9fdd))
+* **files:** DeleteFiles via per-file DELETE API ([622dcdb](https://github.com/eSlider/go-onlyoffice/commit/622dcdb7bffd49acbea5ef07f5d5d009f44b1358))
+
+
+### Documentation
+
+* **readme:** document oo docs hocr ([70e605b](https://github.com/eSlider/go-onlyoffice/commit/70e605b4ca8ee005e4351b2fc2d2eec081604998))
+* **readme:** document oo docs md↔docx / OCR agent workflow ([239c5ea](https://github.com/eSlider/go-onlyoffice/commit/239c5ea67201e62de6ba067f0e7963c7c9bda188))
+
 ## [0.13.0](https://github.com/eSlider/go-onlyoffice/compare/v0.12.0...v0.13.0) (2026-08-27)
 
 
