@@ -611,6 +611,9 @@ oo projects files upload 33 ./notes.docx
 oo projects files download 12345 --to ./copy.docx
 oo projects files rename 12345 notes-v2.docx
 oo projects files delete 12345
+oo projects files dedupe 7              # dry-run duplicate report
+oo projects files dedupe 7 --apply      # remove older stem|ext copies per folder
+oo projects files dedupe 7 --cross --apply  # cross-folder; keep non-_trash
 
 # Agent document pipeline (md in git ↔ docx in OO; OCR scans)
 oo docs tools
