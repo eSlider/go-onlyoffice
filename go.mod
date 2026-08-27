@@ -10,6 +10,7 @@ require (
 	github.com/charmbracelet/lipgloss v0.12.1
 	github.com/charmbracelet/x/ansi v0.1.4
 	github.com/emersion/go-vcard v0.0.0-20260618161152-d854b7e0e2d3
+	github.com/eslider/go-hocr v0.2.2-0.20260827163537-1ee7ff163a07
 	github.com/eslider/go-xls/v2 v2.1.0
 	github.com/google/go-querystring v1.2.0
 	github.com/joho/godotenv v1.5.1

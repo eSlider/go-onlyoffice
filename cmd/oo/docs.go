@@ -24,10 +24,12 @@ func docsCmd() *cobra.Command {
 OnlyOffice Documents UI is poor for .md — keep Markdown in git, store .docx in OO.
 Upload Markdown as DOCX:  oo docs put-md PROJECT_ID file.md
 Read an OO file as MD:    oo docs as-md FILE_ID
-OCR a scan locally:       oo docs ocr scan.pdf --md out.md`,
+OCR a scan locally:       oo docs ocr scan.pdf --md out.md
+Structured OCR (hOCR→MD): oo docs hocr scan.jpg --md out.md --yaml out.yml`,
 	}
 	cmd.AddCommand(docsConvertCmd())
 	cmd.AddCommand(docsOCRCmd())
+	cmd.AddCommand(docsHOCRCmd())
 	cmd.AddCommand(docsAsMDCmd())
 	cmd.AddCommand(docsPutMDCmd())
 	cmd.AddCommand(docsToolsCmd())
@@ -140,10 +142,91 @@ func docsOCRCmd() *cobra.Command {
 	return cmd
 }
 
+func docsHOCRCmd() *cobra.Command {
+	var mdOut, yamlOut, hocrOut, lang string
+	var dpi int
+	var minConf float32
+	cmd := &cobra.Command{
+		Use:   "hocr PATH",
+		Short: "Tesseract hOCR → structured Markdown/YAML (via go-hocr)",
+		Long: `Runs tesseract with hOCR output, parses with go-hocr, writes Markdown
+(and optional YAML). Better reading order / confidence than plain pdftotext.
+
+For Spanish scans: --lang spa or spa+eng (needs tesseract-ocr-spa / TESSDATA_PREFIX).
+Phone photos: --dpi 200..300.`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			in := args[0]
+			t := docpipe.LookPath()
+			dir, err := os.MkdirTemp("", "oo-docs-hocr-*")
+			if err != nil {
+				return err
+			}
+			defer os.RemoveAll(dir)
+
+			res, err := t.ToHOCRMarkdown(in, dir, lang, dpi, minConf)
+			if err != nil {
+				return err
+			}
+			if mdOut == "" {
+				base := strings.TrimSuffix(filepath.Base(in), filepath.Ext(in))
+				mdOut = filepath.Join(filepath.Dir(in), base+".hocr.md")
+			}
+			if err := docpipe.EnsureDir(mdOut); err != nil {
+				return err
+			}
+			if err := os.WriteFile(mdOut, []byte(res.Markdown), 0o644); err != nil {
+				return err
+			}
+			obj := map[string]any{
+				"in":      in,
+				"md":      mdOut,
+				"did_ocr": res.DidOCR,
+			}
+			if hocrOut != "" {
+				if err := docpipe.EnsureDir(hocrOut); err != nil {
+					return err
+				}
+				b, err := os.ReadFile(res.HOCRPath)
+				if err != nil {
+					return err
+				}
+				if err := os.WriteFile(hocrOut, b, 0o644); err != nil {
+					return err
+				}
+				obj["hocr"] = hocrOut
+			} else {
+				obj["hocr_tmp"] = res.HOCRPath
+			}
+			if yamlOut != "" {
+				if err := docpipe.EnsureDir(yamlOut); err != nil {
+					return err
+				}
+				if err := os.WriteFile(yamlOut, []byte(res.YAML), 0o644); err != nil {
+					return err
+				}
+				obj["yaml"] = yamlOut
+			}
+			printObject(obj)
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&mdOut, "md", "", "Markdown output (default: <name>.hocr.md)")
+	cmd.Flags().StringVar(&yamlOut, "yaml", "", "also write structured YAML from go-hocr")
+	cmd.Flags().StringVar(&hocrOut, "hocr", "", "also keep raw .hocr file at this path")
+	cmd.Flags().StringVar(&lang, "lang", "eng", "tesseract language(s), e.g. spa+eng")
+	cmd.Flags().IntVar(&dpi, "dpi", 220, "hint DPI for phone photos / scans (0 = tesseract default)")
+	cmd.Flags().Float32Var(&minConf, "min-conf", 0, "drop words with OCR confidence below this (0 = keep all)")
+	return cmd
+}
+
 func docsAsMDCmd() *cobra.Command {
 	var to, lang string
 	var minChars int
 	var uploadOCR bool
+	var useHOCR bool
+	var dpi int
+	var minConf float32
 	cmd := &cobra.Command{
 		Use:   "as-md FILE_ID",
 		Short: "Download an OO Documents file and emit Markdown (OCR PDF/image if needed)",
@@ -177,9 +260,18 @@ func docsAsMDCmd() *cobra.Command {
 			_ = f.Close()
 
 			tools := docpipe.LookPath()
-			res, err := tools.ToMarkdown(local, dir, lang, minChars)
-			if err != nil {
-				return err
+			var res docpipe.Result
+			if useHOCR {
+				hr, err := tools.ToHOCRMarkdown(local, dir, lang, dpi, minConf)
+				if err != nil {
+					return err
+				}
+				res = docpipe.Result{Markdown: hr.Markdown, DidOCR: hr.DidOCR, Source: hr.Source}
+			} else {
+				res, err = tools.ToMarkdown(local, dir, lang, minChars)
+				if err != nil {
+					return err
+				}
 			}
 			outPath := to
 			if outPath == "" {
@@ -242,6 +334,9 @@ func docsAsMDCmd() *cobra.Command {
 	cmd.Flags().StringVar(&lang, "lang", "eng", "OCR language")
 	cmd.Flags().IntVar(&minChars, "min-chars", docpipe.DefaultMinTextChars, "OCR PDF if text layer shorter than this")
 	cmd.Flags().BoolVar(&uploadOCR, "upload-ocr", false, "upload searchable OCR PDF back into the same OO folder")
+	cmd.Flags().BoolVar(&useHOCR, "hocr", false, "use tesseract hOCR + go-hocr instead of ocrmypdf/pdftotext")
+	cmd.Flags().IntVar(&dpi, "dpi", 220, "DPI hint when --hocr (phone photos)")
+	cmd.Flags().Float32Var(&minConf, "min-conf", 0, "drop low-confidence words when --hocr")
 	return cmd
 }
 
