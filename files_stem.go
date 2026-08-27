@@ -89,7 +89,8 @@ func FindFilesByStem(files []*FileEntry, stem string) []*FileEntry {
 	return out
 }
 
-// DeleteFilesByStem removes all files in folderID matching stem (for put-md upsert).
+// DeleteFilesByStem removes all files in folderID matching stem (any extension).
+// Prefer DeleteFilesByDedupKey when the upload extension is known.
 func (c *Client) DeleteFilesByStem(ctx context.Context, folderID, stem string) ([]int, error) {
 	files, err := c.FolderFiles(ctx, folderID)
 	if err != nil {
@@ -115,10 +116,11 @@ func (c *Client) DeleteFilesByStem(ctx context.Context, folderID, stem string) (
 	return ids, nil
 }
 
-// UploadToFolderReplacing deletes same-stem files then uploads localPath.
+// UploadToFolderReplacing deletes same stem+ext files then uploads localPath.
 func (c *Client) UploadToFolderReplacing(ctx context.Context, folderID, localPath string) (*FileEntry, []int, error) {
 	stem := UploadStemFromLocal(localPath)
-	deleted, err := c.DeleteFilesByStem(ctx, folderID, stem)
+	ext := UploadExtFromLocal(localPath)
+	deleted, err := c.DeleteFilesByDedupKey(ctx, folderID, stem, ext)
 	if err != nil {
 		return nil, deleted, err
 	}

@@ -24,6 +24,7 @@ func projectFilesCmd() *cobra.Command {
 	cmd.AddCommand(prjFilesDownloadCmd())
 	cmd.AddCommand(prjFilesRenameCmd())
 	cmd.AddCommand(prjFilesDeleteCmd())
+	cmd.AddCommand(prjFilesDedupeCmd())
 	// Convenience aliases into oo docs (md↔docx / OCR pipeline).
 	cmd.AddCommand(aliasDocsAsMD())
 	cmd.AddCommand(aliasDocsPutMD())
@@ -199,6 +200,62 @@ func prjFilesDeleteCmd() *cobra.Command {
 			return nil
 		},
 	}
+}
+
+func prjFilesDedupeCmd() *cobra.Command {
+	var apply, cross bool
+	cmd := &cobra.Command{
+		Use:   "dedupe PROJECT_ID",
+		Short: "Find (and optionally remove) duplicate files in project Documents folders",
+		Long: `Duplicates share the same logical name: stem|ext (OO title+fileExst).
+
+Default: dry-run report. Pass --apply to delete older copies (keeps newest; --cross prefers non-trash folders).`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			groups, deleted, err := c.DedupeProject(cmd.Context(), args[0], onlyoffice.DedupOptions{
+				CrossFolder: cross,
+			}, apply)
+			if err != nil {
+				return err
+			}
+			rows := make([]map[string]any, 0, len(groups))
+			for _, g := range groups {
+				row := map[string]any{
+					"key":          g.Key,
+					"folder_id":    g.FolderID,
+					"folder_title": g.FolderTitle,
+					"keep_id":      fileIDStr(g.Keep),
+					"keep_title":   onlyoffice.FileEntryTitle(g.Keep),
+					"remove_count": len(g.Remove),
+				}
+				removeIDs := make([]string, 0, len(g.Remove))
+				for _, f := range g.Remove {
+					removeIDs = append(removeIDs, fileIDStr(f))
+				}
+				row["remove_ids"] = removeIDs
+				rows = append(rows, row)
+			}
+			out := map[string]any{
+				"project_id": args[0],
+				"dry_run":    !apply,
+				"cross":      cross,
+				"groups":     len(groups),
+				"duplicates": rows,
+			}
+			if apply {
+				out["deleted_ids"] = deleted
+			}
+			printObject(out)
+			return nil
+		},
+	}
+	cmd.Flags().BoolVar(&apply, "apply", false, "delete duplicate files (default: report only)")
+	cmd.Flags().BoolVar(&cross, "cross", false, "also dedupe same stem|ext across folders (prefers non-_trash)")
+	return cmd
 }
 
 func fileEntryRows(files []*onlyoffice.FileEntry) []map[string]any {
