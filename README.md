@@ -607,10 +607,20 @@ go test -tags=integration ./cmd/office/fetch/... ./cmd/office/preview/...
 ```bash
 # Project Documents (files module)
 oo projects files list 33
-oo projects files upload 33 ./notes.md
-oo projects files download 12345 --to ./copy.md
-oo projects files rename 12345 notes-v2.md
+oo projects files upload 33 ./notes.docx
+oo projects files download 12345 --to ./copy.docx
+oo projects files rename 12345 notes-v2.docx
 oo projects files delete 12345
+
+# Agent document pipeline (md in git ↔ docx in OO; OCR scans)
+oo docs tools
+oo docs convert ./note.md                 # → note.docx
+oo docs convert ./note.docx               # → note.md
+oo docs ocr ./scan.jpg --md ./scan.md     # searchable PDF + markdown
+oo docs put-md 7 ./OO-HONDA-7-INDEX.md --folder 490
+oo docs as-md 2815 --to ./parte.md        # download OO file as MD (OCR if needed)
+oo projects files put-md 7 ./note.md      # alias
+oo projects files as-md 2815              # alias
 oo tasks files list 208
 oo tasks files upload 208 ./notes.pdf
 oo tasks files detach 208 12345
