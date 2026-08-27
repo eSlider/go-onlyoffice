@@ -16,6 +16,30 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 * Document that invoice→deal must be set at create (`update --opportunity` often HTTP 400)
 
+## [0.12.0](https://github.com/eSlider/go-onlyoffice/compare/v0.11.0...v0.12.0) (2026-08-27)
+
+
+### Features
+
+* **crm:** contact email & person-opportunity indexes, history entity whitelist ([9c450a0](https://github.com/eSlider/go-onlyoffice/commit/9c450a0352c25f12ac16d91062744ab026ffe660))
+* **docs:** md↔docx convert, OCR→PDF, as-md/put-md for agents ([6ea2fba](https://github.com/eSlider/go-onlyoffice/commit/6ea2fbadf768d7d85f6c7a49a9bc1050e642bc56))
+* **docs:** md↔docx, OCR→PDF, as-md/put-md ([db9ef12](https://github.com/eSlider/go-onlyoffice/commit/db9ef12ff4096f8aadb557ca128b6edcb503028c))
+* **files:** add WebDAV-oriented Files operations ([ebbd5d5](https://github.com/eSlider/go-onlyoffice/commit/ebbd5d5373abfeca5f160312f201cbd683f55e42))
+* **mail:** oo mails send — SendMail + guard empty-by-id send ([dda2bd3](https://github.com/eSlider/go-onlyoffice/commit/dda2bd3ca5cea6ebb89e1ac02b785b9838727bda))
+* **mail:** oo mails send — SendMail client + guard empty-by-id ([ab7dfbd](https://github.com/eSlider/go-onlyoffice/commit/ab7dfbd8594de5724286e2b460e789f4acb114bc))
+* **security:** secret-scan via gitleaks in CI + pre-push/pre-commit hooks ([#142](https://github.com/eSlider/go-onlyoffice/issues/142)) ([9ead554](https://github.com/eSlider/go-onlyoffice/commit/9ead554f5cc229687d3a27934a023fb1dddaef15))
+
+
+### Bug Fixes
+
+* **ci:** point gitleaks at /github/workspace in docker action ([2c0df0d](https://github.com/eSlider/go-onlyoffice/commit/2c0df0d55fb03555b60481695554d75dceffce48))
+* **files:** rewrite viewUrl host to API base on download ([ecf34ba](https://github.com/eSlider/go-onlyoffice/commit/ecf34ba51aae77f1626a60795f7329f25d9344e5))
+
+
+### Documentation
+
+* **readme:** document oo docs md↔docx / OCR agent workflow ([239c5ea](https://github.com/eSlider/go-onlyoffice/commit/239c5ea67201e62de6ba067f0e7963c7c9bda188))
+
 ## [0.11.0](https://github.com/eSlider/go-onlyoffice/compare/v0.10.0...v0.11.0) (2026-08-18)
 
 
