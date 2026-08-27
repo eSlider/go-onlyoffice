@@ -343,6 +343,7 @@ func docsAsMDCmd() *cobra.Command {
 func docsPutMDCmd() *cobra.Command {
 	var folderID string
 	var keepLocalDOCX string
+	var replace bool
 	cmd := &cobra.Command{
 		Use:   "put-md PROJECT_ID MARKDOWN_PATH",
 		Short: "Convert Markdown→DOCX and upload DOCX into a project (OO-friendly)",
@@ -378,20 +379,30 @@ func docsPutMDCmd() *cobra.Command {
 				}
 			}
 			ctx := cmd.Context()
+			var ent *onlyoffice.FileEntry
+			var deleted []int
 			if folderID != "" {
-				ent, err := c.UploadToFolder(ctx, folderID, docxPath)
+				if replace {
+					ent, deleted, err = c.UploadToFolderReplacing(ctx, folderID, docxPath)
+				} else {
+					ent, err = c.UploadToFolder(ctx, folderID, docxPath)
+				}
 				if err != nil {
 					return err
 				}
-				printObject(map[string]any{
+				obj := map[string]any{
 					"project_id": pid,
 					"folder_id":  folderID,
 					"md":         mdPath,
 					"uploaded":   fileEntryToMap(ent),
-				})
+				}
+				if len(deleted) > 0 {
+					obj["replaced_file_ids"] = deleted
+				}
+				printObject(obj)
 				return nil
 			}
-			ent, err := c.UploadProjectFile(ctx, pid, docxPath)
+			ent, err = c.UploadProjectFile(ctx, pid, docxPath)
 			if err != nil {
 				return err
 			}
@@ -405,5 +416,6 @@ func docsPutMDCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&folderID, "folder", "", "Documents folder id (default: project root)")
 	cmd.Flags().StringVar(&keepLocalDOCX, "keep-docx", "", "also write the generated DOCX to this local path")
+	cmd.Flags().BoolVar(&replace, "replace", true, "delete same-stem files in folder before upload (put-md upsert)")
 	return cmd
 }
