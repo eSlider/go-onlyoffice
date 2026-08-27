@@ -3,7 +3,7 @@
 // Command tree is subject-based (mirrors the library split and the `tea` CLI):
 //
 //	oo calendar      list | events | add | delete
-//	oo projects      list | get | milestones | create | update | delete | files (list|upload|download|rename|delete)
+//	oo projects      list | get | milestones | create | update | delete | files (list|upload|download|rename|delete|as-md|put-md)
 //	oo tasks         list | get | create | update | delete | subtask add | files (list|upload|detach)
 //	oo users         list | self            (alias: oo whoami)
 //	oo contacts      list | get | delete | info-add | merge | dedupe-info
@@ -15,6 +15,7 @@
 //	oo crm           cleanup
 //	oo mails         accounts | folders | list | get | download-attachment | draft | attach | draft-invoice | delete
 //	oo invoices      list | get | create | update | pdf | pdf-cleanup | status | delete | items …
+//	oo docs          tools | convert | ocr | as-md | put-md
 //
 // CRM association rules: docs/crm-associations.md
 //

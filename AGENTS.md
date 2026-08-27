@@ -28,6 +28,7 @@ Canonical Go client for OnlyOffice Workspace (Projects + Calendar + CRM) and the
 - Prefer `ResponseObject` / `postFormObject` / `putFormObject` / `deleteObject` over hand-rolled `json.Unmarshal(responseField(...))` blocks — they exist for DRY, use them.
 - Domain split is by file, **not** by subpackage. Don't introduce `internal/` or `pkg/*` subpackages inside the library — it flattens the `*Client` call surface for a reason.
 - CLI commands follow **subject → verb** structure (`oo <subject> <verb>`), never `oo <verb>-<subject>`. Add new commands to the existing subject file if one fits; create a new `cmd/oo/<subject>.go` for a genuinely new domain.
+- **Documents for agents:** prefer Markdown in git; OnlyOffice UI is weak for `.md`. Use `oo docs put-md` (md→docx upload) and `oo docs as-md` (download→OCR if needed→markdown). Local converters live in `internal/docpipe` (pandoc / ocrmypdf / pdftotext).
 - Every table output goes through `printTable(headers, rows)`; every single-object through `printObject(v)`. Do not `fmt.Println` rows ad-hoc or the `--output json` flag breaks for that command.
 - No secrets in the repo; use `.env` (gitignored). Commit `.env.example` only.
 - Follow SemVer on tags; this repo is tagged at GitHub under `git@github.com:eSlider/go-onlyoffice.git`.
