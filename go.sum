@@ -37,10 +37,8 @@ github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkp
 github.com/dustin/go-humanize v1.0.1/go.mod h1:Mu1zIs6XwVuF/gI1OepvI0qD18qycQx+mFykh5fBlto=
 github.com/emersion/go-vcard v0.0.0-20260618161152-d854b7e0e2d3 h1:B9YK+Tck5mTccyDhtxBzWyqGYcFxLyB6+noMNW4/VgI=
 github.com/emersion/go-vcard v0.0.0-20260618161152-d854b7e0e2d3/go.mod h1:HMJKR5wlh/ziNp+sHEDV2ltblO4JD2+IdDOWtGcQBTM=
-github.com/eslider/go-hocr v0.2.2-0.20260827163332-a3d4be6d1bc2 h1:JtBoucENIng7rvh2Ht18FtndBtKD2P1GKNL6SeEz3Dc=
-github.com/eslider/go-hocr v0.2.2-0.20260827163332-a3d4be6d1bc2/go.mod h1:fIgfH/E1j3rU8du4X4+7mxTD0GPtPQibTzytgitdJWU=
-github.com/eslider/go-hocr v0.2.2-0.20260827163537-1ee7ff163a07 h1:6HA74AjNuLNU5mmAGTQMtMbxeIF01VmO7S3eMO6fKWk=
-github.com/eslider/go-hocr v0.2.2-0.20260827163537-1ee7ff163a07/go.mod h1:fIgfH/E1j3rU8du4X4+7mxTD0GPtPQibTzytgitdJWU=
+github.com/eslider/go-hocr v0.2.2-0.20260827163626-8ff01582b002 h1:LOFxQG4mxvlH7+lffbO2SIn2ThlClJlrHHfs1OqMNXs=
+github.com/eslider/go-hocr v0.2.2-0.20260827163626-8ff01582b002/go.mod h1:fIgfH/E1j3rU8du4X4+7mxTD0GPtPQibTzytgitdJWU=
 github.com/eslider/go-xls/v2 v2.1.0 h1:HszWKqYQbXxACmAXXWdMsfNl1NDBfGVBnJUPtyUHQ7A=
 github.com/eslider/go-xls/v2 v2.1.0/go.mod h1:xgxO6JrfuBr9jGUB+0z5l/yDmFFZ5diGk0ATGihxlMU=
 github.com/google/go-cmp v0.6.0 h1:ofyhxvXcZhMsU5ulbFiLKl/XBFqE1GSq7atu8tAmTRI=
