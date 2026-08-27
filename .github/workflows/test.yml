@@ -35,12 +35,14 @@ jobs:
           echo "RANGE=$RANGE" >> "$GITHUB_ENV"
           echo "Scanning range: $RANGE"
 
+      # docker:// actions mount the workspace at /github/workspace — not the
+      # host path from ${{ github.workspace }} (that path does not exist in-container).
       - name: Gitleaks (diff-only, fail on leak)
         uses: docker://zricethezav/gitleaks:latest
         env:
           GITLEAKS_RANGE: ${{ env.RANGE }}
         with:
-          args: detect --source "${{ github.workspace }}" --log-opts="$GITLEAKS_RANGE" --redact --verbose
+          args: detect --source /github/workspace --log-opts="$GITLEAKS_RANGE" --redact --verbose
 
   test:
     name: Test (Go ${{ matrix.go }})
