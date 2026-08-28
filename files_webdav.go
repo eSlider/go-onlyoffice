@@ -169,7 +169,7 @@ func (c *Client) CopyDavItems(ctx context.Context, folderIDs, fileIDs []string, 
 
 // DeleteDavItems deletes the given folders and/or files.
 func (c *Client) DeleteDavItems(ctx context.Context, folderIDs, fileIDs []string) error {
-	body := map[string]any{"DeleteAfter": true, "Immediately": false}
+	body := map[string]any{"DeleteAfter": true, "Immediately": true}
 	for _, id := range folderIDs {
 		if _, err := c.deleteJSON(ctx, "/api/2.0/files/folder/"+url.PathEscape(id), body); err != nil {
 			return err
