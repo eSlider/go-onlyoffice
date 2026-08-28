@@ -29,6 +29,7 @@ func projectFilesCmd() *cobra.Command {
 	cmd.AddCommand(aliasDocsAsMD())
 	cmd.AddCommand(aliasDocsPutMD())
 	cmd.AddCommand(aliasDocsPutTxt())
+	cmd.AddCommand(aliasDocsPutXlsx())
 	return cmd
 }
 
@@ -50,6 +51,13 @@ func aliasDocsPutTxt() *cobra.Command {
 	c := docsPutTxtCmd()
 	c.Use = "put-txt PROJECT_ID TEXT_PATH"
 	c.Short = "Alias of `oo docs put-txt` — plain text→DOCX upload into project"
+	return c
+}
+
+func aliasDocsPutXlsx() *cobra.Command {
+	c := docsPutXlsxCmd()
+	c.Use = "put-xlsx PROJECT_ID [LOCAL_XLSX]"
+	c.Short = "Alias of `oo docs put-xlsx` — generate/upload XLSX with formulas"
 	return c
 }
 
