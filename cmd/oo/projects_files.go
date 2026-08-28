@@ -28,6 +28,7 @@ func projectFilesCmd() *cobra.Command {
 	// Convenience aliases into oo docs (md↔docx / OCR pipeline).
 	cmd.AddCommand(aliasDocsAsMD())
 	cmd.AddCommand(aliasDocsPutMD())
+	cmd.AddCommand(aliasDocsPutTxt())
 	return cmd
 }
 
@@ -42,6 +43,13 @@ func aliasDocsPutMD() *cobra.Command {
 	c := docsPutMDCmd()
 	c.Use = "put-md PROJECT_ID MARKDOWN_PATH"
 	c.Short = "Alias of `oo docs put-md` — Markdown→DOCX upload into project"
+	return c
+}
+
+func aliasDocsPutTxt() *cobra.Command {
+	c := docsPutTxtCmd()
+	c.Use = "put-txt PROJECT_ID TEXT_PATH"
+	c.Short = "Alias of `oo docs put-txt` — plain text→DOCX upload into project"
 	return c
 }
 
