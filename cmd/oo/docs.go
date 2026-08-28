@@ -21,8 +21,9 @@ func docsCmd() *cobra.Command {
 		Short: "Local document pipeline: md↔docx, OCR→PDF, extract Markdown",
 		Long: `Agent-friendly conversions (requires pandoc / ocrmypdf / pdftotext on PATH).
 
-OnlyOffice Documents UI is poor for .md — keep Markdown in git, store .docx in OO.
+OnlyOffice Documents UI is poor for .md/.txt — keep sources in git, store .docx in OO.
 Upload Markdown as DOCX:  oo docs put-md PROJECT_ID file.md
+Upload plain text:        oo docs put-txt PROJECT_ID file.txt  (preserves line breaks)
 Read an OO file as MD:    oo docs as-md FILE_ID
 OCR a scan locally:       oo docs ocr scan.pdf --md out.md
 Structured OCR (hOCR→MD): oo docs hocr scan.jpg --md out.md --yaml out.yml`,
@@ -32,6 +33,7 @@ Structured OCR (hOCR→MD): oo docs hocr scan.jpg --md out.md --yaml out.yml`,
 	cmd.AddCommand(docsHOCRCmd())
 	cmd.AddCommand(docsAsMDCmd())
 	cmd.AddCommand(docsPutMDCmd())
+	cmd.AddCommand(docsPutTxtCmd())
 	cmd.AddCommand(docsToolsCmd())
 	return cmd
 }
@@ -417,5 +419,85 @@ func docsPutMDCmd() *cobra.Command {
 	cmd.Flags().StringVar(&folderID, "folder", "", "Documents folder id (default: project root)")
 	cmd.Flags().StringVar(&keepLocalDOCX, "keep-docx", "", "also write the generated DOCX to this local path")
 	cmd.Flags().BoolVar(&replace, "replace", true, "delete same-stem files in folder before upload (put-md upsert)")
+	return cmd
+}
+
+func docsPutTxtCmd() *cobra.Command {
+	var folderID string
+	var keepLocalDOCX string
+	var replace bool
+	cmd := &cobra.Command{
+		Use:   "put-txt PROJECT_ID TEXT_PATH",
+		Short: "Convert plain text→DOCX (preserve line breaks) and upload into a project",
+		Long:  `OnlyOffice cannot render .txt well. This keeps each source line on its own DOCX line.`,
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			pid, txtPath := args[0], args[1]
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			tools := docpipe.LookPath()
+			dir, err := os.MkdirTemp("", "oo-docs-put-txt-*")
+			if err != nil {
+				return err
+			}
+			defer os.RemoveAll(dir)
+			docxName := strings.TrimSuffix(filepath.Base(txtPath), filepath.Ext(txtPath)) + ".docx"
+			docxPath := filepath.Join(dir, docxName)
+			if err := tools.TXTToDOCX(txtPath, docxPath); err != nil {
+				return err
+			}
+			if keepLocalDOCX != "" {
+				if err := docpipe.EnsureDir(keepLocalDOCX); err != nil {
+					return err
+				}
+				b, err := os.ReadFile(docxPath)
+				if err != nil {
+					return err
+				}
+				if err := os.WriteFile(keepLocalDOCX, b, 0o644); err != nil {
+					return err
+				}
+			}
+			ctx := cmd.Context()
+			var ent *onlyoffice.FileEntry
+			var deleted []int
+			if folderID != "" {
+				if replace {
+					ent, deleted, err = c.UploadToFolderReplacing(ctx, folderID, docxPath)
+				} else {
+					ent, err = c.UploadToFolder(ctx, folderID, docxPath)
+				}
+				if err != nil {
+					return err
+				}
+				obj := map[string]any{
+					"project_id": pid,
+					"txt":        txtPath,
+					"folder_id":  folderID,
+					"uploaded":   fileEntryToMap(ent),
+				}
+				if len(deleted) > 0 {
+					obj["replaced_file_ids"] = deleted
+				}
+				printObject(obj)
+				return nil
+			}
+			ent, err = c.UploadProjectFile(ctx, pid, docxPath)
+			if err != nil {
+				return err
+			}
+			printObject(map[string]any{
+				"project_id": pid,
+				"txt":        txtPath,
+				"uploaded":   fileEntryToMap(ent),
+			})
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&folderID, "folder", "", "Documents folder id (default: project root)")
+	cmd.Flags().StringVar(&keepLocalDOCX, "keep-docx", "", "also write the generated DOCX to this local path")
+	cmd.Flags().BoolVar(&replace, "replace", true, "delete same-stem files in folder before upload (put-txt upsert)")
 	return cmd
 }

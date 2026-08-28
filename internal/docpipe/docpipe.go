@@ -76,6 +76,48 @@ func (t Tools) ConvertFile(inPath, outPath string) error {
 	return nil
 }
 
+// TXTToDOCX converts plain text to DOCX preserving line breaks (via markdown hard breaks).
+func (t Tools) TXTToDOCX(txtPath, docxPath string) error {
+	if Ext(txtPath) != ".txt" {
+		return fmt.Errorf("expected .txt input, got %q", txtPath)
+	}
+	if docxPath == "" {
+		docxPath = strings.TrimSuffix(txtPath, Ext(txtPath)) + ".docx"
+	}
+	b, err := os.ReadFile(txtPath)
+	if err != nil {
+		return err
+	}
+	dir := filepath.Dir(docxPath)
+	if dir == "" || dir == "." {
+		dir = os.TempDir()
+	}
+	tmpMD := filepath.Join(dir, trimExt(filepath.Base(txtPath))+".txt2docx.md")
+	md := TxtToMarkdown(string(b))
+	if err := os.WriteFile(tmpMD, []byte(md), 0o644); err != nil {
+		return err
+	}
+	defer os.Remove(tmpMD)
+	return t.MDToDOCX(tmpMD, docxPath)
+}
+
+// TxtToMarkdown converts plain text to Markdown that preserves line breaks in DOCX output.
+// Single newlines become hard breaks; blank lines stay paragraph separators.
+func TxtToMarkdown(content string) string {
+	content = strings.ReplaceAll(content, "\r\n", "\n")
+	content = strings.ReplaceAll(content, "\r", "\n")
+	var b strings.Builder
+	for _, line := range strings.Split(content, "\n") {
+		if strings.TrimSpace(line) == "" {
+			b.WriteByte('\n')
+			continue
+		}
+		b.WriteString(line)
+		b.WriteString("  \n")
+	}
+	return b.String()
+}
+
 // MDToDOCX writes a DOCX next to or at outPath from a Markdown file.
 func (t Tools) MDToDOCX(mdPath, docxPath string) error {
 	if Ext(mdPath) != ".md" && Ext(mdPath) != ".markdown" {
