@@ -34,6 +34,51 @@ func TestNeedsOCR_Image(t *testing.T) {
 	}
 }
 
+func TestTxtToMarkdownPreservesLines(t *testing.T) {
+	in := "line1\nline2\n\nline4"
+	md := TxtToMarkdown(in)
+	if !strings.Contains(md, "line1  \n") || !strings.Contains(md, "line2  \n") {
+		t.Fatalf("hard breaks missing: %q", md)
+	}
+	if !strings.Contains(md, "line4  \n") {
+		t.Fatalf("last line: %q", md)
+	}
+}
+
+func TestTXTToDOCXPreservesLines(t *testing.T) {
+	tools := LookPath()
+	if tools.Pandoc == "" {
+		t.Skip("pandoc not installed")
+	}
+	dir := t.TempDir()
+	txt := filepath.Join(dir, "sample.txt")
+	docx := filepath.Join(dir, "sample.docx")
+	body := "MyBox Auto — resumen\nNº contrato: 123\n\nEstado: Vigente\n"
+	if err := os.WriteFile(txt, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := tools.TXTToDOCX(txt, docx); err != nil {
+		t.Fatal(err)
+	}
+	mdOut := filepath.Join(dir, "out.md")
+	if err := tools.DOCXToMD(docx, mdOut); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(mdOut)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(got)
+	for _, want := range []string{"MyBox Auto", "Nº contrato", "Estado: Vigente"} {
+		if !strings.Contains(s, want) {
+			t.Fatalf("missing %q in %q", want, s)
+		}
+	}
+	if strings.Contains(s, "MyBox Auto — resumen Nº") {
+		t.Fatalf("lines collapsed: %q", s)
+	}
+}
+
 func TestMDDocxRoundTrip(t *testing.T) {
 	tools := LookPath()
 	if tools.Pandoc == "" {
