@@ -101,11 +101,14 @@ func (t Tools) TXTToDOCX(txtPath, docxPath string) error {
 	return t.MDToDOCX(tmpMD, docxPath)
 }
 
-// TxtToMarkdown converts plain text to Markdown that preserves line breaks in DOCX output.
-// Single newlines become hard breaks; blank lines stay paragraph separators.
+// TxtToMarkdown converts plain text to Markdown for DOCX output.
+// Prose text: each line is a hard break. Fixed-width extracts (INE, pdftotext -layout):
+// wrapped in a fenced code block (monospace, columns preserved).
 func TxtToMarkdown(content string) string {
-	content = strings.ReplaceAll(content, "\r\n", "\n")
-	content = strings.ReplaceAll(content, "\r", "\n")
+	content = normalizeTxtNewlines(content)
+	if isFixedWidthTxt(content) {
+		return "```\n" + content + "\n```\n"
+	}
 	var b strings.Builder
 	for _, line := range strings.Split(content, "\n") {
 		if strings.TrimSpace(line) == "" {
@@ -116,6 +119,33 @@ func TxtToMarkdown(content string) string {
 		b.WriteString("  \n")
 	}
 	return b.String()
+}
+
+func normalizeTxtNewlines(content string) string {
+	content = strings.ReplaceAll(content, "\r\n", "\n")
+	return strings.ReplaceAll(content, "\r", "\n")
+}
+
+// isFixedWidthTxt detects pdftotext -layout style extracts (many indented/spaced columns).
+func isFixedWidthTxt(content string) bool {
+	lines := strings.Split(content, "\n")
+	if len(lines) < 8 {
+		return false
+	}
+	indented, long := 0, 0
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		if len(line) >= 72 {
+			long++
+		}
+		if len(line) > 0 && (line[0] == ' ' || line[0] == '\t') {
+			indented++
+		}
+	}
+	n := len(lines)
+	return indented*100/n >= 20 || (long >= 5 && indented*100/n >= 10)
 }
 
 // MDToDOCX writes a DOCX next to or at outPath from a Markdown file.
