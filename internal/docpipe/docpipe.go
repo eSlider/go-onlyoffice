@@ -6,6 +6,7 @@
 //   - ocrmypdf   — OCR into a searchable PDF
 //   - pdftotext  — extract text layer
 //   - tesseract  — OCR single images when ocrmypdf is unsuitable
+//   - ghostscript (gs) — PDF rewrite/optimize via PostScript (pdfwrite)
 package docpipe
 
 import (
@@ -22,10 +23,11 @@ const DefaultMinTextChars = 200
 
 // Tools reports which converters are available on PATH.
 type Tools struct {
-	Pandoc    string
-	OCRMyPDF  string
-	PDFToText string
-	Tesseract string
+	Pandoc      string
+	OCRMyPDF    string
+	PDFToText   string
+	Tesseract   string
+	Ghostscript string
 }
 
 // LookPath resolves converter binaries (empty string if missing).
@@ -39,10 +41,11 @@ func LookPath() Tools {
 		return ""
 	}
 	return Tools{
-		Pandoc:    find("pandoc"),
-		OCRMyPDF:  find("ocrmypdf"),
-		PDFToText: find("pdftotext"),
-		Tesseract: find("tesseract"),
+		Pandoc:      find("pandoc"),
+		OCRMyPDF:    find("ocrmypdf"),
+		PDFToText:   find("pdftotext"),
+		Tesseract:   find("tesseract"),
+		Ghostscript: find("gs", "ghostscript"),
 	}
 }
 
@@ -168,6 +171,39 @@ func (t Tools) DOCXToMD(docxPath, mdPath string) error {
 		mdPath = strings.TrimSuffix(docxPath, Ext(docxPath)) + ".md"
 	}
 	return t.ConvertFile(docxPath, mdPath)
+}
+
+// OptimizePDF rewrites a PDF through Ghostscript (PostScript pdfwrite).
+// Preserves native text layers; strips broken OCR overlays; shrinks for OO preview.
+// Use instead of ocrmypdf when pdftotext already extracts enough text.
+func (t Tools) OptimizePDF(inPath, outPath string) error {
+	if t.Ghostscript == "" {
+		return fmt.Errorf("ghostscript (gs) not found on PATH")
+	}
+	if outPath == "" {
+		return fmt.Errorf("output PDF path required")
+	}
+	args := []string{
+		"-sDEVICE=pdfwrite",
+		"-dCompatibilityLevel=1.5",
+		"-dNOPAUSE", "-dQUIET", "-dBATCH",
+		"-dPDFSETTINGS=/ebook",
+		"-dEmbedAllFonts=true",
+		"-dSubsetFonts=true",
+		"-dCompressFonts=true",
+		"-dCompressPages=true",
+		"-dDetectDuplicateImages=true",
+		"-dAutoRotatePages=/None",
+		"-sOutputFile=" + outPath,
+		inPath,
+	}
+	cmd := exec.Command(t.Ghostscript, args...)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("ghostscript pdfwrite: %w (%s)", err, strings.TrimSpace(stderr.String()))
+	}
+	return nil
 }
 
 // PDFTextLayerChars returns approximate extracted character count (0 if unavailable).

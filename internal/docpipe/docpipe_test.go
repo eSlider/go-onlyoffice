@@ -128,6 +128,33 @@ func TestMDDocxRoundTrip(t *testing.T) {
 	}
 }
 
+func TestOptimizePDF(t *testing.T) {
+	tools := LookPath()
+	if tools.Ghostscript == "" || tools.PDFToText == "" {
+		t.Skip("ghostscript/pdftotext not installed")
+	}
+	in := "/tmp/ccgg-original.pdf"
+	if _, err := os.Stat(in); err != nil {
+		t.Skip("local fixture not present")
+	}
+	dir := t.TempDir()
+	out := filepath.Join(dir, "out.pdf")
+	charsIn, err := tools.PDFTextLayerChars(in)
+	if err != nil || charsIn < 1000 {
+		t.Skip("fixture has no text layer")
+	}
+	if err := tools.OptimizePDF(in, out); err != nil {
+		t.Fatal(err)
+	}
+	charsOut, err := tools.PDFTextLayerChars(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if charsOut < charsIn/2 {
+		t.Fatalf("text layer lost: in=%d out=%d", charsIn, charsOut)
+	}
+}
+
 func TestToMarkdown_PlainMD(t *testing.T) {
 	tools := LookPath()
 	dir := t.TempDir()
