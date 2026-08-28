@@ -34,6 +34,25 @@ func TestNeedsOCR_Image(t *testing.T) {
 	}
 }
 
+func TestTxtToMarkdown_FixedWidthUsesCodeBlock(t *testing.T) {
+	var lines []string
+	for i := 0; i < 12; i++ {
+		lines = append(lines, "          column layout line "+strings.Repeat("x", 40))
+	}
+	in := strings.Join(lines, "\n")
+	md := TxtToMarkdown(in)
+	if !strings.HasPrefix(md, "```\n") || !strings.Contains(md, "```") {
+		t.Fatalf("expected code block: %q", md[:min(80, len(md))])
+	}
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 func TestTxtToMarkdownPreservesLines(t *testing.T) {
 	in := "line1\nline2\n\nline4"
 	md := TxtToMarkdown(in)
