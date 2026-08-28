@@ -29,6 +29,7 @@ OCR a scan locally:       oo docs ocr scan.pdf --md out.md
 Structured OCR (hOCR→MD): oo docs hocr scan.jpg --md out.md --yaml out.yml`,
 	}
 	cmd.AddCommand(docsConvertCmd())
+	cmd.AddCommand(docsOptimizeCmd())
 	cmd.AddCommand(docsOCRCmd())
 	cmd.AddCommand(docsHOCRCmd())
 	cmd.AddCommand(docsAsMDCmd())
@@ -45,10 +46,11 @@ func docsToolsCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			t := docpipe.LookPath()
 			printObject(map[string]any{
-				"pandoc":    strOrNil(t.Pandoc),
-				"ocrmypdf":  strOrNil(t.OCRMyPDF),
-				"pdftotext": strOrNil(t.PDFToText),
-				"tesseract": strOrNil(t.Tesseract),
+				"pandoc":      strOrNil(t.Pandoc),
+				"ocrmypdf":    strOrNil(t.OCRMyPDF),
+				"pdftotext":   strOrNil(t.PDFToText),
+				"tesseract":   strOrNil(t.Tesseract),
+				"ghostscript": strOrNil(t.Ghostscript),
 			})
 			return nil
 		},
@@ -96,6 +98,43 @@ func docsConvertCmd() *cobra.Command {
 	return cmd
 }
 
+func docsOptimizeCmd() *cobra.Command {
+	var out string
+	cmd := &cobra.Command{
+		Use:   "optimize PDF_PATH",
+		Short: "Rewrite PDF via Ghostscript (PostScript pdfwrite) for OO-friendly size/text",
+		Long: `Use for InDesign/iText PDFs with a good text layer — avoids ocrmypdf invisible
+text overlays that break OnlyOffice DocEditor. Skips OCR; rewrites via gs pdfwrite.`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			in := args[0]
+			t := docpipe.LookPath()
+			if out == "" {
+				base := strings.TrimSuffix(filepath.Base(in), filepath.Ext(in))
+				out = filepath.Join(filepath.Dir(in), base+".optimized.pdf")
+			}
+			if err := docpipe.EnsureDir(out); err != nil {
+				return err
+			}
+			chars, _ := t.PDFTextLayerChars(in)
+			if err := t.OptimizePDF(in, out); err != nil {
+				return err
+			}
+			outChars, _ := t.PDFTextLayerChars(out)
+			printObject(map[string]any{
+				"in":              in,
+				"pdf":             out,
+				"text_chars_in":   chars,
+				"text_chars_out":  outChars,
+				"note":            "native text layer preserved; no OCR overlay",
+			})
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&out, "out", "", "output PDF (default: <name>.optimized.pdf)")
+	return cmd
+}
+
 func docsOCRCmd() *cobra.Command {
 	var out, mdOut, lang string
 	var force bool
@@ -140,7 +179,7 @@ func docsOCRCmd() *cobra.Command {
 	cmd.Flags().StringVar(&mdOut, "md", "", "write Markdown extraction to this path")
 	cmd.Flags().BoolVar(&writeMD, "markdown", false, "also write sibling .md next to OCR PDF")
 	cmd.Flags().StringVar(&lang, "lang", "eng", "OCR language(s) for tesseract/ocrmypdf")
-	cmd.Flags().BoolVar(&force, "force", true, "force OCR even if a text layer exists")
+	cmd.Flags().BoolVar(&force, "force", false, "force OCR even if a text layer exists (default: skip when pdftotext finds enough text)")
 	return cmd
 }
 
