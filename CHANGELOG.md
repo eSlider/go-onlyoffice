@@ -16,6 +16,22 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 * Document that invoice→deal must be set at create (`update --opportunity` often HTTP 400)
 
+## [0.15.0](https://github.com/eSlider/go-onlyoffice/compare/v0.14.0...v0.15.0) (2026-08-29)
+
+### Features
+
+* **files:** `ListFolder`, `CreateFolder`, `MoveFiles`, `UploadToFolder` — Documents folder helpers for OO Documents ingestion ([6ea2fba](https://github.com/eSlider/go-onlyoffice/commit/6ea2fba))
+* **files:** dedupe by stem|ext (`files_stem.go`) + `oo projects files dedupe` ([ac06d86](https://github.com/eSlider/go-onlyoffice/commit/ac06d86))
+* **docs:** `internal/docpipe` — md↔docx convert, OCR→PDF, hOCR→Markdown via go-hocr, as-md/put-md for agents ([6ea2fba](https://github.com/eSlider/go-onlyoffice/commit/6ea2fba), [a264cbd](https://github.com/eSlider/go-onlyoffice/commit/a264cbd))
+* **docs:** optimize PDF via Ghostscript pdfwrite ([6b3f40e](https://github.com/eSlider/go-onlyoffice/commit/6b3f40e))
+* **security:** gitleaks secret-scan in CI + pre-push/pre-commit hooks ([9ead554](https://github.com/eSlider/go-onlyoffice/commit/9ead554))
+
+### Fixes
+
+* **files:** `DeleteFiles` via per-file DELETE API; `DeleteDavItems` with `Immediately` true ([622dcdb](https://github.com/eSlider/go-onlyoffice/commit/622dcdb), [d9a7adc](https://github.com/eSlider/go-onlyoffice/commit/d9a7adc))
+* **docs:** put-txt preserves line breaks in DOCX; fixed-width extracts in code block; put-md upsert by stem ([309ae44](https://github.com/eSlider/go-onlyoffice/commit/309ae44), [f1739dc](https://github.com/eSlider/go-onlyoffice/commit/f1739dc), [50bd475](https://github.com/eSlider/go-onlyoffice/commit/50bd475))
+* **ci:** point gitleaks at `/github/workspace` in docker action ([2c0df0d](https://github.com/eSlider/go-onlyoffice/commit/2c0df0d))
+
 ## [0.14.0](https://github.com/eSlider/go-onlyoffice/compare/v0.13.0...v0.14.0) (2026-08-27)
 
 
