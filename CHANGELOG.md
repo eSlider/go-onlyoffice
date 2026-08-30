@@ -16,6 +16,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 * Document that invoice→deal must be set at create (`update --opportunity` often HTTP 400)
 
+## [0.16.0](https://github.com/eSlider/go-onlyoffice/compare/v0.15.0...v0.16.0) (2026-08-30)
+
+
+### Features
+
+* **docs:** put-xlsx with excelize cutover workbook ([68445b0](https://github.com/eSlider/go-onlyoffice/commit/68445b0dfdcf742ccdbaa2402e423cd97199fefc))
+
 ## [0.15.0](https://github.com/eSlider/go-onlyoffice/compare/v0.14.0...v0.15.0) (2026-08-29)
 
 ### Features
