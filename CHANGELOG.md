@@ -6,6 +6,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+## [0.16.0](https://github.com/eSlider/go-onlyoffice/compare/v0.15.0...v0.16.0) (2026-08-30)
+
+### Features
+
+* **docs:** `put-xlsx` — multi-sheet бюджеты с named inputs, SUM/AVG/MIN
+  формулами, cross-sheet ссылками и cell comments (`internal/xlspipe`,
+  excelize) ([68445b0](https://github.com/eSlider/go-onlyoffice/commit/68445b0))
+
 ### Added
 
 * **docs:** CRM association graph and OO quirks (`docs/crm-associations.md`)
