@@ -64,6 +64,26 @@ func TestCrossFolderPrefersNonTrash(t *testing.T) {
 	}
 }
 
+func TestMergeProjectRootForDedupe(t *testing.T) {
+	old := &FileEntry{ID: jsonNum("1"), Title: strPtr("a.docx"), FileExst: strPtr(".docx")}
+	newer := &FileEntry{ID: jsonNum("2"), Title: strPtr("a.docx"), FileExst: strPtr(".docx")}
+	rootFiles := []*FileEntry{old, newer}
+	folders, byFolder := mergeProjectRootForDedupe("489", nil, nil, rootFiles)
+	if len(folders) != 1 || folders[0].ID.String() != "489" {
+		t.Fatalf("folders=%+v", folders)
+	}
+	if len(byFolder["489"]) != 2 {
+		t.Fatalf("root files=%d", len(byFolder["489"]))
+	}
+	groups := findWithinFolderDuplicates([]ProjectFolderFile{
+		{FolderID: "489", FolderTitle: "(project root)", File: old},
+		{FolderID: "489", FolderTitle: "(project root)", File: newer},
+	})
+	if len(groups) != 1 {
+		t.Fatalf("groups=%d", len(groups))
+	}
+}
+
 func TestIsTrashFolderTitle(t *testing.T) {
 	if !IsTrashFolderTitle("_trash-md") {
 		t.Fatal("expected trash")
