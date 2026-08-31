@@ -3,9 +3,14 @@ package onlyoffice
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"path/filepath"
 	"strings"
 )
+
+// ErrFileExists is returned when --no-replace / no-clobber upload hits an existing stem|ext.
+var ErrFileExists = errors.New("onlyoffice: file already exists in folder (use replace or delete first)")
 
 // FileEntryStem returns the logical basename without duplicated extensions.
 // OO often stores title="foo.docx" and fileExst=".docx" (UI shows foo.docx.docx).
@@ -114,6 +119,38 @@ func (c *Client) DeleteFilesByStem(ctx context.Context, folderID, stem string) (
 		return nil, err
 	}
 	return ids, nil
+}
+
+// AssertNoFileConflict reports ErrFileExists when localPath stem|ext is already in folderID.
+func (c *Client) AssertNoFileConflict(ctx context.Context, folderID, localPath string) error {
+	files, err := c.FolderFiles(ctx, folderID)
+	if err != nil {
+		return err
+	}
+	stem := UploadStemFromLocal(localPath)
+	ext := UploadExtFromLocal(localPath)
+	matches := FindFilesByDedupKey(files, stem, ext)
+	if len(matches) == 0 {
+		return nil
+	}
+	ids := make([]string, 0, len(matches))
+	for _, f := range matches {
+		ids = append(ids, fmt.Sprintf("%d", FileEntryNumericID(f)))
+	}
+	return fmt.Errorf("%w: %s%s in folder %s (existing file ids: %s)",
+		ErrFileExists, stem, ext, folderID, strings.Join(ids, ", "))
+}
+
+// UploadProjectFileNoClobber uploads only when stem|ext is not already in the project folder.
+func (c *Client) UploadProjectFileNoClobber(ctx context.Context, projectID, localPath string) (*FileEntry, error) {
+	folderID, err := c.projectFolderID(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+	if err := c.AssertNoFileConflict(ctx, folderID, localPath); err != nil {
+		return nil, err
+	}
+	return c.UploadProjectFile(ctx, projectID, localPath)
 }
 
 // UploadToFolderReplacing deletes same stem+ext files then uploads localPath.

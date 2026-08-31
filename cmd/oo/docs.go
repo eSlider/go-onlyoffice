@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -423,44 +424,28 @@ func docsPutMDCmd() *cobra.Command {
 				}
 			}
 			ctx := cmd.Context()
-			var ent *onlyoffice.FileEntry
-			var deleted []int
-			if folderID != "" {
-				if replace {
-					ent, deleted, err = c.UploadToFolderReplacing(ctx, folderID, docxPath)
-				} else {
-					ent, err = c.UploadToFolder(ctx, folderID, docxPath)
-				}
-				if err != nil {
-					return err
-				}
-				obj := map[string]any{
-					"project_id": pid,
-					"folder_id":  folderID,
-					"md":         mdPath,
-					"uploaded":   fileEntryToMap(ent),
-				}
-				if len(deleted) > 0 {
-					obj["replaced_file_ids"] = deleted
-				}
-				printObject(obj)
-				return nil
-			}
-			ent, err = c.UploadProjectFile(ctx, pid, docxPath)
+			ent, deleted, err := uploadProjectDoc(ctx, c, pid, docxPath, folderID, replace)
 			if err != nil {
 				return err
 			}
-			printObject(map[string]any{
+			obj := map[string]any{
 				"project_id": pid,
 				"md":         mdPath,
 				"uploaded":   fileEntryToMap(ent),
-			})
+			}
+			if folderID != "" {
+				obj["folder_id"] = folderID
+			}
+			if len(deleted) > 0 {
+				obj["replaced_file_ids"] = deleted
+			}
+			printObject(obj)
 			return nil
 		},
 	}
 	cmd.Flags().StringVar(&folderID, "folder", "", "Documents folder id (default: project root)")
 	cmd.Flags().StringVar(&keepLocalDOCX, "keep-docx", "", "also write the generated DOCX to this local path")
-	cmd.Flags().BoolVar(&replace, "replace", true, "delete same-stem files in folder before upload (put-md upsert)")
+	cmd.Flags().BoolVar(&replace, "replace", true, "replace same stem|ext before upload (default); false = fail if name taken")
 	return cmd
 }
 
@@ -503,44 +488,28 @@ func docsPutTxtCmd() *cobra.Command {
 				}
 			}
 			ctx := cmd.Context()
-			var ent *onlyoffice.FileEntry
-			var deleted []int
-			if folderID != "" {
-				if replace {
-					ent, deleted, err = c.UploadToFolderReplacing(ctx, folderID, docxPath)
-				} else {
-					ent, err = c.UploadToFolder(ctx, folderID, docxPath)
-				}
-				if err != nil {
-					return err
-				}
-				obj := map[string]any{
-					"project_id": pid,
-					"txt":        txtPath,
-					"folder_id":  folderID,
-					"uploaded":   fileEntryToMap(ent),
-				}
-				if len(deleted) > 0 {
-					obj["replaced_file_ids"] = deleted
-				}
-				printObject(obj)
-				return nil
-			}
-			ent, err = c.UploadProjectFile(ctx, pid, docxPath)
+			ent, deleted, err := uploadProjectDoc(ctx, c, pid, docxPath, folderID, replace)
 			if err != nil {
 				return err
 			}
-			printObject(map[string]any{
+			obj := map[string]any{
 				"project_id": pid,
 				"txt":        txtPath,
 				"uploaded":   fileEntryToMap(ent),
-			})
+			}
+			if folderID != "" {
+				obj["folder_id"] = folderID
+			}
+			if len(deleted) > 0 {
+				obj["replaced_file_ids"] = deleted
+			}
+			printObject(obj)
 			return nil
 		},
 	}
 	cmd.Flags().StringVar(&folderID, "folder", "", "Documents folder id (default: project root)")
 	cmd.Flags().StringVar(&keepLocalDOCX, "keep-docx", "", "also write the generated DOCX to this local path")
-	cmd.Flags().BoolVar(&replace, "replace", true, "delete same-stem files in folder before upload (put-txt upsert)")
+	cmd.Flags().BoolVar(&replace, "replace", true, "replace same stem|ext before upload (default); false = fail if name taken")
 	return cmd
 }
 
@@ -618,21 +587,7 @@ formulas (SUM/AVG, cross-sheet refs, named inputs) via --template, or upload an 
 			}
 
 			ctx := cmd.Context()
-			var ent *onlyoffice.FileEntry
-			var deleted []int
-			if folderID != "" {
-				if replace {
-					ent, deleted, err = c.UploadToFolderReplacing(ctx, folderID, xlsxPath)
-				} else {
-					ent, err = c.UploadToFolder(ctx, folderID, xlsxPath)
-				}
-			} else {
-				if replace {
-					ent, deleted, err = c.UploadProjectFileReplacing(ctx, pid, xlsxPath)
-				} else {
-					ent, err = c.UploadProjectFile(ctx, pid, xlsxPath)
-				}
-			}
+			ent, deleted, err := uploadProjectDoc(ctx, c, pid, xlsxPath, folderID, replace)
 			if err != nil {
 				return err
 			}
@@ -655,6 +610,25 @@ formulas (SUM/AVG, cross-sheet refs, named inputs) via --template, or upload an 
 	cmd.Flags().StringVar(&template, "template", "", "built-in workbook template (cutover-portugal)")
 	cmd.Flags().StringVar(&title, "title", "", "upload file name when using --template")
 	cmd.Flags().StringVar(&keepLocal, "keep-xlsx", "", "also write generated/uploaded bytes to this local path")
-	cmd.Flags().BoolVar(&replace, "replace", true, "delete same-stem files before upload")
+	cmd.Flags().BoolVar(&replace, "replace", true, "replace same stem|ext before upload (default); false = fail if name taken")
 	return cmd
+}
+
+// uploadProjectDoc upserts (--replace, default) or no-clobbers into project/folder Documents.
+func uploadProjectDoc(ctx context.Context, c *onlyoffice.Client, pid, localPath, folderID string, replace bool) (*onlyoffice.FileEntry, []int, error) {
+	if folderID != "" {
+		if replace {
+			return c.UploadToFolderReplacing(ctx, folderID, localPath)
+		}
+		if err := c.AssertNoFileConflict(ctx, folderID, localPath); err != nil {
+			return nil, nil, err
+		}
+		ent, err := c.UploadToFolder(ctx, folderID, localPath)
+		return ent, nil, err
+	}
+	if replace {
+		return c.UploadProjectFileReplacing(ctx, pid, localPath)
+	}
+	ent, err := c.UploadProjectFileNoClobber(ctx, pid, localPath)
+	return ent, nil, err
 }

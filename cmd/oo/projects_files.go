@@ -107,10 +107,13 @@ func prjFilesListCmd() *cobra.Command {
 }
 
 func prjFilesUploadCmd() *cobra.Command {
-	return &cobra.Command{
+	var replace, allowDuplicate bool
+	cmd := &cobra.Command{
 		Use:   "upload PROJECT_ID LOCAL_PATH [LOCAL_PATH...]",
-		Short: "Upload file(s) into the project's Documents folder",
-		Args:  cobra.MinimumNArgs(2),
+		Short: "Upload file(s) into the project's Documents folder (upsert by stem|ext)",
+		Long: `Default: replace an existing file with the same logical name (stem|ext), like cp overwrite.
+Pass --no-replace to fail when the name is taken; --allow-duplicate to always create a new file id.`,
+		Args: cobra.MinimumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := newOO(cmd)
 			if err != nil {
@@ -118,15 +121,31 @@ func prjFilesUploadCmd() *cobra.Command {
 			}
 			pid := args[0]
 			for _, p := range args[1:] {
-				entry, err := c.UploadProjectFile(cmd.Context(), pid, p)
+				var entry *onlyoffice.FileEntry
+				var deleted []int
+				switch {
+				case allowDuplicate:
+					entry, err = c.UploadProjectFile(cmd.Context(), pid, p)
+				case replace:
+					entry, deleted, err = c.UploadProjectFileReplacing(cmd.Context(), pid, p)
+				default:
+					entry, err = c.UploadProjectFileNoClobber(cmd.Context(), pid, p)
+				}
 				if err != nil {
 					return err
 				}
-				printObject(fileEntryToMap(entry))
+				obj := fileEntryToMap(entry)
+				if len(deleted) > 0 {
+					obj["replaced_file_ids"] = deleted
+				}
+				printObject(obj)
 			}
 			return nil
 		},
 	}
+	cmd.Flags().BoolVar(&replace, "replace", true, "replace same stem|ext in project folder (default)")
+	cmd.Flags().BoolVar(&allowDuplicate, "allow-duplicate", false, "always create a new file even when the name exists")
+	return cmd
 }
 
 func prjFilesDownloadCmd() *cobra.Command {

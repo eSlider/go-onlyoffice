@@ -2,6 +2,7 @@ package onlyoffice
 
 import (
 	"context"
+	"encoding/json"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -310,25 +311,70 @@ func (c *Client) DeleteFilesByDedupKey(ctx context.Context, folderID, stem, ext 
 	return ids, nil
 }
 
+// mergeProjectRootForDedupe includes projectFolder files in dedupe scans. OO often lists
+// root documents only in pf.Files while pf.Folders is empty.
+func mergeProjectRootForDedupe(rootID string, folders []*FolderEntry, filesByFolder map[string][]*FileEntry, rootFiles []*FileEntry) ([]*FolderEntry, map[string][]*FileEntry) {
+	if rootID == "" {
+		return folders, filesByFolder
+	}
+	if filesByFolder == nil {
+		filesByFolder = map[string][]*FileEntry{}
+	}
+	for _, folder := range folders {
+		if folder != nil && folder.ID != nil && folder.ID.String() == rootID {
+			if len(rootFiles) > 0 {
+				filesByFolder[rootID] = rootFiles
+			}
+			return folders, filesByFolder
+		}
+	}
+	if len(rootFiles) == 0 {
+		return folders, filesByFolder
+	}
+	id := json.Number(rootID)
+	title := "(project root)"
+	folders = append(folders, &FolderEntry{ID: &id, Title: &title})
+	filesByFolder[rootID] = rootFiles
+	return folders, filesByFolder
+}
+
 // DedupeProject scans project folders and optionally deletes duplicates.
 func (c *Client) DedupeProject(ctx context.Context, projectID string, opts DedupOptions, apply bool) ([]DedupGroup, []int, error) {
 	pf, err := c.GetProjectFiles(ctx, projectID)
 	if err != nil {
 		return nil, nil, err
 	}
-	filesByFolder := make(map[string][]*FileEntry, len(pf.Folders))
+	rootID, err := c.projectFolderID(ctx, projectID)
+	if err != nil {
+		return nil, nil, err
+	}
+	var rootFiles []*FileEntry
+	if rootID != "" {
+		rootFiles, err = c.FolderFiles(ctx, rootID)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+	filesByFolder := make(map[string][]*FileEntry, len(pf.Folders)+1)
+	folders := make([]*FolderEntry, 0, len(pf.Folders)+1)
 	for _, folder := range pf.Folders {
 		if folder == nil || folder.ID == nil {
 			continue
 		}
 		fid := folder.ID.String()
-		files, err := c.FolderFiles(ctx, fid)
-		if err != nil {
-			return nil, nil, err
+		if fid == rootID {
+			filesByFolder[fid] = rootFiles
+		} else {
+			files, err := c.FolderFiles(ctx, fid)
+			if err != nil {
+				return nil, nil, err
+			}
+			filesByFolder[fid] = files
 		}
-		filesByFolder[fid] = files
+		folders = append(folders, folder)
 	}
-	groups := FindProjectDuplicates(pf.Folders, filesByFolder, opts)
+	folders, filesByFolder = mergeProjectRootForDedupe(rootID, folders, filesByFolder, rootFiles)
+	groups := FindProjectDuplicates(folders, filesByFolder, opts)
 	if !apply || len(groups) == 0 {
 		return groups, nil, nil
 	}
