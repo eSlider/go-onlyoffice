@@ -243,6 +243,24 @@ func (c *Client) DeleteContact(ctx context.Context, contactID string) (map[strin
 	return c.deleteObject(ctx, fmt.Sprintf("/api/2.0/crm/contact/%s.json", url.PathEscape(contactID)))
 }
 
+// UpdateContactName renames a CRM company contact displayName.
+// Uses the company endpoint (person names go through /crm/contact/person/{id}).
+func (c *Client) UpdateContactName(ctx context.Context, contactID, newName string) (map[string]any, error) {
+	body := map[string]any{
+		"displayName": newName,
+		"companyName": newName,
+		"isCompany":   true,
+	}
+	out, err := c.putJSONObject(ctx, fmt.Sprintf("/api/2.0/crm/contact/company/%s.json", url.PathEscape(contactID)), body)
+	if err != nil {
+		return out, err
+	}
+	if fresh, gerr := c.GetContact(ctx, contactID); gerr == nil && fresh != nil {
+		out = fresh
+	}
+	return out, nil
+}
+
 // ListContactTags returns all CRM contact tags (title + relativeItemsCount).
 func (c *Client) ListContactTags(ctx context.Context) ([]map[string]any, error) {
 	return c.ResponseArray(ctx, "/api/2.0/crm/contact/tag.json")
@@ -715,6 +733,11 @@ func (c *Client) UpdateCRMTask(ctx context.Context, id, title, deadline string, 
 // DeleteCRMTask removes a CRM task by id.
 func (c *Client) DeleteCRMTask(ctx context.Context, id string) (map[string]any, error) {
 	return c.deleteObject(ctx, fmt.Sprintf("/api/2.0/crm/task/%s.json", url.PathEscape(id)))
+}
+
+// CloseCRMTask closes (completes) a CRM task via the task close endpoint.
+func (c *Client) CloseCRMTask(ctx context.Context, id string) (map[string]any, error) {
+	return c.putFormObject(ctx, fmt.Sprintf("/api/2.0/crm/task/%s/close.json", url.PathEscape(id)), url.Values{})
 }
 
 // ListTaskCategories returns CRM task categories.
