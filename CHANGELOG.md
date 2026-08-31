@@ -6,6 +6,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+## [0.18.0](https://github.com/eSlider/go-onlyoffice/compare/v0.17.0...v0.18.0) (2026-08-31)
+
+
+### Features
+
+* **crm:** add UpdateContactName and CloseCRMTask helpers ([4d8af7a](https://github.com/eSlider/go-onlyoffice/commit/4d8af7a2fef1fcfd96ad913cefc6497e3389963b))
+
 ## [0.17.0](https://github.com/eSlider/go-onlyoffice/compare/v0.16.0...v0.17.0) (2026-08-31)
 
 
