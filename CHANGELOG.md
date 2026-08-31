@@ -6,6 +6,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+## [0.17.0](https://github.com/eSlider/go-onlyoffice/compare/v0.16.0...v0.17.0) (2026-08-31)
+
+
+### Features
+
+* **mailsync:** FetchMailFolder — integration-layer walk for ETL consumers ([35f0cb8](https://github.com/eSlider/go-onlyoffice/commit/35f0cb8d20076244141065c07e203e633bc3612a))
+
 ## [0.16.0](https://github.com/eSlider/go-onlyoffice/compare/v0.15.0...v0.16.0) (2026-08-30)
 
 ### Features
