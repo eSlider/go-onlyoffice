@@ -15,10 +15,15 @@ import (
 )
 
 // ListContacts returns a page of CRM contacts and the total count.
+// sortBy=id is always set: OnlyOffice filter.json without an explicit sort
+// order is non-deterministic on large contact sets, so a paged walk
+// (ListAllContacts, ListContactsByTag, FindCompany, FindPerson) can skip or
+// duplicate contacts across page boundaries.
 func (c *Client) ListContacts(ctx context.Context, count, startIndex int, search string) ([]map[string]any, int, error) {
 	q := url.Values{}
 	q.Set("count", strconv.Itoa(count))
 	q.Set("startIndex", strconv.Itoa(startIndex))
+	q.Set("sortBy", "id")
 	if search != "" {
 		q.Set("filterValue", search)
 	}
@@ -306,6 +311,7 @@ func (c *Client) ListContactsByTag(ctx context.Context, tagName string, count, s
 	q.Set("count", strconv.Itoa(count))
 	q.Set("startIndex", strconv.Itoa(startIndex))
 	q.Set("tags", tagName)
+	q.Set("sortBy", "id")
 	raw, err := c.getJSON(ctx, "/api/2.0/crm/contact/filter.json?"+q.Encode())
 	if err != nil {
 		return nil, 0, err
