@@ -321,10 +321,20 @@ func (c *Client) MoveFiles(ctx context.Context, destFolderID int, fileIDs []int)
 		"folderIds":    []int{},
 		"fileIds":      fileIDs,
 		"destFolderId": destFolderID,
+		"resolveType":  "Skip",
+		"holdResult":   true,
 	}
 	out, err := c.putJSONObject(ctx, "/api/2.0/files/fileops/move.json", body)
 	if err != nil {
 		out, err = c.putJSONObject(ctx, "/api/2.0/files/fileops/move", body)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if raw, merr := json.Marshal(out); merr == nil {
+		if ferr := fileopsError(raw); ferr != nil {
+			return nil, ferr
+		}
 	}
 	return out, err
 }
@@ -338,6 +348,24 @@ func (c *Client) UploadToFolder(ctx context.Context, folderID, localPath string)
 	raw, err := c.uploadMultipart(ctx, uploadPath, "file", localPath)
 	if err != nil {
 		uploadPath = fmt.Sprintf("/api/2.0/files/%s/upload", url.PathEscape(folderID))
+		raw, err = c.uploadMultipart(ctx, uploadPath, "file", localPath)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return decodeResponseFileEntry(raw)
+}
+
+// UpdateFile uploads a new version of an existing file (same id, name and
+// folder). It does not delete and does not create a second file.
+func (c *Client) UpdateFile(ctx context.Context, fileID, localPath string) (*FileEntry, error) {
+	if fileID == "" || localPath == "" {
+		return nil, fmt.Errorf("file id and local path are required")
+	}
+	uploadPath := fmt.Sprintf("/api/2.0/files/%s/update", url.PathEscape(fileID))
+	raw, err := c.uploadMultipart(ctx, uploadPath, "file", localPath)
+	if err != nil {
+		uploadPath = fmt.Sprintf("/api/2.0/files/%s/update.json", url.PathEscape(fileID))
 		raw, err = c.uploadMultipart(ctx, uploadPath, "file", localPath)
 		if err != nil {
 			return nil, err
