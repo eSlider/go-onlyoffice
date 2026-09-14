@@ -16,6 +16,7 @@
 //	oo mails         accounts | folders | list | get | download-attachment | draft | attach | draft-invoice | delete
 //	oo invoices      list | get | create | update | pdf | pdf-cleanup | status | delete | items …
 //	oo docs          tools | convert | ocr | as-md | put-md
+//	oo dav           ls | move | copy | mkdir | rename-file | rename-folder | download | fileops
 //
 // CRM association rules: docs/crm-associations.md
 //
