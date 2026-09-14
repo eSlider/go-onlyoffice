@@ -6,6 +6,23 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+## [0.18.0](https://github.com/eSlider/go-onlyoffice/compare/v0.17.0...v0.18.0) (2026-09-04)
+
+
+### Features
+
+* **crm:** add UpdateContactName and CloseCRMTask helpers ([4d8af7a](https://github.com/eSlider/go-onlyoffice/commit/4d8af7a2fef1fcfd96ad913cefc6497e3389963b))
+
+
+### Bug Fixes
+
+* **crm:** deterministic sortBy=id in contact paged lists ([4d91726](https://github.com/eSlider/go-onlyoffice/commit/4d917261792203732ac739644c9c82124b2166eb))
+
+
+### Documentation
+
+* **funding:** eSlider support links (reverse-import GitHub e9c969a) ([d650a16](https://github.com/eSlider/go-onlyoffice/commit/d650a16a36037949505eb017c92bd3283e6e2f0f))
+
 ## [0.17.0](https://github.com/eSlider/go-onlyoffice/compare/v0.16.0...v0.17.0) (2026-08-31)
 
 
