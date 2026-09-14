@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	github.com/JohannesKaufmann/html-to-markdown/v2 v2.5.2
+	github.com/aws/aws-sdk-go-v2 v1.41.1
 	github.com/charmbracelet/bubbles v0.18.0
 	github.com/charmbracelet/bubbletea v0.25.0
 	github.com/charmbracelet/glamour v0.8.0
@@ -26,6 +27,7 @@ require (
 	github.com/JohannesKaufmann/dom v0.3.1 // indirect
 	github.com/alecthomas/chroma/v2 v2.14.0 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
+	github.com/aws/smithy-go v1.24.0 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/containerd/console v1.0.4-0.20230313162750-1ae8d489ac81 // indirect

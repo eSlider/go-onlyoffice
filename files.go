@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"net/url"
 	"path"
 	"strconv"
@@ -383,36 +382,15 @@ func FileFolderID(f *FileEntry) string {
 }
 
 // DownloadFile streams file bytes from the file's viewUrl using the same auth
-// as API calls. Writes into dst.
+// as API calls. Writes into dst. When the portal serves the file from its stale
+// AWS S3 consumer, the bytes are fetched from the local MinIO store instead
+// (see storage_fallback.go).
 func (c *Client) DownloadFile(ctx context.Context, fileID string, dst io.Writer) (int64, error) {
 	f, err := c.GetFile(ctx, fileID)
 	if err != nil {
 		return 0, err
 	}
-	if f.ViewURL == nil || *f.ViewURL == "" {
-		return 0, fmt.Errorf("file %s has no viewUrl", fileID)
-	}
-	downloadURL := c.resolveAPIURL(*f.ViewURL)
-	auth, err := c.authHeader()
-	if err != nil {
-		return 0, err
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
-	if err != nil {
-		return 0, err
-	}
-	req.Header.Set("Authorization", auth)
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return 0, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 400 {
-		b, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
-		return 0, fmt.Errorf("GET viewUrl: %d %s", resp.StatusCode, truncate(string(b), 400))
-	}
-	n, err := io.Copy(dst, resp.Body)
-	return n, err
+	return c.downloadFileEntry(ctx, f, dst)
 }
 
 func (c *Client) resolveAPIURL(ref string) string {
