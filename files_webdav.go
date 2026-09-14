@@ -259,34 +259,10 @@ func (c *Client) UploadDavFile(ctx context.Context, folderID, fileName string, s
 	return env.Response, nil
 }
 
-// DownloadDavFile streams the file identified by id to w, returning bytes copied.
+// DownloadDavFile streams the file identified by id to w, returning bytes
+// copied. It shares the MinIO stale-S3 fallback with DownloadFile.
 func (c *Client) DownloadDavFile(ctx context.Context, id string, w io.Writer) (int64, error) {
-	file, err := c.GetFile(ctx, id)
-	if err != nil {
-		return 0, err
-	}
-	if file.ViewURL == nil || *file.ViewURL == "" {
-		return 0, fmt.Errorf("onlyoffice: file %s has no viewUrl", id)
-	}
-	u := c.resolveAPIURL(*file.ViewURL)
-	auth, err := c.authHeader()
-	if err != nil {
-		return 0, err
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
-	if err != nil {
-		return 0, err
-	}
-	req.Header.Set("Authorization", auth)
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return 0, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 400 {
-		return 0, fmt.Errorf("onlyoffice: download: %d", resp.StatusCode)
-	}
-	return io.Copy(w, resp.Body)
+	return c.DownloadFile(ctx, id, w)
 }
 
 // --- internal helpers -------------------------------------------------------
