@@ -144,27 +144,85 @@ func (c *Client) RenameDavFile(ctx context.Context, id, title string) error {
 }
 
 // MoveDavItems moves the given folders and/or files into destFolderID.
+// The fileops API answers 200 with per-operation error strings even when
+// nothing moves (e.g. missing permission), so the response is parsed and the
+// first operation error is returned instead of a silent nil.
 func (c *Client) MoveDavItems(ctx context.Context, folderIDs, fileIDs []string, destFolderID string) error {
-	_, err := c.putJSON(ctx, "/api/2.0/files/fileops/move", map[string]any{
+	raw, err := c.putJSON(ctx, "/api/2.0/files/fileops/move", map[string]any{
 		"folderIds":    nums(folderIDs),
 		"fileIds":      nums(fileIDs),
 		"destFolderId": num(destFolderID),
 		"resolveType":  "Skip",
 		"holdResult":   true,
 	})
-	return err
+	if err != nil {
+		return err
+	}
+	return fileopsError(raw)
 }
 
 // CopyDavItems copies the given folders and/or files into destFolderID.
+// Per-operation errors are surfaced like in MoveDavItems.
 func (c *Client) CopyDavItems(ctx context.Context, folderIDs, fileIDs []string, destFolderID string) error {
-	_, err := c.putJSON(ctx, "/api/2.0/files/fileops/copy", map[string]any{
+	raw, err := c.putJSON(ctx, "/api/2.0/files/fileops/copy", map[string]any{
 		"folderIds":           nums(folderIDs),
 		"fileIds":             nums(fileIDs),
 		"destFolderId":        num(destFolderID),
 		"conflictResolveType": "Skip",
 		"deleteAfter":         true,
 	})
-	return err
+	if err != nil {
+		return err
+	}
+	return fileopsError(raw)
+}
+
+// ListFileOps returns the currently active file operations
+// (GET /api/2.0/files/fileops) for status polling.
+func (c *Client) ListFileOps(ctx context.Context) ([]map[string]any, error) {
+	raw, err := c.getJSON(ctx, "/api/2.0/files/fileops")
+	if err != nil {
+		return nil, err
+	}
+	resp, err := responseField(raw, "response")
+	if err != nil {
+		return nil, err
+	}
+	if len(resp) == 0 || string(resp) == "null" {
+		return nil, nil
+	}
+	var ops []map[string]any
+	if err := json.Unmarshal(resp, &ops); err != nil {
+		return nil, err
+	}
+	return ops, nil
+}
+
+// fileopsError extracts per-operation "error" strings from a fileops/move or
+// fileops/copy envelope. A 200 with error entries means nothing moved.
+func fileopsError(raw json.RawMessage) error {
+	resp, err := responseField(raw, "response")
+	if err != nil {
+		return err
+	}
+	var ops []struct {
+		Error    *string `json:"error"`
+		Finished *bool   `json:"finished"`
+		Progress *int    `json:"progress"`
+	}
+	if err := json.Unmarshal(resp, &ops); err != nil {
+		return nil // not an operations envelope — nothing to report
+	}
+	var errs []string
+	for _, op := range ops {
+		if op.Error != nil && *op.Error != "" {
+			errs = append(errs, *op.Error)
+		}
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("onlyoffice: fileops: %s", strings.Join(errs, "; "))
+	}
+	return nil
 }
 
 // DeleteDavItems deletes the given folders and/or files.
