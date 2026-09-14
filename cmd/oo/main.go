@@ -3,19 +3,20 @@
 // Command tree is subject-based (mirrors the library split and the `tea` CLI):
 //
 //	oo calendar      list | events | add | delete
-//	oo projects      list | get | milestones | create | update | delete | files (list|upload|download|rename|delete|as-md|put-md)
+//	oo projects      list | get | milestones | milestone-create | create | update | delete | contacts (add|remove) | link-authors | link-git | files (list|upload|download|rename|delete|dedupe|as-md|put-md|put-txt|put-xlsx)
 //	oo tasks         list | get | create | update | delete | subtask add | files (list|upload|detach)
 //	oo users         list | self            (alias: oo whoami)
-//	oo contacts      list | get | delete | info-add | merge | dedupe-info
+//	oo contacts      list | get | delete | info-add | merge | dedupe-info | tags | tag-add | tag-create | tag-remove
 //	oo persons       list | create | delete | dedupe
 //	oo companies     list | create | delete | dedupe | dedupe-persons
-//	oo opportunities list | get | create | delete | stages | member-add | dedupe | dedupe-members | fix-titles
+//	oo opportunities list | get | create | update | delete | stages | member-add | dedupe | dedupe-members | fix-titles
 //	oo cases         list | create | delete | member-add
-//	oo crm-tasks     list | create | delete | categories
+//	oo crm-tasks     list | create | delete | categories | reassign-self
 //	oo crm           cleanup
-//	oo mails         accounts | folders | list | get | download-attachment | draft | attach | draft-invoice | delete
+//	oo mails         accounts | folders | list | get | download-attachment | draft | attach | draft-invoice | send | delete
 //	oo invoices      list | get | create | update | pdf | pdf-cleanup | status | delete | items …
-//	oo docs          tools | convert | ocr | as-md | put-md
+//	oo docs          tools | convert | optimize | ocr | hocr | as-md | put-md | put-txt | put-xlsx
+//	oo catalog       match | merge | apply | scan-contacts | scan-projects | scan-thunderbird
 //	oo dav           ls | move | copy | mkdir | rename-file | rename-folder | download | fileops
 //
 // CRM association rules: docs/crm-associations.md
