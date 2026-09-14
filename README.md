@@ -503,6 +503,29 @@ type Task struct {
 |---|---|
 | `GetUsers()` | List all users with profiles |
 
+### Documents Files
+
+| Method | Description |
+|---|---|
+| `ListDavFolder(ctx, id)` | List a Documents folder (`@root` for virtual sections) |
+| `ListDavSections(ctx)` | Virtual sections (Documents, Projects, …) |
+| `CreateDavFolder(ctx, parentID, title)` | Create a subfolder |
+| `RenameDavFolder(ctx, id, title)` / `RenameDavFile(ctx, id, title)` | Rename folder / file |
+| `DownloadFile(ctx, id, dst)` / `DownloadDavFile(ctx, id, w)` | Download file bytes |
+| `UploadDavFile(ctx, folderID, fileName, src)` | Upload from a reader |
+| `UploadToFolder(ctx, folderID, localPath)` | Upload a local file into a folder |
+| `UploadToFolderReplacing(ctx, folderID, localPath)` | Upsert by `stem\|ext`; returns replaced ids |
+| `UpdateFile(ctx, fileID, localPath)` | New version of an existing file (same id, no copy) |
+| `MoveDavItems(ctx, folderIDs, fileIDs, dest)` | Move (`resolveType=Skip`); per-operation errors surfaced, not silent nil |
+| `CopyDavItems(ctx, folderIDs, fileIDs, dest)` | Copy (`conflictResolveType=Skip`); errors surfaced |
+| `MoveFiles(ctx, destFolderID, fileIDs)` | Move with `resolveType=Skip` + `holdResult`; errors surfaced |
+| `ListFileOps(ctx)` | Active file operations (move/copy status polling) |
+| `FolderFiles(ctx, folderID)` | Flat file list of a folder (stem helpers) |
+| `DeleteFilesByStem(ctx, folderID, stem)` | Remove `stem\|ext` copies |
+| `DoRetry(ctx, policy, fn)` | Deterministic linear backoff (N·Base, no jitter) on 429/502/503/504 |
+| `DefaultRetryPolicy()` | 5 attempts, 1s·2s·3s·4s waits, 30s cap |
+| `Transient(err)` | True for retriable OnlyOffice answers |
+
 ### Helper Types
 
 | Type | Description |
@@ -622,6 +645,8 @@ oo docs convert ./note.docx               # → note.md
 oo docs ocr ./scan.jpg --md ./scan.md     # searchable PDF + markdown
 oo docs hocr ./scan.jpg --lang spa --md ./scan.hocr.md --yaml ./scan.yml
 oo docs put-md 7 ./OO-HONDA-7-INDEX.md --folder 490
+oo docs put-txt 7 ./notes.txt --folder 490
+oo docs put-xlsx 7 ./table.xlsx --folder 490
 oo docs as-md 2815 --to ./parte.md        # download OO file as MD (OCR if needed)
 oo docs as-md 307 --hocr --lang spa       # OO download via go-hocr structure
 oo projects files put-md 7 ./note.md      # alias
@@ -631,21 +656,64 @@ oo tasks files upload 208 ./notes.pdf
 oo tasks files detach 208 12345
 ```
 
+### Documents module (`oo dav`)
+
+Direct access to the Documents module by folder/file id — the same calls that
+back `oo-webdav` and the project/task file commands. `move` sends
+`resolveType=Skip` + `holdResult=true`: without those params the legacy
+`fileops/move` endpoint answers 200 without moving anything, and the library
+surfaces such per-operation errors instead of a silent nil
+(`MoveDavItems` / `CopyDavItems` / `MoveFiles`).
+
+```bash
+oo dav ls 659
+oo dav ls @root                       # virtual sections (Documents, Projects, …)
+oo dav mkdir 659 "2026 inbox"
+oo dav move 659 22881 22882           # DEST_FOLDER_ID FILE_ID…
+oo dav move 659 22881 --folders 670   # move folders along with files
+oo dav copy 659 22881
+oo dav rename-file 22881 invoice-v2.pdf
+oo dav rename-folder 671 o2-archive
+oo dav download 22881 --to ./copy.pdf # default path: ./<server title>
+oo dav fileops                        # active move/copy operations (status polling)
+```
+
+### Bulk tools (`cmd/`)
+
+Small single-purpose binaries for bulk Documents work. All of them pace
+requests and retry transient OnlyOffice answers (429/502/503/504) with a
+deterministic linear backoff — no jitter, same waits on every run
+(see `DoRetry` below). Build with `go build ./cmd/<tool>`.
+
+```bash
+ooscan 659                             # recursive index → TSV: file_id, folder_id, path, title
+ooscan 659 666 > oo-index.tsv          # several roots into one index
+pdfamount 671                          # "Zu zahlender Betrag" per PDF → TSV: file_id, title, amount
+kontoblatt 3906 ./kontoblatt.xlsx      # summary (Gegenkonto/Monat) uploaded next to source
+kontolink IN.xlsx oo-index.tsv OUT.xlsx [FILE_ID] [AMOUNTS_TSV]
+# kontolink writes DocEditor links into the Link column: Beleg → supplier+month
+# → amount+date (5th arg = pdfamount output); with FILE_ID it updates the
+# source file in place, else uploads an "(links)" copy next to it.
+```
+
 | Subject | Verbs |
 |---|---|
 | `calendar` | `list`, `events`, `add`, `delete` |
-| `projects` | `list`, `get`, `milestones`, `create`, `update`, `delete`, **`files`** (`list`, `upload`, `download`, `rename`, `delete`) |
+| `projects` | `list`, `get`, `milestones`, `milestone-create`, `create`, `update`, `delete`, `contacts` (`add`, `remove`), `link-authors`, `link-git`, **`files`** (`list`, `upload`, `download`, `rename`, `delete`, `dedupe`, `as-md`, `put-md`, `put-txt`, `put-xlsx`) |
 | `tasks` | `list`, `get`, `create`, `update`, `delete`, `subtask add`, **`files`** (`list`, `upload`, `detach`) |
 | `users` | `list`, `self` (alias: `oo whoami`) |
-| `contacts` | `list`, `get`, `delete`, `info-add`, `merge`, `dedupe-info` |
+| `contacts` | `list`, `get`, `delete`, `info-add`, `merge`, `dedupe-info`, `tags`, `tag-add`, `tag-create`, `tag-remove` |
 | `persons` | `list`, `create`, `delete`, `dedupe` |
 | `companies` | `list`, `create`, `delete`, `dedupe`, `dedupe-persons` |
-| `opportunities` | `list`, `get`, `create`, `delete`, `stages`, `member-add`, `dedupe`, `dedupe-members`, `fix-titles` |
+| `opportunities` | `list`, `get`, `create`, `update`, `delete`, `stages`, `member-add`, `dedupe`, `dedupe-members`, `fix-titles` |
 | `invoices` | `list`, `get`, `create`, `update`, `pdf`, `pdf-cleanup`, `status`, `delete`, `items …` |
 | `crm` | `cleanup` |
-| `mails` | `accounts`, `folders`, `list`, `get`, `draft`, `attach`, `draft-invoice`, `delete` |
+| `mails` | `accounts`, `folders`, `list`, `get`, `download-attachment`, `draft`, `attach`, `draft-invoice`, `send`, `delete` |
 | `cases` | `list`, `create`, `delete`, `member-add` |
-| `crm-tasks` | `list`, `create`, `delete`, `categories` |
+| `crm-tasks` | `list`, `create`, `delete`, `categories`, `reassign-self` |
+| `docs` | `tools`, `convert`, `optimize`, `ocr`, `hocr`, `as-md`, `put-md`, `put-txt`, `put-xlsx` |
+| `catalog` | `match`, `merge`, `apply`, `scan-contacts`, `scan-projects`, `scan-thunderbird` |
+| `dav` | `ls`, `move`, `copy`, `mkdir`, `rename-file`, `rename-folder`, `download`, `fileops` |
 
 The CLI reads only `.env` from the current working directory (godotenv is a
 CLI-only concern — the library itself never loads dotfiles).
