@@ -77,6 +77,51 @@ func TestExtractAmount(t *testing.T) {
 			want: "123.45",
 		},
 		{
+			name: "dkv gesamtsummenaufstellung grand total after marker",
+			text: "» TOTAL: 111,11 100,00 11,11 111,11\n" +
+				"» TOTAL: 222,22 200,00 22,22 222,22\n" +
+				"Gesamtsummenaufstellung\n" +
+				"Netto 240,00\n" +
+				"MwSt 47,25\n" +
+				"» 287,25\n",
+			want: "287.25",
+		},
+		{
+			name: "dkv gesamtsummenaufstellung total on next line",
+			text: "» TOTAL: 111,11\nGesamtsummenaufstellung\n»\n287,25\n",
+			want: "287.25",
+		},
+		{
+			name: "tax rate with percent sign is not an amount",
+			text: "Betrag: 19,00 % MwSt",
+			want: "",
+		},
+		{
+			name: "mehrwertsteuer rate is not an amount",
+			text: "Gesamtsumme: 19,00% MwSt",
+			want: "",
+		},
+		{
+			name: "steuer word on the number line rejects it",
+			text: "Betrag: 2,83 Steuer",
+			want: "",
+		},
+		{
+			name: "rejected primary falls back to a usable label",
+			text: "Gesamtsumme: 19,00 % MwSt\nEndbetrag: 42,00",
+			want: "42.00",
+		},
+		{
+			name: "labeled zu zahlender betrag beats unlabeled larger number",
+			text: "unlabeled 999,99\nZu zahlender Betrag: 10,00",
+			want: "10.00",
+		},
+		{
+			name: "labeled zu zahlender betrag beats lower label larger number",
+			text: "Endbetrag: 999,99\nZu zahlender Betrag: 10,00",
+			want: "10.00",
+		},
+		{
 			name: "diashop style gesamtsumme with comment",
 			text: "Zwischensumme\n12,34 €\nZwischensumme\n12,34 €\nVersand & Bearbeitung\n4,95 €\nGesamtsumme (inkl. Steuern)\n17,29 €\n",
 			want: "17.29",
