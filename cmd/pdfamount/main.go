@@ -18,7 +18,36 @@ import (
 	onlyoffice "github.com/eslider/go-onlyoffice"
 )
 
-var amountRe = regexp.MustCompile(`(?i)(zu zahlender betrag|rechnungsbetrag)\s*[:\s]*([0-9][0-9.]*,[0-9]{2})`)
+// amountLabels are the payable-amount labels in priority order: the first
+// label present in a document wins. Within one label the last amount is taken,
+// because totals usually come last.
+//
+// "gesamtsumme" is not in the original list but is the real label on Diashop
+// invoices: "Gesamtsumme (inkl. Steuern)".
+var amountLabels = []string{
+	"zu zahlender betrag",
+	"rechnungsbetrag",
+	"rechnungsendbetrag",
+	"endbetrag",
+	"zahlbetrag",
+	"bruttobetrag",
+	"gesamtbetrag",
+	"gesamtsumme",
+	"betrag",
+	"total",
+	"summe",
+}
+
+// amountRes matches "<label> [optional (comment)] [: -] <number>" for every
+// label, in the same priority order as amountLabels.
+var amountRes = func() []*regexp.Regexp {
+	res := make([]*regexp.Regexp, 0, len(amountLabels))
+	for _, label := range amountLabels {
+		res = append(res, regexp.MustCompile(
+			`(?i)\b`+regexp.QuoteMeta(label)+`\b\s*(?:\([^)]*\))?\s*[:\-]?\s*([0-9]+(?:[.,][0-9]+)*)`))
+	}
+	return res
+}()
 
 func main() {
 	if len(os.Args) < 2 {
@@ -105,20 +134,63 @@ func pdfAmount(ctx context.Context, c *onlyoffice.Client, id string) (string, er
 	if err := cmd.Run(); err != nil {
 		return "", err
 	}
-	m := amountRe.FindStringSubmatch(buf.String())
-	if m == nil {
-		return "", nil
-	}
-	return parseDe(m[2]), nil
+	return extractAmount(buf.String()), nil
 }
 
-// parseDe turns "1.234,56" into 1234.56.
-func parseDe(s string) string {
-	s = strings.ReplaceAll(s, ".", "")
-	s = strings.ReplaceAll(s, ",", ".")
-	v, err := strconv.ParseFloat(s, 64)
-	if err != nil {
-		return s
+// extractAmount returns the normalised ("1234.56") payable amount found in
+// text, or "" if no known label matches.
+func extractAmount(text string) string {
+	for _, re := range amountRes {
+		ms := re.FindAllStringSubmatch(text, -1)
+		if len(ms) == 0 {
+			continue
+		}
+		if v, ok := normalizeAmount(ms[len(ms)-1][1]); ok {
+			return v
+		}
 	}
-	return strconv.FormatFloat(v, 'f', 2, 64)
+	return ""
+}
+
+// normalizeAmount turns "1.234,56" (DE), "1,234.56" (EN) or "1234.56" into
+// "1234.56". The rightmost separator is decimal only when followed by one or
+// two digits; otherwise every separator is a thousands separator.
+func normalizeAmount(s string) (string, bool) {
+	last := -1
+	for i := 0; i < len(s); i++ {
+		if s[i] == '.' || s[i] == ',' {
+			last = i
+		}
+	}
+	var dec byte
+	if last >= 0 {
+		digits := 0
+		for i := last + 1; i < len(s); i++ {
+			if s[i] < '0' || s[i] > '9' {
+				return "", false
+			}
+			digits++
+		}
+		if digits == 1 || digits == 2 {
+			dec = s[last]
+		}
+	}
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		switch c := s[i]; {
+		case c >= '0' && c <= '9':
+			b.WriteByte(c)
+		case (c == '.' || c == ',') && c == dec:
+			b.WriteByte('.')
+		case c == '.' || c == ',':
+			// thousands separator
+		default:
+			return "", false
+		}
+	}
+	v, err := strconv.ParseFloat(b.String(), 64)
+	if err != nil {
+		return "", false
+	}
+	return strconv.FormatFloat(v, 'f', 2, 64), true
 }
