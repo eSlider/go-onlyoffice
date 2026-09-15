@@ -25,6 +25,7 @@ func davCmd() *cobra.Command {
 	cmd.AddCommand(davMoveCmd())
 	cmd.AddCommand(davCopyCmd())
 	cmd.AddCommand(davMkdirCmd())
+	cmd.AddCommand(davRemoveCmd())
 	cmd.AddCommand(davRenameFileCmd())
 	cmd.AddCommand(davRenameFolderCmd())
 	cmd.AddCommand(davDownloadCmd())
@@ -182,6 +183,32 @@ func davMkdirCmd() *cobra.Command {
 			return nil
 		},
 	}
+}
+
+func davRemoveCmd() *cobra.Command {
+	var folderIDs []string
+	cmd := &cobra.Command{
+		Use:     "rm [FILE_ID...]",
+		Aliases: []string{"delete"},
+		Short:   "Permanently delete file(s) and/or folder(s) from Documents",
+		Args:    cobra.ArbitraryArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 && len(folderIDs) == 0 {
+				return fmt.Errorf("dav rm: give at least one FILE_ID or --folders")
+			}
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			if err := c.DeleteDavItems(cmd.Context(), folderIDs, args); err != nil {
+				return err
+			}
+			printObject(map[string]any{"deleted_files": args, "deleted_folders": folderIDs})
+			return nil
+		},
+	}
+	cmd.Flags().StringSliceVar(&folderIDs, "folders", nil, "folder ids to delete")
+	return cmd
 }
 
 func davRenameFileCmd() *cobra.Command {
