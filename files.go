@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"path"
 	"strconv"
@@ -357,20 +358,31 @@ func (c *Client) UploadToFolder(ctx context.Context, folderID, localPath string)
 
 // UpdateFile uploads a new version of an existing file (same id, name and
 // folder). It does not delete and does not create a second file.
+//
+// The Documents API method is PUT /api/2.0/files/{id}/update; POST is kept as
+// a fallback for older servers. The path is tried with and without .json.
 func (c *Client) UpdateFile(ctx context.Context, fileID, localPath string) (*FileEntry, error) {
 	if fileID == "" || localPath == "" {
 		return nil, fmt.Errorf("file id and local path are required")
 	}
-	uploadPath := fmt.Sprintf("/api/2.0/files/%s/update", url.PathEscape(fileID))
-	raw, err := c.uploadMultipart(ctx, uploadPath, "file", localPath)
-	if err != nil {
-		uploadPath = fmt.Sprintf("/api/2.0/files/%s/update.json", url.PathEscape(fileID))
-		raw, err = c.uploadMultipart(ctx, uploadPath, "file", localPath)
-		if err != nil {
-			return nil, err
-		}
+	base := fmt.Sprintf("/api/2.0/files/%s/update", url.PathEscape(fileID))
+	attempts := []struct {
+		method, path string
+	}{
+		{http.MethodPut, base},
+		{http.MethodPut, base + ".json"},
+		{http.MethodPost, base},
+		{http.MethodPost, base + ".json"},
 	}
-	return decodeResponseFileEntry(raw)
+	var lastErr error
+	for _, a := range attempts {
+		raw, err := c.uploadMultipartMethod(ctx, a.method, a.path, "file", localPath)
+		if err == nil {
+			return decodeResponseFileEntry(raw)
+		}
+		lastErr = err
+	}
+	return nil, lastErr
 }
 
 // FileFolderID returns the parent folder id string for a file entry, if known.

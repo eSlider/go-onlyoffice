@@ -346,6 +346,14 @@ func (c *Client) putJSON(ctx context.Context, path string, body any) (json.RawMe
 
 // uploadMultipart posts a single file to path under the given form field name.
 func (c *Client) uploadMultipart(ctx context.Context, path, fieldName, filePath string) (json.RawMessage, error) {
+	return c.uploadMultipartMethod(ctx, http.MethodPost, path, fieldName, filePath)
+}
+
+// uploadMultipartMethod sends a single-file multipart request with the given
+// HTTP method. The OnlyOffice Documents API needs PUT for /update (a new
+// version) and POST for /upload (a new file); sending POST to /update answers
+// 500 on current servers.
+func (c *Client) uploadMultipartMethod(ctx context.Context, method, path, fieldName, filePath string) (json.RawMessage, error) {
 	auth, err := c.authHeader()
 	if err != nil {
 		return nil, err
@@ -368,7 +376,7 @@ func (c *Client) uploadMultipart(ctx context.Context, path, fieldName, filePath 
 	if err := mw.Close(); err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL()+path, &buf)
+	req, err := http.NewRequestWithContext(ctx, method, c.baseURL()+path, &buf)
 	if err != nil {
 		return nil, err
 	}
