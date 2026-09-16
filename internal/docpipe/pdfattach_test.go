@@ -135,6 +135,32 @@ func TestAttachmentMarkdownFallback(t *testing.T) {
 		t.Errorf("xml attachment text = %q, want S1063", got)
 	}
 
+	// Classified digitised PDFs (Scanner-*.ocr.pdf) carry .yaml metadata.
+	yamlPath := filepath.Join(dir, "Scanner-123-003.ocr.yaml")
+	if err := os.WriteFile(yamlPath, []byte("document:\n  type: Rechnung\nnumber: S1063\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gotYAML, err := (Tools{}).attachmentMarkdown(yamlPath, dir, "", 0)
+	if err != nil {
+		t.Fatalf("attachmentMarkdown(yaml): %v", err)
+	}
+	if !strings.Contains(gotYAML, "S1063") {
+		t.Errorf("yaml attachment text = %q, want S1063", gotYAML)
+	}
+
+	// Extensionless textual attachment falls back to raw text.
+	noExt := filepath.Join(dir, "attachment")
+	if err := os.WriteFile(noExt, []byte("plain attachment token goonoext"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gotNoExt, err := (Tools{}).attachmentMarkdown(noExt, dir, "", 0)
+	if err != nil {
+		t.Fatalf("attachmentMarkdown(no extension): %v", err)
+	}
+	if !strings.Contains(gotNoExt, "goonoext") {
+		t.Errorf("extensionless attachment text = %q, want goonoext", gotNoExt)
+	}
+
 	binPath := filepath.Join(dir, "data.bin")
 	if err := os.WriteFile(binPath, []byte{0, 1, 2, 3}, 0o644); err != nil {
 		t.Fatal(err)
