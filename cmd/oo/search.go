@@ -1,6 +1,9 @@
 package main
 
 import (
+	"fmt"
+	"strings"
+
 	onlyoffice "github.com/eslider/go-onlyoffice"
 	"github.com/eslider/go-onlyoffice/cmd/internal/bootstrap"
 	"github.com/spf13/cobra"
@@ -18,6 +21,7 @@ func searchCmd() *cobra.Command {
 		content bool
 		folder  string
 		limit   int
+		backend string
 		asJSON  bool
 	)
 	cmd := &cobra.Command{
@@ -27,6 +31,9 @@ func searchCmd() *cobra.Command {
 			"By default only file names are matched. With --content the query also\n" +
 			"matches extracted document text (document.attachment.content); this covers\n" +
 			"Office formats (docx/xlsx/pptx) and is slower.\n\n" +
+			"--backend own queries the separate index populated by `oo index`\n" +
+			"(ONLYOFFICE_ES_TEXT_INDEX, default oo_docs_text) instead, which also holds\n" +
+			"PDFs and scans (see docs/elasticsearch.md).\n\n" +
 			"Requires ONLYOFFICE_ES_URL (and optionally ONLYOFFICE_ES_INDEX,\n" +
 			"ONLYOFFICE_TENANT). See docs/elasticsearch.md for the tunnel setup.",
 		Args: cobra.ExactArgs(1),
@@ -36,7 +43,18 @@ func searchCmd() *cobra.Command {
 			}
 			bootstrap.LoadEnv()
 			c := onlyoffice.NewClient(onlyoffice.GetEnvironmentCredentials())
-			searcher, err := c.Files().Search()
+			var (
+				searcher onlyoffice.Searcher
+				err      error
+			)
+			switch strings.ToLower(strings.TrimSpace(backend)) {
+			case "", "oo", "elasticsearch":
+				searcher, err = c.Files().Search()
+			case "own", "es-text":
+				searcher, err = onlyoffice.NewESTextIndex(onlyoffice.ESTextConfigFromEnv())
+			default:
+				return fmt.Errorf("unknown search backend %q (want oo|own)", backend)
+			}
 			if err != nil {
 				return err
 			}
@@ -70,6 +88,7 @@ func searchCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&content, "content", false, "also match extracted document content")
 	cmd.Flags().StringVar(&folder, "folder", "", "limit to a Documents folder id")
 	cmd.Flags().IntVar(&limit, "limit", 20, "maximum number of results")
+	cmd.Flags().StringVar(&backend, "backend", "oo", "index to query: oo (OnlyOffice) | own (oo index)")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "shorthand for --output json")
 	return cmd
 }
