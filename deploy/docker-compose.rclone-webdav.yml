@@ -1,0 +1,70 @@
+# rclone WebDAV mount of the oo-webdav sidecar (OnlyOffice Documents).
+#
+# The sidecar publishes the portal's WebDAV tree on the docker bridge
+# (http://172.17.0.1:8098, prefix /webdav). rclone mounts it inside this
+# container as a normal filesystem.
+#
+# Credentials are OnlyOffice portal credentials (the same the `oo` CLI uses).
+# Export them before `docker compose up`, e.g.
+#   set -a; . .secrets/oo.env; set +a
+# or copy .env.example to .env and fill it. Only names live in git.
+#
+#   docker compose -f deploy/docker-compose.rclone-webdav.yml up -d
+#   docker exec rclone-webdav ls /mnt/onlyoffice
+#   docker compose -f deploy/docker-compose.rclone-webdav.yml down
+#
+# The mount point is the named volume `onlyoffice-mnt`; join it from another
+# container with `external_volumes` to read the tree without the API.
+name: rclone-webdav
+
+services:
+  rclone-webdav:
+    image: rclone/rclone:latest
+    container_name: rclone-webdav
+    restart: unless-stopped
+    # rclone mount needs FUSE. The remote is defined on the fly via flags for
+    # the mount; the same credentials are written to an rclone config so that
+    # `docker exec rclone-webdav rclone ls webdav:` works without flags.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        : "$${ONLYOFFICE_USER:?ONLYOFFICE_USER is required}"
+        : "$${ONLYOFFICE_PASSWORD:?ONLYOFFICE_PASSWORD is required}"
+        obscured=$$(rclone obscure "$${ONLYOFFICE_PASSWORD}")
+        mkdir -p /config/rclone
+        cat > /config/rclone/rclone.conf <<EOF
+        [webdav]
+        type = webdav
+        url = $${ONLYOFFICE_WEBDAV_URL}
+        vendor = other
+        user = $${ONLYOFFICE_USER}
+        pass = $${obscured}
+        EOF
+        exec rclone mount :webdav: /mnt/onlyoffice \
+          --webdav-url "$${ONLYOFFICE_WEBDAV_URL}" \
+          --webdav-user "$${ONLYOFFICE_USER}" \
+          --webdav-pass "$${obscured}" \
+          --vfs-cache-mode writes \
+          --cache-dir /cache \
+          --dir-cache-time 1m \
+          --allow-other \
+          --allow-non-empty
+    environment:
+      ONLYOFFICE_USER: ${ONLYOFFICE_USER:?ONLYOFFICE_USER is required}
+      ONLYOFFICE_PASSWORD: ${ONLYOFFICE_PASSWORD:-${ONLYOFFICE_PASS:?ONLYOFFICE_PASSWORD is required}}
+      ONLYOFFICE_WEBDAV_URL: ${ONLYOFFICE_WEBDAV_URL:-http://172.17.0.1:8098/webdav}
+    cap_add:
+      - SYS_ADMIN
+    devices:
+      - /dev/fuse
+    # Ubuntu hosts run AppArmor; FUSE mounts need it unconfined.
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - onlyoffice-mnt:/mnt/onlyoffice
+      - rclone-cache:/cache
+
+volumes:
+  onlyoffice-mnt:
+  rclone-cache:
