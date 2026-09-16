@@ -56,6 +56,7 @@ write `mux.HandleFunc("/api/2.0/...")` to emulate OnlyOffice, we write an
 
 ## Related
 
+- [`docs/README.md`](docs/README.md) — reference index (file client, ES, SQL, rclone).
 - [`eSlider/inventar`](https://git.produktor.io/eSlider/inventar) — ASR/ADR (see ASR-0008 Go library module conventions).
 - [`eSlider/inventar-sync`](https://git.produktor.io/eSlider/inventar-sync) — OnlyOffice → Gitea issue sync, consumes this library.
 - [`produktor.io/vidarr`](https://git.produktor.io/produktor.io/vidarr) — legacy consumer being migrated from `pkg/onlyoffice` to this module.
