@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 
-	onlyoffice "github.com/eslider/go-onlyoffice"
 	"github.com/eslider/go-onlyoffice/cmd/office/model"
 	"github.com/eslider/go-onlyoffice/cmd/office/preview"
 )
@@ -30,13 +29,11 @@ func (l *Loader) filePreviewMarkdown(ctx context.Context, item model.Item) (stri
 		return "", fmt.Errorf("file id missing")
 	}
 	name := item.Title
-	if meta, err := l.Client.GetFile(ctx, item.ID); err == nil && meta != nil {
-		if t := onlyoffice.FileEntryTitle(meta); t != "" {
-			name = t
-		}
+	if e, err := l.fileStore().Stat(ctx, item.ID); err == nil && e.Title != "" {
+		name = e.Title
 	}
 	var buf bytes.Buffer
-	if _, err := l.Client.DownloadFile(ctx, item.ID, &buf); err != nil {
+	if _, err := l.fileStore().Download(ctx, item.ID, &buf); err != nil {
 		return "", err
 	}
 	return preview.FileBytesToMarkdown(name, buf.Bytes())
