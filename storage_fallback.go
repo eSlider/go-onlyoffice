@@ -157,6 +157,13 @@ func (c *Client) downloadFileEntry(ctx context.Context, f *FileEntry, dst io.Wri
 
 // downloadFromMinio streams objectKey from the configured MinIO bucket.
 func (c *Client) downloadFromMinio(ctx context.Context, objectKey string, dst io.Writer) (int64, error) {
+	return downloadMinioObject(ctx, c.client, objectKey, dst)
+}
+
+// downloadMinioObject streams objectKey from the configured MinIO bucket using
+// hc. It is the shared implementation behind (*Client).downloadFromMinio and
+// the read-only SQL store (file_pg.go), which has no *Client.
+func downloadMinioObject(ctx context.Context, hc *http.Client, objectKey string, dst io.Writer) (int64, error) {
 	if objectKey == "" {
 		return 0, fmt.Errorf("onlyoffice: minio fallback: empty object key")
 	}
@@ -177,7 +184,7 @@ func (c *Client) downloadFromMinio(ctx context.Context, objectKey string, dst io
 	if err := signMinioRequest(ctx, cfg, req); err != nil {
 		return 0, err
 	}
-	resp, err := c.client.Do(req)
+	resp, err := hc.Do(req)
 	if err != nil {
 		return 0, fmt.Errorf("onlyoffice: minio fallback: %w", err)
 	}
