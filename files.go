@@ -247,6 +247,8 @@ func (c *Client) UploadProjectFileReplacing(ctx context.Context, projectID, loca
 }
 
 // GetFile returns file metadata including viewUrl for download.
+//
+// Deprecated: use FileStore.Stat via Client.Files()/Client.FileStore.
 func (c *Client) GetFile(ctx context.Context, fileID string) (*FileEntry, error) {
 	if fileID == "" {
 		return nil, fmt.Errorf("file id is required")
@@ -260,6 +262,8 @@ func (c *Client) GetFile(ctx context.Context, fileID string) (*FileEntry, error)
 }
 
 // RenameFile sets a new title (including extension) for the file.
+//
+// Deprecated: use FileStore.Rename via Client.Files()/Client.FileStore.
 func (c *Client) RenameFile(ctx context.Context, fileID, newTitle string) (*FileEntry, error) {
 	if fileID == "" || newTitle == "" {
 		return nil, fmt.Errorf("file id and new title are required")
@@ -275,6 +279,8 @@ func (c *Client) RenameFile(ctx context.Context, fileID, newTitle string) (*File
 // DeleteFiles permanently deletes files by numeric id (Documents module).
 // Uses per-file DELETE (DeleteDavItems); fileops/delete returns 200 on some
 // portals (e.g. produktor.io) without removing the file.
+//
+// Deprecated: use FileStore.Delete via Client.Files()/Client.FileStore.
 func (c *Client) DeleteFiles(ctx context.Context, fileIDs []int) error {
 	if len(fileIDs) == 0 {
 		return fmt.Errorf("no file ids to delete")
@@ -288,6 +294,8 @@ func (c *Client) DeleteFiles(ctx context.Context, fileIDs []int) error {
 
 // ListFolder returns the Documents module listing for a folder id
 // (GET /api/2.0/files/{folderId}).
+//
+// Deprecated: use FileStore.List via Client.Files()/Client.FileStore.
 func (c *Client) ListFolder(ctx context.Context, folderID string) (map[string]any, error) {
 	if folderID == "" {
 		return nil, fmt.Errorf("folder id is required")
@@ -313,6 +321,8 @@ func (c *Client) CreateFolder(ctx context.Context, parentFolderID, title string)
 }
 
 // MoveFiles moves file ids into destFolderID (Documents fileops/move).
+//
+// Deprecated: use FileStore.Move via Client.Files()/Client.FileStore.
 func (c *Client) MoveFiles(ctx context.Context, destFolderID int, fileIDs []int) (map[string]any, error) {
 	if destFolderID == 0 || len(fileIDs) == 0 {
 		return nil, fmt.Errorf("dest folder and file ids are required")
@@ -343,6 +353,8 @@ func (c *Client) MoveFiles(ctx context.Context, destFolderID int, fileIDs []int)
 }
 
 // UploadToFolder uploads a local file into an arbitrary Documents folder id.
+//
+// Deprecated: use FileStore.Upload via Client.Files()/Client.FileStore.
 func (c *Client) UploadToFolder(ctx context.Context, folderID, localPath string) (*FileEntry, error) {
 	if folderID == "" || localPath == "" {
 		return nil, fmt.Errorf("folder id and local path are required")
@@ -400,6 +412,8 @@ func FileFolderID(f *FileEntry) string {
 // as API calls. Writes into dst. When the portal serves the file from its stale
 // AWS S3 consumer, the bytes are fetched from the local MinIO store instead
 // (see storage_fallback.go).
+//
+// Deprecated: use FileStore.Download via Client.Files()/Client.FileStore.
 func (c *Client) DownloadFile(ctx context.Context, fileID string, dst io.Writer) (int64, error) {
 	f, err := c.GetFile(ctx, fileID)
 	if err != nil {
