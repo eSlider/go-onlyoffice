@@ -723,7 +723,8 @@ trade-offs.
 All file backends (REST, WebDAV, read-only SQL, Elasticsearch) sit behind one
 facade: `c.Files()` returns a `*FileClient` that also implements `FileStore`,
 so old call sites keep working. Pick a transport per call with
-`c.FileStore("rest"|"dav")`, or register a backend on the facade
+`c.FileStore("rest"|"dav"|"pg"|"sql")` (SQL is read-only), open the SQL store
+with `c.SQLFileStore()`, or register a backend on the facade
 (`RegisterStore`/`RegisterSearcher`). Contract, model (`Entry`/`Kind`),
 fallback rules, env names and how to add a backend:
 [`docs/unified-file-client.md`](docs/unified-file-client.md).

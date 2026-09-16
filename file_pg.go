@@ -90,6 +90,15 @@ func pgDSNFromParts() string {
 		host, port, os.Getenv("ONLYOFFICE_PG_USER"), os.Getenv("ONLYOFFICE_PG_PASSWORD"), dbname, sslmode)
 }
 
+// SQLFileStore opens the read-only SQL store from the environment
+// (PGConfigFromEnv: ONLYOFFICE_DSN or the ONLYOFFICE_PG_* parts). It is the
+// error-aware counterpart of Client.FileStore("pg"/"sql"), which returns an
+// errStore when the open fails. The caller owns the returned store and should
+// close it (the concrete type has a Close method).
+func (c *Client) SQLFileStore() (FileStore, error) {
+	return NewPGStore(PGConfigFromEnv())
+}
+
 // pgStore is a read-only FileStore/Searcher over the Community Server database.
 type pgStore struct {
 	db        *sql.DB
