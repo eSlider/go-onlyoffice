@@ -10,10 +10,11 @@ import (
 	"time"
 )
 
-// TestIntegrationFileStores runs the same operation set (create folder, upload,
-// list, stat, download, move, copy, rename, delete) through the REST and DAV
-// FileStore adapters against a throwaway project Documents folder. Destructive
-// — only run against instances you own.
+// TestIntegrationFileStores runs the same operation set through the REST and
+// DAV FileStore adapters against a throwaway project Documents folder: file
+// create/upload/list/stat/download/move/copy/rename/delete and folder
+// create/stat/list/rename/move/delete. Destructive — only run against
+// instances you own.
 //
 // The Documents fileops API is asynchronous: a move/copy/delete is accepted
 // immediately and becomes visible a moment later, so effects are polled.
@@ -102,10 +103,7 @@ func testFileStoreOps(t *testing.T, ctx context.Context, c *Client, store FileSt
 		t.Fatalf("moved file %s not in dst", up.ID)
 	}
 
-	if err := store.Copy(ctx, []string{up.ID}, src.ID); err != nil {
-		t.Fatalf("Copy: %v", err)
-	}
-	copied := waitOtherFile(ctx, store, src.ID, up.ID, 20*time.Second)
+	copied := copyEventually(t, ctx, store, up.ID, src.ID, 20*time.Second)
 	if copied == nil {
 		t.Fatalf("no copy found in src after Copy")
 	}
@@ -121,6 +119,67 @@ func testFileStoreOps(t *testing.T, ctx context.Context, c *Client, store FileSt
 	}
 	if !waitNoEntry(ctx, store, src.ID, copied.ID, 20*time.Second) {
 		t.Fatalf("copy %s still present in src after delete", copied.ID)
+	}
+
+	// --- CRUD on the folders themselves, reusing the throwaway src/dst ---
+	// A child file lets us prove it survives the folder rename and move.
+	child, err := store.Upload(ctx, src.ID, "child-"+suffix+".txt", bytes.NewReader(content))
+	if err != nil {
+		t.Fatalf("Upload child: %v", err)
+	}
+	if !waitEntry(ctx, store, src.ID, child.ID, 15*time.Second) {
+		t.Fatalf("child %s not listed in src", child.ID)
+	}
+
+	fst, err := store.Stat(ctx, src.ID)
+	if err != nil {
+		t.Fatalf("Stat(folder): %v", err)
+	}
+	if fst.ID != src.ID || fst.Kind != Folder {
+		t.Fatalf("Stat(folder) = %+v", fst)
+	}
+
+	flist, err := store.List(ctx, src.ID)
+	if err != nil {
+		t.Fatalf("List(folder): %v", err)
+	}
+	if entryByID(flist, child.ID) == nil {
+		t.Fatalf("child %s not in List(src)", child.ID)
+	}
+
+	folderTitle := "renamed-folder-" + suffix
+	renameEventually(t, ctx, store, src.ID, folderTitle)
+	if e, err := store.Stat(ctx, src.ID); err != nil {
+		t.Fatalf("Stat(folder) after rename: %v", err)
+	} else if e.Kind != Folder || e.Title != folderTitle {
+		t.Fatalf("folder after rename = %+v, want title %q", e, folderTitle)
+	}
+
+	moveEventually(t, ctx, store, src.ID, dst.ID)
+	if !waitEntry(ctx, store, dst.ID, src.ID, 20*time.Second) {
+		t.Fatalf("moved folder %s not in dst %s", src.ID, dst.ID)
+	}
+	if !waitNoEntry(ctx, store, root, src.ID, 20*time.Second) {
+		t.Fatalf("folder %s still in root after move", src.ID)
+	}
+	if !waitEntry(ctx, store, src.ID, child.ID, 20*time.Second) {
+		t.Fatalf("child file %s lost after moving folder %s", child.ID, src.ID)
+	}
+
+	if err := store.Delete(ctx, []string{child.ID}); err != nil {
+		t.Fatalf("Delete(child): %v", err)
+	}
+	if err := store.Delete(ctx, []string{src.ID}); err != nil {
+		t.Fatalf("Delete(folder): %v", err)
+	}
+	if !waitNoEntry(ctx, store, dst.ID, src.ID, 20*time.Second) {
+		t.Fatalf("folder %s still present in dst after delete", src.ID)
+	}
+	if err := store.Delete(ctx, []string{dst.ID}); err != nil {
+		t.Fatalf("Delete(dst folder): %v", err)
+	}
+	if !waitNoEntry(ctx, store, root, dst.ID, 20*time.Second) {
+		t.Fatalf("dst folder %s still present in root after delete", dst.ID)
 	}
 }
 
@@ -139,6 +198,23 @@ func moveEventually(t *testing.T, ctx context.Context, store FileStore, id, dstI
 		time.Sleep(time.Second)
 	}
 	t.Fatalf("Move %s -> %s: %v", id, dstID, lastErr)
+}
+
+// copyEventually issues Copy and retries while the new copy is not visible yet
+// (copy is accepted asynchronously, like move).
+func copyEventually(t *testing.T, ctx context.Context, store FileStore, id, dstID string, d time.Duration) *Entry {
+	t.Helper()
+	var lastErr error
+	for attempt := 0; attempt < 5; attempt++ {
+		if lastErr = store.Copy(ctx, []string{id}, dstID); lastErr == nil {
+			if e := waitOtherFile(ctx, store, dstID, id, d); e != nil {
+				return e
+			}
+		}
+		time.Sleep(time.Second)
+	}
+	t.Fatalf("Copy %s -> %s: %v", id, dstID, lastErr)
+	return nil
 }
 
 func renameEventually(t *testing.T, ctx context.Context, store FileStore, id, title string) {
