@@ -84,7 +84,7 @@ type Searcher interface {
 компилируется.
 
 - `Read()` — первый зарегистрированный из `readOrder`:
-  `postgres` → `rest` → `dav`.
+  `postgres` → `mysql` → `rest` → `dav`.
 - `Write()` — первый из `writeOrder`: `rest` → `dav`. SQL не пишет.
 - `Search()` — первый из `searchOrder`: `elasticsearch`. Нет бэкенда →
   ошибка (`ONLYOFFICE_ES_URL`).
@@ -103,13 +103,21 @@ Fallback:
 каждый `c.Files()`, регистрируй на том же экземпляре.
 
 ```go
+sql, err := c.SQLFileStore()                     // открыть из env (ONLYOFFICE_DSN)
+if err != nil { /* нет DSN */ }
+if closer, ok := sql.(interface{ Close() error }); ok { defer closer.Close() }
+
 f := c.Files()
-if pg, err := onlyoffice.NewPGStore(onlyoffice.PGConfigFromEnv()); err == nil {
-    defer pg.Close()
-    f.RegisterStore(onlyoffice.ProviderPG, pg)
-}
-entries, _ := f.List(ctx, "649")   // пойдёт в SQL
+f.RegisterStore(onlyoffice.ProviderPG, sql)      // или sql.Name() == "mysql"
+e, _ := f.Stat(ctx, "19423")                     // e.Provider == "mysql"
+entries, _ := f.List(ctx, "676")                 // пойдёт в SQL
 ```
+
+`Client.FileStore("pg"|"sql"|"postgres"|"mysql")` — одноразовый доступ к
+SQL-стору без фасада: открывает из env; при ошибке возвращает заглушку,
+которая отдаёт ошибку открытия на каждом вызове (не `nil`). `SQLFileStore()`
+— тот же открыватель, но с ошибкой. Отвечавший бэкенд видно по
+`Entry.Provider` (`mysql` / `postgres` у SQL, `rest` у REST).
 
 ## CLI
 

@@ -45,7 +45,7 @@ func (c *Client) newFileClient() *FileClient {
 			ProviderDAV:  &davStore{c: c},
 		},
 		searchers:   map[string]Searcher{},
-		readOrder:   []string{ProviderPG, ProviderREST, ProviderDAV},
+		readOrder:   []string{ProviderPG, ProviderMySQL, ProviderREST, ProviderDAV},
 		writeOrder:  []string{ProviderREST, ProviderDAV},
 		searchOrder: []string{ProviderES},
 	}
@@ -88,8 +88,8 @@ func (f *FileClient) RegisterSearcher(name string, s Searcher) {
 	f.searchers[name] = s
 }
 
-// Read returns the preferred backend for reads: PostgreSQL when registered,
-// then REST, then WebDAV.
+// Read returns the preferred backend for reads: the SQL store (PostgreSQL or
+// MySQL) when registered, then REST, then WebDAV.
 func (f *FileClient) Read() FileStore { return f.firstStore(f.readOrder) }
 
 // Write returns the preferred backend for writes: REST, then WebDAV.

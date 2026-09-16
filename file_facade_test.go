@@ -212,6 +212,44 @@ func TestFileClientWriteWithoutBackend(t *testing.T) {
 	}
 }
 
+func TestNewFileClientReadOrderIncludesSQL(t *testing.T) {
+	f := NewClient(Credentials{}).newFileClient()
+	want := []string{ProviderPG, ProviderMySQL, ProviderREST, ProviderDAV}
+	if fmt.Sprint(f.readOrder) != fmt.Sprint(want) {
+		t.Fatalf("readOrder = %v, want %v", f.readOrder, want)
+	}
+}
+
+// TestClientFileStoreSQLRoutingWithoutDSN checks that the SQL backend names are
+// recognised and never yield nil: without a DSN the returned store surfaces the
+// open error on use.
+func TestClientFileStoreSQLRoutingWithoutDSN(t *testing.T) {
+	t.Setenv("ONLYOFFICE_DSN", "")
+	t.Setenv("ONLYOFFICE_PG_HOST", "")
+	c := NewClient(Credentials{})
+	for _, name := range []string{"pg", "sql", ProviderPG, ProviderMySQL} {
+		s := c.FileStore(name)
+		if s == nil {
+			t.Fatalf("FileStore(%q) = nil", name)
+		}
+		if _, err := s.Stat(context.Background(), "1"); err == nil {
+			t.Errorf("FileStore(%q).Stat without DSN: want error", name)
+		}
+	}
+}
+
+func TestFileClientMySQLStoreIsPreferredForReads(t *testing.T) {
+	mysql := &fakeStore{name: ProviderMySQL}
+	f := newFacadeTestClient(
+		map[string]FileStore{ProviderREST: &fakeStore{name: ProviderREST}, ProviderMySQL: mysql},
+		[]string{ProviderPG, ProviderMySQL, ProviderREST},
+		[]string{ProviderREST},
+	)
+	if got := f.Read().Name(); got != ProviderMySQL {
+		t.Errorf("Read().Name() = %q, want %q", got, ProviderMySQL)
+	}
+}
+
 func TestFileClientSearchSelection(t *testing.T) {
 	f := &FileClient{searchers: map[string]Searcher{}, searchOrder: []string{ProviderES}}
 	_, err := f.Search()
