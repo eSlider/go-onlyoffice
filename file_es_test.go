@@ -55,7 +55,7 @@ func TestESSearchRequestFiltersAndLimit(t *testing.T) {
 		Text:       "Storchen",
 		FolderID:   "649",
 		Extensions: []string{".PDF", "pdf", "docx"},
-		Limit:      999,
+		Limit:      5000,
 	}, "42")
 	if got.Size != maxESLimit {
 		t.Errorf("size = %d, want cap %d", got.Size, maxESLimit)
@@ -65,10 +65,10 @@ func TestESSearchRequestFiltersAndLimit(t *testing.T) {
 		switch {
 		case f.Term != nil && f.Term["tenantId"] != nil:
 			tenant++
-		case f.Term != nil && f.Term["folders.folderId"] != nil:
+		case f.Nested != nil:
 			folder++
-			if f.Term["folders.folderId"] != "649" {
-				t.Errorf("folder filter = %+v", f.Term)
+			if f.Nested.Path != "folders" || f.Nested.Query.Term["folders.folderId"] != "649" {
+				t.Errorf("folder filter = %+v, want nested folders term 649", f.Nested)
 			}
 		case f.Wildcard != nil:
 			wildcards++
@@ -79,6 +79,34 @@ func TestESSearchRequestFiltersAndLimit(t *testing.T) {
 	}
 	if wildcards != 2 {
 		t.Errorf("wildcard filters = %d, want deduped PDF+docx", wildcards)
+	}
+}
+
+func TestESSearchRequestSubstringAndsTerms(t *testing.T) {
+	got := esSearchRequest(SearchQuery{Text: "Rechnung 2025", Substring: true, FolderID: "522"}, "")
+	if got.Query.Bool.Must[0].MultiMatch != nil {
+		t.Fatalf("substring must not use multi_match: %+v", got.Query.Bool.Must)
+	}
+	if len(got.Query.Bool.Must) != 2 {
+		t.Fatalf("must = %+v, want two ANDed wildcard terms", got.Query.Bool.Must)
+	}
+	want := []string{"*rechnung*", "*2025*"}
+	for i, m := range got.Query.Bool.Must {
+		if m.Wildcard == nil || m.Wildcard["title"] != want[i] {
+			t.Errorf("must[%d] = %+v, want title wildcard %q", i, m, want[i])
+		}
+	}
+	if len(got.Query.Bool.Filter) != 1 || got.Query.Bool.Filter[0].Nested == nil {
+		t.Errorf("folder filter = %+v, want nested", got.Query.Bool.Filter)
+	}
+}
+
+func TestEscapeWildcard(t *testing.T) {
+	cases := map[string]string{"*rechnung*": "rechnung", "a?b\\c": "abc", "plain": "plain"}
+	for in, want := range cases {
+		if got := escapeWildcard(in); got != want {
+			t.Errorf("escapeWildcard(%q) = %q, want %q", in, got, want)
+		}
 	}
 }
 

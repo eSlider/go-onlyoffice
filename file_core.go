@@ -80,13 +80,16 @@ type FileStore interface {
 }
 
 // SearchQuery narrows a Searcher request. InContent asks the backend to match
-// document bodies, not just titles.
+// document bodies, not just titles. Substring switches title matching from the
+// analyzer's whole-token match to a case-insensitive "*term*" wildcard and ANDs
+// every whitespace-separated term (e.g. "rechnung 2025").
 type SearchQuery struct {
 	Text       string
 	InContent  bool
 	FolderID   string
 	Extensions []string
 	Limit      int
+	Substring  bool
 }
 
 // SearchHit is one Searcher result: the matching entry plus backend-specific

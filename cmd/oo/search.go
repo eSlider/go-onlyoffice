@@ -18,14 +18,15 @@ func init() {
 // content search needs Elasticsearch (see docs/elasticsearch.md).
 func searchCmd() *cobra.Command {
 	var (
-		content bool
-		folder  string
-		limit   int
-		backend string
-		asJSON  bool
+		content   bool
+		folder    string
+		limit     int
+		backend   string
+		asJSON    bool
+		substring bool
 	)
 	cmd := &cobra.Command{
-		Use:   "search QUERY",
+		Use:   "search QUERY...",
 		Short: "Full-text search over documents by name, optionally by content (Elasticsearch)",
 		Long: "Search the OnlyOffice Documents index.\n\n" +
 			"By default only file names are matched. With --content the query also\n" +
@@ -36,7 +37,7 @@ func searchCmd() *cobra.Command {
 			"PDFs and scans (see docs/elasticsearch.md).\n\n" +
 			"Requires ONLYOFFICE_ES_URL (and optionally ONLYOFFICE_ES_INDEX,\n" +
 			"ONLYOFFICE_TENANT). See docs/elasticsearch.md for the tunnel setup.",
-		Args: cobra.ExactArgs(1),
+		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if asJSON {
 				outputFormat = "json"
@@ -59,10 +60,11 @@ func searchCmd() *cobra.Command {
 				return err
 			}
 			hits, err := searcher.Search(cmd.Context(), onlyoffice.SearchQuery{
-				Text:      args[0],
+				Text:      strings.Join(args, " "),
 				InContent: content,
 				FolderID:  folder,
 				Limit:     limit,
+				Substring: substring,
 			})
 			if err != nil {
 				return err
@@ -86,7 +88,8 @@ func searchCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&content, "content", false, "also match extracted document content")
-	cmd.Flags().StringVar(&folder, "folder", "", "limit to a Documents folder id")
+	cmd.Flags().BoolVar(&substring, "substring", false, "case-insensitive *term* title match; multiple QUERY args are ANDed")
+	cmd.Flags().StringVar(&folder, "folder", "", "limit to a Documents folder id (matches the folder subtree)")
 	cmd.Flags().IntVar(&limit, "limit", 20, "maximum number of results")
 	cmd.Flags().StringVar(&backend, "backend", "oo", "index to query: oo (OnlyOffice) | own (oo index)")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "shorthand for --output json")
