@@ -7,12 +7,9 @@ package onlyoffice
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 )
 
 // restStore is a FileStore over the REST Documents API.
@@ -39,11 +36,25 @@ func (s *restStore) List(ctx context.Context, parentID string) ([]Entry, error) 
 	return out, err
 }
 
-// Stat returns file metadata. The REST adapter resolves files only; folders
-// are listed by their parent (use List).
+// Stat returns file or folder metadata. Folders are resolved through the
+// listing endpoint (their own id appears as the listing's Current); other ids
+// fall back to the file metadata API.
 func (s *restStore) Stat(ctx context.Context, id string) (Entry, error) {
+	return s.stat(ctx, id)
+}
+
+// stat resolves a single id to a folder or file Entry.
+func (s *restStore) stat(ctx context.Context, id string) (Entry, error) {
 	var out Entry
 	err := retryStoreOp(ctx, func() error {
+		if l, err := s.c.ListDavFolder(ctx, id); err == nil {
+			if l != nil && l.Current.ID != "" && l.Current.ID == id {
+				out = DavFolderToEntry(l.Current, ProviderREST)
+				return nil
+			}
+		} else if Transient(err) {
+			return err
+		}
 		f, err := s.c.GetFile(ctx, id)
 		if err != nil {
 			return err
@@ -124,54 +135,82 @@ func (s *restStore) Download(ctx context.Context, id string, w io.Writer) (int64
 	return n, err
 }
 
-// Move moves file ids into parentID. The REST MoveFiles endpoint handles files
-// only; folder moves are not exposed by this adapter.
+// Move moves folders and/or files into parentID. Ids are classified through
+// stat so folder moves use folderIds and file moves use fileIds on the shared
+// fileops/move endpoint.
 func (s *restStore) Move(ctx context.Context, ids []string, parentID string) error {
-	dest, err := strconv.Atoi(strings.TrimSpace(parentID))
-	if err != nil {
-		return fmt.Errorf("onlyoffice: rest store: move: non-numeric destination folder id %q", parentID)
-	}
-	fileIDs, err := numericIDs(ids)
+	folders, files, err := s.split(ctx, ids)
 	if err != nil {
 		return err
 	}
-	return retryStoreOp(ctx, func() error {
-		_, err := s.c.MoveFiles(ctx, dest, fileIDs)
-		return err
-	})
-}
-
-// Copy copies file ids into parentID. files.go has no copy method, so the
-// shared REST fileops copy endpoint (CopyDavItems) is used.
-func (s *restStore) Copy(ctx context.Context, ids []string, parentID string) error {
-	if len(ids) == 0 {
+	if len(folders) == 0 && len(files) == 0 {
 		return nil
 	}
 	return retryStoreOp(ctx, func() error {
-		return s.c.CopyDavItems(ctx, nil, ids, parentID)
+		return s.c.MoveDavItems(ctx, folders, files, parentID)
 	})
 }
 
-// Rename sets a new title (including extension) for a file.
+// Copy copies folders and/or files into parentID. files.go has no copy method,
+// so the shared REST fileops copy endpoint (CopyDavItems) is used.
+func (s *restStore) Copy(ctx context.Context, ids []string, parentID string) error {
+	folders, files, err := s.split(ctx, ids)
+	if err != nil {
+		return err
+	}
+	if len(folders) == 0 && len(files) == 0 {
+		return nil
+	}
+	return retryStoreOp(ctx, func() error {
+		return s.c.CopyDavItems(ctx, folders, files, parentID)
+	})
+}
+
+// Rename sets a new title (including extension) for a file or folder.
 func (s *restStore) Rename(ctx context.Context, id, title string) error {
+	e, err := s.stat(ctx, id)
+	if err != nil {
+		return err
+	}
+	if e.Kind == Folder {
+		return retryStoreOp(ctx, func() error {
+			return s.c.RenameDavFolder(ctx, id, title)
+		})
+	}
 	return retryStoreOp(ctx, func() error {
 		_, err := s.c.RenameFile(ctx, id, title)
 		return err
 	})
 }
 
-// Delete permanently deletes file ids.
+// Delete permanently deletes folders and/or files.
 func (s *restStore) Delete(ctx context.Context, ids []string) error {
-	fileIDs, err := numericIDs(ids)
+	folders, files, err := s.split(ctx, ids)
 	if err != nil {
 		return err
 	}
-	if len(fileIDs) == 0 {
+	if len(folders) == 0 && len(files) == 0 {
 		return nil
 	}
 	return retryStoreOp(ctx, func() error {
-		return s.c.DeleteFiles(ctx, fileIDs)
+		return s.c.DeleteDavItems(ctx, folders, files)
 	})
+}
+
+// split classifies ids into folder and file id lists.
+func (s *restStore) split(ctx context.Context, ids []string) (folders, files []string, err error) {
+	for _, id := range ids {
+		e, err := s.stat(ctx, id)
+		if err != nil {
+			return nil, nil, err
+		}
+		if e.Kind == Folder {
+			folders = append(folders, id)
+		} else {
+			files = append(files, id)
+		}
+	}
+	return folders, files, nil
 }
 
 // entriesFromFolderMap converts a ListFolder response map into canonical
@@ -214,17 +253,4 @@ func folderEntryFromMap(m map[string]any, parentID, provider string) (Entry, err
 	}
 	e = DavFolderToEntry(f, provider)
 	return e, nil
-}
-
-// numericIDs parses Documents numeric ids from strings.
-func numericIDs(ids []string) ([]int, error) {
-	out := make([]int, 0, len(ids))
-	for _, id := range ids {
-		n, err := strconv.Atoi(strings.TrimSpace(id))
-		if err != nil {
-			return nil, fmt.Errorf("onlyoffice: rest store: non-numeric id %q", id)
-		}
-		out = append(out, n)
-	}
-	return out, nil
 }
