@@ -999,8 +999,50 @@ oo projects files list 33
 | `ONLYOFFICE_CALENDAR_ID` | Default calendar id used when omitted (default `1`) |
 | `ONLYOFFICE_PROJECT_ID` | Default project id used when omitted (default `33`) |
 | `OO_URL`, `OO_USER`, `OO_PASS` | Optional CLI-only aliases for `ONLYOFFICE_*` |
+| `ONLYOFFICE_ES_URL` | Elasticsearch base URL (`oo search`, own index); see [`docs/elasticsearch.md`](docs/elasticsearch.md) |
+| `ONLYOFFICE_ES_INDEX` | OnlyOffice index (default `files_file`) |
+| `ONLYOFFICE_ES_TEXT_INDEX` | Own PDF/scan index (default `oo_docs_text`) |
+| `ONLYOFFICE_TENANT` | `tenantId` filter for ES/SQL (empty = all) |
+| `ONLYOFFICE_DSN` | Read-only SQL DSN (MySQL or `postgres://`); see [`docs/community-server-db.md`](docs/community-server-db.md) |
+| `ONLYOFFICE_PG_DRIVER`, `ONLYOFFICE_PG_TENANT`, `ONLYOFFICE_PG_HOST/_PORT/_USER/_PASSWORD/_DBNAME/_SSLMODE` | SQL store override / DSN by parts (PostgreSQL) |
+| `MINIO_ENDPOINT`, `MINIO_BUCKET`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY` | Object-store layout for SQL `Download` |
+| `ONLYOFFICE_WEBDAV_URL` | rclone WebDAV sidecar URL (default `http://172.17.0.1:8098/webdav`) |
 
 Mail and CRM cleanup are documented in [oo CLI use cases](#oo-cli-use-cases) above. Personal disk inventory / dossier sync lives in the private `oo-workspace` (`oow`) tooling.
+
+## Testing
+
+```bash
+go build ./... && go vet ./...
+go test ./...                 # unit — no network, no vendor mocks
+go test -race ./...
+go test -tags=integration ./...   # live OnlyOffice (skip without creds)
+```
+
+Unit tests are pure Go (parsers, encoders, conversions). Integration tests
+(`//go:build integration`) hit a live instance and **skip** cleanly when the
+env is missing, so `go test ./...` stays green offline. New endpoints ship with
+an integration test before merge (policy in [`AGENTS.md`](AGENTS.md)).
+
+Live runs need credentials (`ONLYOFFICE_URL`, `ONLYOFFICE_USER`,
+`ONLYOFFICE_PASS`) and, per backend:
+
+- **Elasticsearch** (`oo search`, own index) — ES lives on `127.0.0.1:9200`
+  inside the OnlyOffice VM; expose it over SSH
+  (`-L 9200:127.0.0.1:9200`) and set `ONLYOFFICE_ES_URL`
+  (see [`docs/elasticsearch.md`](docs/elasticsearch.md)).
+- **SQL backend** (`FileClient`, `SQLFileStore`) — MySQL on `127.0.0.1:3306`
+  in the same VM; tunnel `-L 3306:127.0.0.1:3306`, then set `ONLYOFFICE_DSN`
+  (see [`docs/community-server-db.md`](docs/community-server-db.md)).
+  `ONLYOFFICE_PG_TEST_FILE_ID` / `ONLYOFFICE_PG_TEST_FOLDER_ID` select a real
+  file for the REST cross-check; `MINIO_*` enable the download check.
+
+### rclone WebDAV mount
+
+`deploy/docker-compose.rclone-webdav.yml` mounts the Documents tree as a
+filesystem (compose, not systemd; container `rclone-webdav`) — read/write like
+a normal FS over the `oo-webdav` sidecar. Setup, smoke log and limitations:
+[`docs/rclone-webdav.md`](docs/rclone-webdav.md).
 
 ### CI / releases
 
