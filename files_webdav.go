@@ -52,6 +52,8 @@ type DavListing struct {
 
 // ListDavFolder returns the contents of a folder by id, which may be a
 // symbolic root such as "@my". For "@root" use ListDavSections.
+//
+// Deprecated: use FileStore.List via Client.Files()/Client.FileStore.
 func (c *Client) ListDavFolder(ctx context.Context, id string) (*DavListing, error) {
 	raw, err := c.getJSON(ctx, "/api/2.0/files/"+url.PathEscape(id))
 	if err != nil {
@@ -111,6 +113,8 @@ func (c *Client) ListDavSections(ctx context.Context) ([]DavFolder, error) {
 }
 
 // CreateDavFolder creates a folder titled title inside parentID.
+//
+// Deprecated: use FileStore.CreateFolder via Client.Files()/Client.FileStore.
 func (c *Client) CreateDavFolder(ctx context.Context, parentID, title string) (*DavFolder, error) {
 	raw, err := c.postJSON(ctx, "/api/2.0/files/folder/"+url.PathEscape(parentID),
 		map[string]string{"title": title})
@@ -130,6 +134,8 @@ func (c *Client) CreateDavFolder(ctx context.Context, parentID, title string) (*
 }
 
 // RenameDavFolder renames a folder.
+//
+// Deprecated: use FileStore.Rename via Client.Files()/Client.FileStore.
 func (c *Client) RenameDavFolder(ctx context.Context, id, title string) error {
 	_, err := c.putJSON(ctx, "/api/2.0/files/folder/"+url.PathEscape(id),
 		map[string]string{"title": title})
@@ -137,6 +143,8 @@ func (c *Client) RenameDavFolder(ctx context.Context, id, title string) error {
 }
 
 // RenameDavFile renames a file (title includes the extension).
+//
+// Deprecated: use FileStore.Rename via Client.Files()/Client.FileStore.
 func (c *Client) RenameDavFile(ctx context.Context, id, title string) error {
 	_, err := c.putJSON(ctx, "/api/2.0/files/file/"+url.PathEscape(id),
 		map[string]string{"title": title})
@@ -147,6 +155,8 @@ func (c *Client) RenameDavFile(ctx context.Context, id, title string) error {
 // The fileops API answers 200 with per-operation error strings even when
 // nothing moves (e.g. missing permission), so the response is parsed and the
 // first operation error is returned instead of a silent nil.
+//
+// Deprecated: use FileStore.Move via Client.Files()/Client.FileStore.
 func (c *Client) MoveDavItems(ctx context.Context, folderIDs, fileIDs []string, destFolderID string) error {
 	raw, err := c.putJSON(ctx, "/api/2.0/files/fileops/move", map[string]any{
 		"folderIds":    nums(folderIDs),
@@ -163,6 +173,8 @@ func (c *Client) MoveDavItems(ctx context.Context, folderIDs, fileIDs []string, 
 
 // CopyDavItems copies the given folders and/or files into destFolderID.
 // Per-operation errors are surfaced like in MoveDavItems.
+//
+// Deprecated: use FileStore.Copy via Client.Files()/Client.FileStore.
 func (c *Client) CopyDavItems(ctx context.Context, folderIDs, fileIDs []string, destFolderID string) error {
 	raw, err := c.putJSON(ctx, "/api/2.0/files/fileops/copy", map[string]any{
 		"folderIds":           nums(folderIDs),
@@ -226,6 +238,8 @@ func fileopsError(raw json.RawMessage) error {
 }
 
 // DeleteDavItems deletes the given folders and/or files.
+//
+// Deprecated: use FileStore.Delete via Client.Files()/Client.FileStore.
 func (c *Client) DeleteDavItems(ctx context.Context, folderIDs, fileIDs []string) error {
 	body := map[string]any{"DeleteAfter": true, "Immediately": true}
 	for _, id := range folderIDs {
@@ -242,6 +256,8 @@ func (c *Client) DeleteDavItems(ctx context.Context, folderIDs, fileIDs []string
 }
 
 // UploadDavFile uploads src (fileName) into folderID, streaming from src.
+//
+// Deprecated: use FileStore.Upload via Client.Files()/Client.FileStore.
 func (c *Client) UploadDavFile(ctx context.Context, folderID, fileName string, src io.Reader) (*DavFile, error) {
 	raw, err := c.uploadReader(ctx, "/api/2.0/files/"+url.PathEscape(folderID)+"/upload", "file", fileName, src)
 	if err != nil {
@@ -261,6 +277,8 @@ func (c *Client) UploadDavFile(ctx context.Context, folderID, fileName string, s
 
 // DownloadDavFile streams the file identified by id to w, returning bytes
 // copied. It shares the MinIO stale-S3 fallback with DownloadFile.
+//
+// Deprecated: use FileStore.Download via Client.Files()/Client.FileStore.
 func (c *Client) DownloadDavFile(ctx context.Context, id string, w io.Writer) (int64, error) {
 	return c.DownloadFile(ctx, id, w)
 }

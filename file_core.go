@@ -52,8 +52,17 @@ type Entry struct {
 	MIME     string
 	Created  time.Time
 	Modified time.Time
+	// Updated is the backend-native timestamp string, when the backend exposes
+	// one. It lets list output round-trip the API value; Modified is the
+	// parsed form for logic.
+	Updated  string
 	Version  int
 	Provider string
+
+	// Folder-only counters. Zero for files and for backends that do not
+	// report them.
+	FilesCount   int
+	FoldersCount int
 }
 
 // FileStore is the operation surface every file backend implements.
@@ -97,8 +106,8 @@ type Searcher interface {
 }
 
 // FileStore returns the adapter for a backend name: ProviderREST (default) or
-// ProviderDAV. Unknown or empty names select the REST backend. The full facade
-// (backend composition) is deliberately left to a later change.
+// ProviderDAV. Unknown or empty names select the REST backend. The composed
+// facade (backend selection/fallback) lives on FileClient in file_facade.go.
 func (c *Client) FileStore(backend string) FileStore {
 	switch strings.ToLower(strings.TrimSpace(backend)) {
 	case ProviderDAV, "webdav":
@@ -108,8 +117,9 @@ func (c *Client) FileStore(backend string) FileStore {
 	}
 }
 
-// Files returns the default (REST) file store.
-func (c *Client) Files() FileStore { return c.FileStore(ProviderREST) }
+// Files returns the composed file facade. The returned *FileClient implements
+// FileStore, so callers that used Files() as the plain REST store keep working.
+func (c *Client) Files() *FileClient { return c.newFileClient() }
 
 // retryStoreOp runs one store operation under the shared deterministic
 // transient-error policy (429/502/503/504).
@@ -140,6 +150,7 @@ func FileEntryToEntry(f *FileEntry, provider string) Entry {
 	e.MIME = mimeForTitle(e.Title, exst)
 	if f.Updated != nil {
 		e.Modified = *f.Updated
+		e.Updated = f.Updated.Format(time.RFC3339)
 	}
 	return e
 }
@@ -153,6 +164,7 @@ func DavFileToEntry(f DavFile, provider string) Entry {
 		Size:     f.Size,
 		MIME:     mimeForTitle(f.Title, ""),
 		Modified: f.ModTime(),
+		Updated:  f.Updated,
 		Provider: provider,
 	}
 }
@@ -160,12 +172,15 @@ func DavFileToEntry(f DavFile, provider string) Entry {
 // DavFolderToEntry converts a WebDAV folder row to the canonical model.
 func DavFolderToEntry(f DavFolder, provider string) Entry {
 	return Entry{
-		ID:       f.ID,
-		ParentID: f.ParentID,
-		Title:    f.Title,
-		Kind:     Folder,
-		Modified: f.ModTime(),
-		Provider: provider,
+		ID:           f.ID,
+		ParentID:     f.ParentID,
+		Title:        f.Title,
+		Kind:         Folder,
+		Modified:     f.ModTime(),
+		Updated:      f.Updated,
+		Provider:     provider,
+		FilesCount:   f.FilesCount,
+		FoldersCount: f.FoldersCount,
 	}
 }
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	onlyoffice "github.com/eslider/go-onlyoffice"
+	"github.com/eslider/go-onlyoffice/cmd/internal/bootstrap"
 	"github.com/spf13/cobra"
 )
 
@@ -9,9 +10,9 @@ func init() {
 	rootCmd.AddCommand(searchCmd())
 }
 
-// searchCmd queries the OnlyOffice Elasticsearch index directly. The REST
-// /api/2.0/files/@search endpoint only searches file names in the database;
-// content search needs ES (see docs/elasticsearch.md).
+// searchCmd queries the OnlyOffice document index through the file facade. The
+// REST /api/2.0/files/@search endpoint only searches file names in the database;
+// content search needs Elasticsearch (see docs/elasticsearch.md).
 func searchCmd() *cobra.Command {
 	var (
 		content bool
@@ -33,11 +34,13 @@ func searchCmd() *cobra.Command {
 			if asJSON {
 				outputFormat = "json"
 			}
-			es, err := onlyoffice.NewESSearcher(onlyoffice.ESConfigFromEnv())
+			bootstrap.LoadEnv()
+			c := onlyoffice.NewClient(onlyoffice.GetEnvironmentCredentials())
+			searcher, err := c.Files().Search()
 			if err != nil {
 				return err
 			}
-			hits, err := es.Search(cmd.Context(), onlyoffice.SearchQuery{
+			hits, err := searcher.Search(cmd.Context(), onlyoffice.SearchQuery{
 				Text:      args[0],
 				InContent: content,
 				FolderID:  folder,
