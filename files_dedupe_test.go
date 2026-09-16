@@ -84,6 +84,32 @@ func TestMergeProjectRootForDedupe(t *testing.T) {
 	}
 }
 
+func TestFindDuplicatesSkipsEmptyKey(t *testing.T) {
+	// Dotfiles (".env", ".gitignore", ".npmrc") normalize to an empty stem, so
+	// FileDedupKey is "". They are not duplicates of each other and must never
+	// form a dedup group that would delete one of them.
+	env := &FileEntry{ID: jsonNum("1"), Title: strPtr(".env")}
+	gitignore := &FileEntry{ID: jsonNum("2"), Title: strPtr(".gitignore")}
+	npmrc := &FileEntry{ID: jsonNum("3"), Title: strPtr(".npmrc")}
+	if FileDedupKey(env) != "" || FileDedupKey(gitignore) != "" || FileDedupKey(npmrc) != "" {
+		t.Fatalf("dotfiles should have empty dedup key")
+	}
+	within := []ProjectFolderFile{
+		{FolderID: "500", FolderTitle: "Cfg", File: env},
+		{FolderID: "500", FolderTitle: "Cfg", File: gitignore},
+	}
+	if groups := findWithinFolderDuplicates(within); len(groups) != 0 {
+		t.Fatalf("within-folder empty-key groups = %d, want 0 (%+v)", len(groups), groups)
+	}
+	cross := []ProjectFolderFile{
+		{FolderID: "500", FolderTitle: "Cfg", File: env},
+		{FolderID: "501", FolderTitle: "Other", File: npmrc},
+	}
+	if groups := findCrossFolderDuplicates(cross); len(groups) != 0 {
+		t.Fatalf("cross-folder empty-key groups = %d, want 0 (%+v)", len(groups), groups)
+	}
+}
+
 func TestIsTrashFolderTitle(t *testing.T) {
 	if !IsTrashFolderTitle("_trash-md") {
 		t.Fatal("expected trash")
