@@ -174,6 +174,22 @@ OnlyOffice PDF лежит только по имени.
 - CLI: `oo index folder|files` наполняет индекс; `oo search --backend own`
   ищет по нему.
 
+### Встроенные вложения PDF
+
+Оцифрованные PDF несут вложения (`<doc>.md` — текст/таблицы скана,
+`<doc>.yaml`/`.json` — метаданные, `.xml` — EN 16931 CII eRechnung,
+`factur-x.xml` у ZUGFeRD; см. `office-assistant/docs/reference/document-metadata.md`).
+`TextIndexer` обходит их: `pdfdetach -list` перечисляет, `-save` сохраняет,
+каждое вложение проходит штатный `docpipe.ToMarkdown` (PDF/картинки → OCR,
+`.md`/`.txt` — как есть). Форматы, которые docpipe не конвертирует
+(`.xml`/`.html` — снимаются теги; `.json`/`.csv` — как текст), извлекаются
+текстом; нечитаемые — пропускаются.
+
+Текст склеивается: тело, затем по секции на вложение с маркером
+`[attachment: <имя>]` (функция `docpipe.JoinWithAttachments`). Индекс — тот же
+`file_id`, upsert идемпотентен. Нет вложений или pdfdetach/формат нечитаем —
+индексируется тело (без падения).
+
 Поля `oo_docs_text`:
 
 | поле | тип | смысл |
@@ -217,8 +233,12 @@ ONLYOFFICE_ES_URL=http://127.0.0.1:9200 \
 ```
 
 Интеграционный тест создаёт временный индекс, наполняет, ищет по контенту,
-проверяет фильтры и удаление, затем удаляет индекс. Unit-тесты используют
-fake-store/fake-extractor и не требуют pdftotext/OCR.
+проверяет фильтры и удаление, затем удаляет индекс;
+`TestIntegrationESTextIndexPDFAttachment` индексирует
+`testdata/pdf-with-attachment.pdf` реальным конвейером (pdfdetach + pdftotext)
+и ищет токен, лежащий только во вложении. Unit-тесты используют
+fake-store/fake-extractor и не требуют pdftotext/OCR (парсер списка, склейка
+`JoinWithAttachments`, снятие тегов `xmlToText` — чистые).
 
 ## Грабли
 
@@ -229,3 +249,7 @@ fake-store/fake-extractor и не требуют pdftotext/OCR.
 - `folder` фильтруется как id папки, а не как путь.
 - Дубликаты (напр. `S1055.pdf` и `2026-08-20-S1055-…`) дадут несколько строк —
   это ожидаемо, дедуп — на стороне потребителя.
+- Вложения: нужен `pdfdetach` (poppler); если его нет — индексируется только
+  тело. Вложенный PDF/картинка с плохим текстовым слоем проходит OCR, это
+  медленно. `.json`-метаданные (CuraSoft) индексируются как текст и могут
+  добавить шумовых токенов.

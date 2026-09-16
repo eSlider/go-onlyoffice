@@ -3,9 +3,10 @@ package onlyoffice
 // Text extraction pipeline for the own full-text index (epic #34, F6 #42).
 //
 // TextIndexer downloads stored documents, extracts text through docpipe
-// (pdftotext; OCR for scans) and writes the result to a TextIndex. It is the
-// write side of ESTextIndex and never touches the OnlyOffice server's own ES
-// index.
+// (pdftotext; OCR for scans) and writes the result to a TextIndex. For PDFs it
+// also indexes the text of embedded attachments (pdfdetach), so a scan filed
+// as an attachment is searchable too. It is the write side of ESTextIndex and
+// never touches the OnlyOffice server's own ES index.
 
 import (
 	"context"
@@ -38,13 +39,14 @@ type TextExtractor interface {
 type docpipeExtractor struct{ tools docpipe.Tools }
 
 // Extract renders the file as Markdown, OCRing PDFs/images with a weak text
-// layer first (docpipe.ToMarkdown).
+// layer first and appending the text of embedded PDF attachments
+// (docpipe.ToMarkdownWithAttachments).
 func (d docpipeExtractor) Extract(path, workDir, lang string, minChars int) (string, error) {
-	res, err := d.tools.ToMarkdown(path, workDir, lang, minChars)
+	text, err := d.tools.ToMarkdownWithAttachments(path, workDir, lang, minChars)
 	if err != nil {
 		return "", err
 	}
-	return strings.TrimSpace(res.Markdown), nil
+	return strings.TrimSpace(text), nil
 }
 
 // IndexOptions controls a TextIndexer run.
