@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -159,20 +160,22 @@ func prjFilesDownloadCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			f, err := c.GetFile(cmd.Context(), args[0])
+			ctx := cmd.Context()
+			store := c.Files()
+			e, err := store.Stat(ctx, args[0])
 			if err != nil {
 				return err
 			}
 			path := to
 			if path == "" {
-				path = onlyoffice.SafeLocalFileName(onlyoffice.FileEntryTitle(f))
+				path = onlyoffice.SafeLocalFileName(e.Title)
 			}
 			out, err := os.Create(path)
 			if err != nil {
 				return err
 			}
 			defer out.Close()
-			n, err := c.DownloadFile(cmd.Context(), args[0], out)
+			n, err := store.Download(ctx, args[0], out)
 			if err != nil {
 				_ = os.Remove(path)
 				return err
@@ -199,11 +202,16 @@ func prjFilesRenameCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			entry, err := c.RenameFile(cmd.Context(), args[0], args[1])
+			store := c.Files()
+			if err := store.Rename(cmd.Context(), args[0], args[1]); err != nil {
+				return err
+			}
+			entry, err := store.Stat(cmd.Context(), args[0])
 			if err != nil {
 				return err
 			}
-			printObject(fileEntryToMap(entry))
+			entry.Title = args[1]
+			printObject(entryToMap(entry))
 			return nil
 		},
 	}
@@ -228,7 +236,7 @@ func prjFilesDeleteCmd() *cobra.Command {
 				}
 				ids = append(ids, id)
 			}
-			if err := c.DeleteFiles(cmd.Context(), ids); err != nil {
+			if err := c.Files().Delete(cmd.Context(), args); err != nil {
 				return err
 			}
 			printObject(map[string]any{"deleted": ids})
@@ -315,6 +323,29 @@ func fileEntryToMap(f *onlyoffice.FileEntry) map[string]any {
 		m["updated"] = f.Updated.Format(time.RFC3339)
 	}
 	return m
+}
+
+// entryToMap renders a canonical Entry with the same keys as fileEntryToMap.
+func entryToMap(e onlyoffice.Entry) map[string]any {
+	m := map[string]any{
+		"id":            e.ID,
+		"title":         e.Title,
+		"fileExst":      filepath.Ext(e.Title),
+		"contentLength": contentLengthString(e.Size),
+	}
+	if e.Updated != "" {
+		m["updated"] = e.Updated
+	} else if !e.Modified.IsZero() {
+		m["updated"] = e.Modified.Format(time.RFC3339)
+	}
+	return m
+}
+
+func contentLengthString(n int64) string {
+	if n <= 0 {
+		return ""
+	}
+	return strconv.FormatInt(n, 10)
 }
 
 func fileIDStr(f *onlyoffice.FileEntry) string {
