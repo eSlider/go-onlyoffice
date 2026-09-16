@@ -678,7 +678,7 @@ oo dav download 22881 --to ./copy.pdf # default path: ./<server title>
 oo dav fileops                        # active move/copy operations (status polling)
 ```
 
-### Search (`oo search`)
+### Search and index (`oo search`, `oo index`)
 
 Full-text search over the Documents index. The REST endpoint
 `/api/2.0/files/@search/{query}` only searches file names in the database, so
@@ -717,6 +717,16 @@ oo search "Rechnung" --backend own --folder 634 --json
 
 See [`docs/elasticsearch.md`](docs/elasticsearch.md) for the decision and
 trade-offs.
+
+### Unified file client
+
+All file backends (REST, WebDAV, read-only SQL, Elasticsearch) sit behind one
+facade: `c.Files()` returns a `*FileClient` that also implements `FileStore`,
+so old call sites keep working. Pick a transport per call with
+`c.FileStore("rest"|"dav")`, or register a backend on the facade
+(`RegisterStore`/`RegisterSearcher`). Contract, model (`Entry`/`Kind`),
+fallback rules, env names and how to add a backend:
+[`docs/unified-file-client.md`](docs/unified-file-client.md).
 
 ### Bulk tools (`cmd/`)
 
