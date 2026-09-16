@@ -17,6 +17,18 @@ const MailListPageSize = 25
 // Loader fetches list items for a menu subject using the OnlyOffice client.
 type Loader struct {
 	Client *onlyoffice.Client
+
+	// Files is the backend-agnostic file store used for file download, preview
+	// and delete. When nil it falls back to Client.FileStore(ProviderREST).
+	Files onlyoffice.FileStore
+}
+
+// fileStore returns the configured file store, defaulting to REST.
+func (l *Loader) fileStore() onlyoffice.FileStore {
+	if l.Files != nil {
+		return l.Files
+	}
+	return l.Client.FileStore(onlyoffice.ProviderREST)
 }
 
 // List returns items for the given list spec (nav leaf).
@@ -171,11 +183,7 @@ func (l *Loader) executeDelete(ctx context.Context, item model.Item) (string, er
 		}
 		return fmt.Sprintf("Deleted message %s", item.Title), nil
 	case model.KindFile:
-		id, err := strconv.Atoi(item.ID)
-		if err != nil {
-			return "", err
-		}
-		if err := l.Client.DeleteFiles(ctx, []int{id}); err != nil {
+		if err := l.fileStore().Delete(ctx, []string{item.ID}); err != nil {
 			return "", err
 		}
 		return fmt.Sprintf("Deleted file %s", item.Title), nil
@@ -199,7 +207,7 @@ func (l *Loader) executeDownload(ctx context.Context, item model.Item, destPath 
 		return "", err
 	}
 	defer f.Close()
-	if _, err := l.Client.DownloadFile(ctx, item.ID, f); err != nil {
+	if _, err := l.fileStore().Download(ctx, item.ID, f); err != nil {
 		return "", err
 	}
 	return fmt.Sprintf("Downloaded to %s", destPath), nil

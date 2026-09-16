@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	onlyoffice "github.com/eslider/go-onlyoffice"
 	"github.com/spf13/cobra"
@@ -12,8 +13,8 @@ func init() {
 	rootCmd.AddCommand(davCmd())
 }
 
-// davCmd exposes the Documents module through the same Dav calls that back
-// oo-webdav (ListDavFolder / MoveDavItems / CopyDavItems / DownloadDavFile).
+// davCmd exposes the Documents module through the backend-agnostic FileStore
+// (DAV backend). The underlying Dav calls are the oo-webdav proven path:
 // MoveDavItems sends resolveType=Skip + holdResult=true, which the legacy
 // fileops/move call without those params silently ignores (200 without move).
 func davCmd() *cobra.Command {
@@ -61,64 +62,63 @@ func davLsCmd() *cobra.Command {
 				printTable([]string{"id", "title", "filesCount", "foldersCount"}, rows)
 				return nil
 			}
-			l, err := c.ListDavFolder(ctx, args[0])
+			entries, err := c.FileStore(onlyoffice.ProviderDAV).List(ctx, args[0])
 			if err != nil {
 				return err
 			}
-			if outputFormat == "json" {
-				folders := make([]map[string]any, 0, len(l.Folders))
-				for _, f := range l.Folders {
-					folders = append(folders, map[string]any{
-						"id":           f.ID,
-						"title":        f.Title,
-						"filesCount":   f.FilesCount,
-						"foldersCount": f.FoldersCount,
-					})
+			folders := make([]onlyoffice.Entry, 0, len(entries))
+			files := make([]onlyoffice.Entry, 0, len(entries))
+			for _, e := range entries {
+				if e.Kind == onlyoffice.Folder {
+					folders = append(folders, e)
+				} else {
+					files = append(files, e)
 				}
-				files := make([]map[string]any, 0, len(l.Files))
-				for _, f := range l.Files {
-					files = append(files, map[string]any{
-						"id":      f.ID,
-						"title":   f.Title,
-						"size":    f.Size,
-						"updated": f.Updated,
-					})
-				}
-				printObject(map[string]any{"folders": folders, "files": files})
-				return nil
 			}
-			if len(l.Folders) > 0 {
-				frows := make([]map[string]any, 0, len(l.Folders))
-				for _, f := range l.Folders {
-					frows = append(frows, map[string]any{
-						"id":           f.ID,
-						"title":        f.Title,
-						"filesCount":   f.FilesCount,
-						"foldersCount": f.FoldersCount,
-					})
-				}
-				if outputFormat == "table" {
-					fmt.Println("folders:")
-				}
-				printTable([]string{"id", "title", "filesCount", "foldersCount"}, frows)
+			frows := make([]map[string]any, 0, len(folders))
+			for _, f := range folders {
+				frows = append(frows, map[string]any{
+					"id":           f.ID,
+					"title":        f.Title,
+					"filesCount":   f.FilesCount,
+					"foldersCount": f.FoldersCount,
+				})
 			}
-			rows := make([]map[string]any, 0, len(l.Files))
-			for _, f := range l.Files {
+			rows := make([]map[string]any, 0, len(files))
+			for _, f := range files {
 				rows = append(rows, map[string]any{
 					"id":      f.ID,
 					"title":   f.Title,
 					"size":    f.Size,
-					"updated": f.Updated,
+					"updated": entryUpdated(f),
 				})
 			}
-			if outputFormat == "table" {
-				fmt.Println("files:")
+			if outputFormat == "json" {
+				printObject(map[string]any{"folders": frows, "files": rows})
+				return nil
 			}
+			if len(frows) > 0 {
+				fmt.Println("folders:")
+				printTable([]string{"id", "title", "filesCount", "foldersCount"}, frows)
+			}
+			fmt.Println("files:")
 			printTable([]string{"id", "title", "size", "updated"}, rows)
 			return nil
 		},
 	}
 	return cmd
+}
+
+// entryUpdated prefers the backend-native timestamp string so table/JSON output
+// round-trips what the API returned.
+func entryUpdated(e onlyoffice.Entry) string {
+	if e.Updated != "" {
+		return e.Updated
+	}
+	if e.Modified.IsZero() {
+		return ""
+	}
+	return e.Modified.Format(time.RFC3339)
 }
 
 func davMoveCmd() *cobra.Command {
@@ -132,7 +132,8 @@ func davMoveCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := c.MoveDavItems(cmd.Context(), folderIDs, args[1:], args[0]); err != nil {
+			ids := append(append([]string{}, folderIDs...), args[1:]...)
+			if err := c.FileStore(onlyoffice.ProviderDAV).Move(cmd.Context(), ids, args[0]); err != nil {
 				return err
 			}
 			printObject(map[string]any{"moved_files": args[1:], "moved_folders": folderIDs, "dest": args[0]})
@@ -154,7 +155,8 @@ func davCopyCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := c.CopyDavItems(cmd.Context(), folderIDs, args[1:], args[0]); err != nil {
+			ids := append(append([]string{}, folderIDs...), args[1:]...)
+			if err := c.FileStore(onlyoffice.ProviderDAV).Copy(cmd.Context(), ids, args[0]); err != nil {
 				return err
 			}
 			printObject(map[string]any{"copied_files": args[1:], "copied_folders": folderIDs, "dest": args[0]})
@@ -175,7 +177,7 @@ func davMkdirCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			f, err := c.CreateDavFolder(cmd.Context(), args[0], args[1])
+			f, err := c.FileStore(onlyoffice.ProviderDAV).CreateFolder(cmd.Context(), args[0], args[1])
 			if err != nil {
 				return err
 			}
@@ -200,7 +202,8 @@ func davRemoveCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := c.DeleteDavItems(cmd.Context(), folderIDs, args); err != nil {
+			ids := append(append([]string{}, args...), folderIDs...)
+			if err := c.FileStore(onlyoffice.ProviderDAV).Delete(cmd.Context(), ids); err != nil {
 				return err
 			}
 			printObject(map[string]any{"deleted_files": args, "deleted_folders": folderIDs})
@@ -221,7 +224,7 @@ func davRenameFileCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := c.RenameDavFile(cmd.Context(), args[0], args[1]); err != nil {
+			if err := c.FileStore(onlyoffice.ProviderDAV).Rename(cmd.Context(), args[0], args[1]); err != nil {
 				return err
 			}
 			printObject(map[string]any{"id": args[0], "title": args[1]})
@@ -240,7 +243,7 @@ func davRenameFolderCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := c.RenameDavFolder(cmd.Context(), args[0], args[1]); err != nil {
+			if err := c.FileStore(onlyoffice.ProviderDAV).Rename(cmd.Context(), args[0], args[1]); err != nil {
 				return err
 			}
 			printObject(map[string]any{"id": args[0], "title": args[1]})
@@ -261,20 +264,21 @@ func davDownloadCmd() *cobra.Command {
 				return err
 			}
 			ctx := cmd.Context()
-			f, err := c.GetFile(ctx, args[0])
+			store := c.FileStore(onlyoffice.ProviderDAV)
+			e, err := store.Stat(ctx, args[0])
 			if err != nil {
 				return err
 			}
 			path := to
 			if path == "" {
-				path = onlyoffice.SafeLocalFileName(onlyoffice.FileEntryTitle(f))
+				path = onlyoffice.SafeLocalFileName(e.Title)
 			}
 			out, err := os.Create(path)
 			if err != nil {
 				return err
 			}
 			defer out.Close()
-			n, err := c.DownloadDavFile(ctx, args[0], out)
+			n, err := store.Download(ctx, args[0], out)
 			if err != nil {
 				_ = os.Remove(path)
 				return err
