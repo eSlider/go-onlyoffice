@@ -324,19 +324,22 @@ func (c *Client) MoveFiles(ctx context.Context, destFolderID int, fileIDs []int)
 		"resolveType":  "Skip",
 		"holdResult":   true,
 	}
-	out, err := c.putJSONObject(ctx, "/api/2.0/files/fileops/move.json", body)
+	// fileops/move answers an operations envelope (like MoveDavItems), not a
+	// single object, so parse the raw body before unwrapping and surface any
+	// per-operation error. Unwrapping first (putJSONObject) made fileopsError
+	// look for a "response" key that was already stripped.
+	raw, err := c.putJSON(ctx, "/api/2.0/files/fileops/move", body)
 	if err != nil {
-		out, err = c.putJSONObject(ctx, "/api/2.0/files/fileops/move", body)
-	}
-	if err != nil {
-		return nil, err
-	}
-	if raw, merr := json.Marshal(out); merr == nil {
-		if ferr := fileopsError(raw); ferr != nil {
-			return nil, ferr
+		raw, err = c.putJSON(ctx, "/api/2.0/files/fileops/move.json", body)
+		if err != nil {
+			return nil, err
 		}
 	}
-	return out, err
+	if ferr := fileopsError(raw); ferr != nil {
+		return nil, ferr
+	}
+	out, _ := unmarshalResponseObject(raw)
+	return out, nil
 }
 
 // UploadToFolder uploads a local file into an arbitrary Documents folder id.
