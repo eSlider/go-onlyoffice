@@ -14,6 +14,97 @@ import (
 	"github.com/xuri/excelize/v2"
 )
 
+// Default known fixtures for TestIntegrationESFacadeUsesES on the live index.
+const (
+	defaultESTestQuery     = "Rechnung_986-2025.pdf"
+	defaultESTestSubstring = "rechnung 2025"
+	defaultESTestFolder    = "522"
+)
+
+// TestIntegrationESFacadeUsesES proves that the public search path — `oo search`
+// and Client.Files().Search() — really runs against the OnlyOffice
+// Elasticsearch backend and not the REST @search endpoint, which only looks at
+// file names in the database and is not a Searcher at all (see
+// docs/elasticsearch.md). It pins the concrete backend and checks that a known
+// document comes back with a non-empty id and folder path.
+//
+// Requires ONLYOFFICE_ES_URL only — the query never touches the REST API, so no
+// OnlyOffice credentials are needed. Skips when it is missing. The fixture is
+// overridable with ONLYOFFICE_ES_TEST_QUERY, ONLYOFFICE_ES_TEST_TITLE,
+// ONLYOFFICE_ES_TEST_SUBSTRING and ONLYOFFICE_ES_TEST_FOLDER.
+func TestIntegrationESFacadeUsesES(t *testing.T) {
+	esURL := strings.TrimSpace(os.Getenv("ONLYOFFICE_ES_URL"))
+	if esURL == "" {
+		t.Skip("ONLYOFFICE_ES_URL not set — skipping Elasticsearch integration test")
+	}
+	query := firstNonEmpty(strings.TrimSpace(os.Getenv("ONLYOFFICE_ES_TEST_QUERY")), defaultESTestQuery)
+	wantTitle := firstNonEmpty(strings.TrimSpace(os.Getenv("ONLYOFFICE_ES_TEST_TITLE")), query)
+	substring := firstNonEmpty(strings.TrimSpace(os.Getenv("ONLYOFFICE_ES_TEST_SUBSTRING")), defaultESTestSubstring)
+	folder := firstNonEmpty(strings.TrimSpace(os.Getenv("ONLYOFFICE_ES_TEST_FOLDER")), defaultESTestFolder)
+
+	c := NewClient(Credentials{})
+	searcher, err := c.Files().Search()
+	if err != nil {
+		t.Fatalf("Files().Search(): %v", err)
+	}
+	if got := searcher.Name(); got != ProviderES {
+		t.Fatalf("searcher.Name() = %q, want %q (REST @search is not a Searcher)", got, ProviderES)
+	}
+	if _, ok := searcher.(*ESSearcher); !ok {
+		t.Fatalf("searcher = %T, want *ESSearcher (ES backend, not REST)", searcher)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	// Known file name: multi_match over title, as `oo search <file>` does.
+	start := time.Now()
+	hits, err := searcher.Search(ctx, SearchQuery{Text: query, Limit: 20})
+	if err != nil {
+		t.Fatalf("Search(%q): %v", query, err)
+	}
+	t.Logf("ES facade query %q: %d hits in %s", query, len(hits), time.Since(start))
+
+	known := findHitByTitle(hits, wantTitle)
+	if known == nil {
+		t.Fatalf("query %q returned %d hits, none titled %q", query, len(hits), wantTitle)
+	}
+	if strings.TrimSpace(known.ID) == "" {
+		t.Errorf("hit %q has empty id", known.Title)
+	}
+	if len(known.Path) == 0 {
+		t.Errorf("hit %q has empty path", known.Title)
+	}
+	if known.Provider != ProviderES {
+		t.Errorf("hit provider = %q, want %q", known.Provider, ProviderES)
+	}
+
+	// Substring + folder subtree, as `oo search <terms> --substring --folder N`
+	// does: wildcard terms ANDed together, scoped to the folder's subtree.
+	start = time.Now()
+	subHits, err := searcher.Search(ctx, SearchQuery{Text: substring, Substring: true, FolderID: folder, Limit: 200})
+	if err != nil {
+		t.Fatalf("substring Search(%q, folder %s): %v", substring, folder, err)
+	}
+	t.Logf("ES facade substring %q folder %s: %d hits in %s", substring, folder, len(subHits), time.Since(start))
+	if len(subHits) == 0 {
+		t.Fatalf("substring query %q in folder %s returned no hits", substring, folder)
+	}
+	if findHitByTitle(subHits, wantTitle) == nil {
+		t.Errorf("substring query %q in folder %s did not return %q", substring, folder, wantTitle)
+	}
+}
+
+// findHitByTitle returns the first hit whose title matches, case-insensitively.
+func findHitByTitle(hits []SearchHit, title string) *SearchHit {
+	for i := range hits {
+		if strings.EqualFold(strings.TrimSpace(hits[i].Title), title) {
+			return &hits[i]
+		}
+	}
+	return nil
+}
+
 // TestIntegrationESSearch uploads a throwaway workbook and verifies that the
 // direct Elasticsearch search finds it by file name and by content.
 //
