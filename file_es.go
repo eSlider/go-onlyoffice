@@ -28,7 +28,7 @@ import (
 const (
 	defaultESIndex    = "files_file"
 	defaultESLimit    = 20
-	maxESLimit        = 200
+	maxESLimit        = 1000
 	maxESResponseSize = 8 << 20
 )
 
@@ -119,14 +119,30 @@ func esSearchRequest(q SearchQuery, tenant string) esRequest {
 	if q.InContent {
 		fields = append(fields, "document.attachment.content")
 	}
-	must := []esClause{{MultiMatch: &esMultiMatch{Query: q.Text, Fields: fields}}}
+	var must []esClause
+	if q.Substring {
+		for _, term := range strings.Fields(strings.ToLower(q.Text)) {
+			if term = escapeWildcard(term); term != "" {
+				must = append(must, esClause{Wildcard: map[string]any{"title": "*" + term + "*"}})
+			}
+		}
+	}
+	if len(must) == 0 {
+		must = []esClause{{MultiMatch: &esMultiMatch{Query: q.Text, Fields: fields}}}
+	}
 
 	var filter []esClause
 	if t := strings.TrimSpace(tenant); t != "" {
 		filter = append(filter, esClause{Term: map[string]any{"tenantId": numericOrString(t)}})
 	}
 	if f := strings.TrimSpace(q.FolderID); f != "" {
-		filter = append(filter, esClause{Term: map[string]any{"folders.folderId": f}})
+		// folders is an ES nested field; a plain term on folders.folderId would
+		// not match. The stored Folders list holds every ancestor id, so
+		// filtering by a project root id scopes to its whole subtree.
+		filter = append(filter, esClause{Nested: &esNested{
+			Path:  "folders",
+			Query: esNestedTerm{Term: map[string]any{"folders.folderId": f}},
+		}})
 	}
 	for _, ext := range normalizeExtensions(q.Extensions) {
 		filter = append(filter, esClause{Wildcard: map[string]any{"title": "*." + ext}})
@@ -190,6 +206,22 @@ type esClause struct {
 	Term       map[string]any `json:"term,omitempty"`
 	Terms      map[string]any `json:"terms,omitempty"`
 	Wildcard   map[string]any `json:"wildcard,omitempty"`
+	Nested     *esNested      `json:"nested,omitempty"`
+}
+
+type esNested struct {
+	Path  string       `json:"path"`
+	Query esNestedTerm `json:"query"`
+}
+
+type esNestedTerm struct {
+	Term map[string]any `json:"term,omitempty"`
+}
+
+// escapeWildcard strips ES wildcard metacharacters from a user term so a query
+// cannot inject wildcard syntax. Pure, so it is unit-tested.
+func escapeWildcard(s string) string {
+	return strings.NewReplacer("*", "", "?", "", `\`, "").Replace(s)
 }
 
 type esMultiMatch struct {
