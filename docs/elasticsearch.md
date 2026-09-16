@@ -121,5 +121,111 @@ ONLYOFFICE_ES_URL=http://127.0.0.1:9200 ONLYOFFICE_TENANT=1 \
 - `locale`/версия ES: 7.16.3, `_search` совместим с REST 7.x.
 - ES без auth и слушает только localhost — туннель обязателен.
 - Фильтр `tenantId` сузит выдачу; без него видны документы всех тенантов.
-- Поиск по содержимому PDF, залитых через API, не работает (нет
-  `attachment.content`) — только Office-форматы.
+- Поиск по содержимому PDF в индексе OnlyOffice не работает (для PDF нет
+  `attachment.content`) — только Office-форматы. Решение для PDF — свой индекс
+  `oo_docs_text` (F6 #42), см. ниже.
+
+# PDF и сканы — свой индекс (F6 #42)
+
+## Проблема
+
+`oo search --content "S1019"` не находил номер внутри PDF-счёта: в индексе
+OnlyOffice PDF лежит только по имени.
+
+## Почему PDF исключён (исходники CommunityServer)
+
+Разобрано в `ONLYOFFICE/CommunityServer`:
+
+- `web/core/ASC.Web.Core/Files/FileUtility.cs` — `CanIndex(fileName)` читает
+  серверную настройку `files.index.formats` (в `web/studio/ASC.Web.Studio/web.appsettings.config`
+  значение по умолчанию `".pptx|.xlsx|.docx"`).
+- `web/studio/ASC.Web.Studio/Products/Files/Core/Search/FilesWrapper.cs` —
+  `GetDocumentStream*` возвращает `null`, если `!FileUtility.CanIndex(Title)`,
+  файл зашифрован или больше `MaxFileSize`.
+- `module/ASC.ElasticSearch/Core/WrapperWithDoc.cs` + mapping в `Wrapper.cs` —
+  маппинг `document.attachment.content` и ingest-pipeline `attachments`
+  формат-агностичны: они распарсят любой поток.
+
+Вывод: PDF исключён **только настройкой** `files.index.formats`; жёсткого
+ограничения на формат в коде нет.
+
+## Варианты и решение
+
+| # | Вариант | Оценка |
+|---|---------|--------|
+| a | Включить `.pdf` в `files.index.formats` + reindex | Правка сервера OO; настройка может потеряться при обновлении; полный reindex 39k док-в; Tika **не OCR** — сканы без текстового слоя дадут пустой контент. Отклонён без решения PO. |
+| b | Server-side ingest/attachment для PDF | По факту то же, что (a): сервер кормит поток только для `CanIndex`. |
+| c | **Свой индекс** `oo_docs_text`, наполняемый `internal/docpipe` | **Выбран.** Сервер OO не трогаем; детерминированно; работает OCR для сканов; независимо от обновлений OO; любые форматы; фильтры папка/тип. |
+| d | Локальный поиск без индекса | Отклонён как основной: качаем и извлекаем на каждый запрос, нет выдачи/ранжирования/highlight. |
+
+Итог: **вариант c**. Индекс OnlyOffice (`files_file`) не изменяется; наш
+индекс живёт рядом.
+
+## Устройство
+
+- `file_es_text.go` — `ESTextIndex` (`Name() = "es-text"`):
+  `Ensure` (создаёт индекс с явным маппингом), `Put` (bulk, `refresh`),
+  `Delete` (по `id`), `Search` (`multi_match` по `title^2` + `content`,
+  фильтры `folder`/`ext`, highlight).
+- `file_text_index.go` — `TextIndexer`: листает папки (`FileStore.List`),
+  качает файлы (`FileStore.Download`), извлекает текст через
+  `internal/docpipe` (`pdftotext`, для сканов — `ocrmypdf`/`tesseract`),
+  пишет в `TextIndex`. Пул воркеров (по умолчанию 3).
+- CLI: `oo index folder|files` наполняет индекс; `oo search --backend own`
+  ищет по нему.
+
+Поля `oo_docs_text`:
+
+| поле | тип | смысл |
+|------|-----|-------|
+| `id` | keyword | id файла Documents |
+| `title` | text (+`.keyword`) | имя файла |
+| `folder` | keyword | id папки |
+| `ext` | keyword | расширение |
+| `content` | text | извлечённый текст (pdftotext/OCR) |
+
+## CLI
+
+```bash
+set -a; . .env; set +a          # ONLYOFFICE_URL/USER/PASS + ONLYOFFICE_ES_URL
+oo index folder 634             # PDF в папке 634
+oo index folder 634 --recursive --exts pdf,png --limit 100
+oo index files 3576 3578        # точечно
+oo index folder 634 --dry-run   # показать план, ничего не менять
+
+oo search "S1021" --content --backend own
+oo search "S1021" --backend own --folder 634 --json
+```
+
+`--backend` у `oo search`: `oo` (по умолчанию, индекс OnlyOffice) или `own`
+(наш `ONLYOFFICE_ES_TEXT_INDEX`).
+
+## Переменные (дополнение)
+
+| env | default | смысл |
+|-----|---------|-------|
+| `ONLYOFFICE_ES_TEXT_INDEX` | `oo_docs_text` | индекс своего конвейера |
+
+`ONLYOFFICE_ES_URL` — общий для обоих индексов.
+
+## Тесты
+
+```bash
+go test -run 'ESText|TextIndexer|Index' ./ ./cmd/oo/        # unit, без сети
+ONLYOFFICE_ES_URL=http://127.0.0.1:9200 \
+  go test -tags=integration -run TestIntegrationESTextIndex -v .
+```
+
+Интеграционный тест создаёт временный индекс, наполняет, ищет по контенту,
+проверяет фильтры и удаление, затем удаляет индекс. Unit-тесты используют
+fake-store/fake-extractor и не требуют pdftotext/OCR.
+
+## Грабли
+
+- Наполнение — ручное (`oo index`); после изменения/добавления PDF повтори.
+  Повтор идемпотентен (upsert по id файла).
+- В индексе ищется только то, что проиндексировано; `oo index` качает каждый
+  файл и (для сканов) гоняет OCR — это медленно, отсюда `--limit`/`--exts`.
+- `folder` фильтруется как id папки, а не как путь.
+- Дубликаты (напр. `S1055.pdf` и `2026-08-20-S1055-…`) дадут несколько строк —
+  это ожидаемо, дедуп — на стороне потребителя.

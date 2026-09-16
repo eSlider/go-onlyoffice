@@ -188,6 +188,7 @@ type esBool struct {
 type esClause struct {
 	MultiMatch *esMultiMatch  `json:"multi_match,omitempty"`
 	Term       map[string]any `json:"term,omitempty"`
+	Terms      map[string]any `json:"terms,omitempty"`
 	Wildcard   map[string]any `json:"wildcard,omitempty"`
 }
 
@@ -268,9 +269,10 @@ func parseESSearchResponse(raw []byte) ([]SearchHit, error) {
 var esHighlightTag = regexp.MustCompile(`</?em[^>]*>`)
 
 // esHighlightText flattens a highlight map into one plain-text snippet,
-// preferring the content fragment over the title.
+// preferring the content fragment over the title. It covers both the
+// OnlyOffice content field and the own-index "content" field.
 func esHighlightText(hl map[string][]string) string {
-	for _, key := range []string{"document.attachment.content", "title"} {
+	for _, key := range []string{"document.attachment.content", "content", "title"} {
 		frags := hl[key]
 		if len(frags) == 0 {
 			continue
