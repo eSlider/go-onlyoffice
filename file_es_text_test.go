@@ -135,12 +135,12 @@ func TestESTextConfigFromEnvIndexDefault(t *testing.T) {
 }
 
 func TestTextIndexerIndexEntries(t *testing.T) {
-	store := &fakeStore{
+	store := &textFakeStore{
 		files: map[string][]byte{"1": []byte("PDFBYTES")},
 	}
-	idx := &fakeIndex{}
+	idx := &textFakeIndex{}
 	ix := NewTextIndexer(store, idx)
-	ix.Extractor = fakeExtractor{prefix: "TEXT "}
+	ix.Extractor = textFakeExtractor{prefix: "TEXT "}
 
 	res, err := ix.IndexEntries(context.Background(), []Entry{
 		{ID: "1", Title: "Rechnung.PDF", ParentID: "649", Kind: File},
@@ -164,10 +164,10 @@ func TestTextIndexerIndexEntries(t *testing.T) {
 }
 
 func TestTextIndexerRecordsExtractionFailure(t *testing.T) {
-	store := &fakeStore{files: map[string][]byte{"1": []byte("x")}}
-	idx := &fakeIndex{}
+	store := &textFakeStore{files: map[string][]byte{"1": []byte("x")}}
+	idx := &textFakeIndex{}
 	ix := NewTextIndexer(store, idx)
-	ix.Extractor = failingExtractor{}
+	ix.Extractor = textFailingExtractor{}
 
 	res, err := ix.IndexEntries(context.Background(), []Entry{{ID: "1", Title: "a.pdf", Kind: File}}, IndexOptions{})
 	if err != nil {
@@ -179,7 +179,7 @@ func TestTextIndexerRecordsExtractionFailure(t *testing.T) {
 }
 
 func TestTextIndexerPlanFolder(t *testing.T) {
-	store := &fakeStore{dirs: map[string][]Entry{
+	store := &textFakeStore{dirs: map[string][]Entry{
 		"root": {
 			{ID: "10", Title: "a.pdf", Kind: File},
 			{ID: "11", Title: "sub", Kind: Folder},
@@ -189,7 +189,7 @@ func TestTextIndexerPlanFolder(t *testing.T) {
 			{ID: "13", Title: "c.xlsx", Kind: File},
 		},
 	}}
-	ix := NewTextIndexer(store, &fakeIndex{})
+	ix := NewTextIndexer(store, &textFakeIndex{})
 
 	flat, err := ix.PlanFolder(context.Background(), "root", IndexOptions{})
 	if err != nil {
@@ -209,26 +209,26 @@ func TestTextIndexerPlanFolder(t *testing.T) {
 
 // --- fakes -----------------------------------------------------------------
 
-type fakeStore struct {
+type textFakeStore struct {
 	dirs  map[string][]Entry
 	files map[string][]byte
 	stat  map[string]Entry
 }
 
-func (f *fakeStore) Name() string { return "fake" }
+func (f *textFakeStore) Name() string { return "fake" }
 
-func (f *fakeStore) List(_ context.Context, parentID string) ([]Entry, error) {
+func (f *textFakeStore) List(_ context.Context, parentID string) ([]Entry, error) {
 	return f.dirs[parentID], nil
 }
 
-func (f *fakeStore) Stat(_ context.Context, id string) (Entry, error) {
+func (f *textFakeStore) Stat(_ context.Context, id string) (Entry, error) {
 	if e, ok := f.stat[id]; ok {
 		return e, nil
 	}
 	return Entry{}, fmt.Errorf("not found: %s", id)
 }
 
-func (f *fakeStore) Download(_ context.Context, id string, w io.Writer) (int64, error) {
+func (f *textFakeStore) Download(_ context.Context, id string, w io.Writer) (int64, error) {
 	b, ok := f.files[id]
 	if !ok {
 		return 0, fmt.Errorf("no bytes for %s", id)
@@ -237,30 +237,30 @@ func (f *fakeStore) Download(_ context.Context, id string, w io.Writer) (int64, 
 	return int64(n), err
 }
 
-func (f *fakeStore) CreateFolder(context.Context, string, string) (Entry, error) {
+func (f *textFakeStore) CreateFolder(context.Context, string, string) (Entry, error) {
 	return Entry{}, nil
 }
-func (f *fakeStore) Upload(context.Context, string, string, io.Reader) (Entry, error) {
+func (f *textFakeStore) Upload(context.Context, string, string, io.Reader) (Entry, error) {
 	return Entry{}, nil
 }
-func (f *fakeStore) Move(context.Context, []string, string) error { return nil }
-func (f *fakeStore) Copy(context.Context, []string, string) error { return nil }
-func (f *fakeStore) Rename(context.Context, string, string) error { return nil }
-func (f *fakeStore) Delete(context.Context, []string) error       { return nil }
+func (f *textFakeStore) Move(context.Context, []string, string) error { return nil }
+func (f *textFakeStore) Copy(context.Context, []string, string) error { return nil }
+func (f *textFakeStore) Rename(context.Context, string, string) error { return nil }
+func (f *textFakeStore) Delete(context.Context, []string) error       { return nil }
 
-type fakeIndex struct{ docs []TextDoc }
+type textFakeIndex struct{ docs []TextDoc }
 
-func (f *fakeIndex) Put(_ context.Context, docs []TextDoc) error {
+func (f *textFakeIndex) Put(_ context.Context, docs []TextDoc) error {
 	f.docs = append(f.docs, docs...)
 	return nil
 }
-func (f *fakeIndex) Delete(context.Context, []string) error                   { return nil }
-func (f *fakeIndex) Search(context.Context, SearchQuery) ([]SearchHit, error) { return nil, nil }
-func (f *fakeIndex) Name() string                                             { return "fake" }
+func (f *textFakeIndex) Delete(context.Context, []string) error                   { return nil }
+func (f *textFakeIndex) Search(context.Context, SearchQuery) ([]SearchHit, error) { return nil, nil }
+func (f *textFakeIndex) Name() string                                             { return "fake" }
 
-type fakeExtractor struct{ prefix string }
+type textFakeExtractor struct{ prefix string }
 
-func (f fakeExtractor) Extract(path, _, _ string, _ int) (string, error) {
+func (f textFakeExtractor) Extract(path, _, _ string, _ int) (string, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return "", err
@@ -268,8 +268,8 @@ func (f fakeExtractor) Extract(path, _, _ string, _ int) (string, error) {
 	return f.prefix + string(b), nil
 }
 
-type failingExtractor struct{}
+type textFailingExtractor struct{}
 
-func (failingExtractor) Extract(string, string, string, int) (string, error) {
+func (textFailingExtractor) Extract(string, string, string, int) (string, error) {
 	return "", fmt.Errorf("boom")
 }
