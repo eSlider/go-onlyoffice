@@ -9,11 +9,14 @@ import (
 	"bytes"
 	"encoding/xml"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 // PDFAttachment is one embedded file in a PDF.
@@ -193,15 +196,59 @@ func (t Tools) attachmentMarkdown(path, workDir, lang string, minChars int) (str
 			return "", err
 		}
 		return xmlToText(raw), nil
-	case ".json", ".csv":
+	case ".json", ".csv", ".yaml", ".yml", ".toml", ".txt", ".md", ".markdown":
 		raw, err := os.ReadFile(path)
 		if err != nil {
 			return "", err
 		}
 		return string(raw), nil
 	default:
+		return textFallback(path)
+	}
+}
+
+// textFallback reads an attachment of an unknown or missing extension as plain
+// text when it looks textual (valid UTF-8, mostly printable runes). Binary
+// payloads (images, archives, NUL-padded blobs) are rejected with an error so
+// the caller skips them instead of poisoning the index. Classified digitised
+// PDFs (Scanner-*.ocr.pdf) carry .yaml/.md attachments; some exporters omit the
+// extension, which this covers.
+func textFallback(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	raw, err := io.ReadAll(io.LimitReader(f, 1<<20))
+	if err != nil {
+		return "", err
+	}
+	if !utf8.Valid(raw) {
 		return "", fmt.Errorf("unsupported attachment type %q", Ext(path))
 	}
+	if !mostlyPrintable(raw) {
+		return "", fmt.Errorf("unsupported attachment type %q", Ext(path))
+	}
+	return string(raw), nil
+}
+
+// mostlyPrintable reports whether at least 90% of the runes are printable text
+// (newlines, carriage returns and tabs count as text). Pure, so it is tested.
+func mostlyPrintable(b []byte) bool {
+	if len(b) == 0 {
+		return false
+	}
+	printable, total := 0, 0
+	for _, r := range string(b) {
+		if r == utf8.RuneError {
+			continue
+		}
+		total++
+		if unicode.IsPrint(r) || r == '\n' || r == '\r' || r == '\t' {
+			printable++
+		}
+	}
+	return total > 0 && printable*10 >= total*9
 }
 
 // xmlToText returns the character data of an XML/HTML document: element text
