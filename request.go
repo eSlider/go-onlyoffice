@@ -8,6 +8,7 @@ package onlyoffice
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -49,6 +50,12 @@ func (r Request) GetMethod() string {
 //   - If request.NoAuth is true then no token is fetched — the caller is
 //     responsible for authenticating requests (used internally by Auth()).
 func (c *Client) Query(request Request, result interface{}) error {
+	return DoRetry(context.Background(), DefaultRetryPolicy(), func() error {
+		return c.queryOnce(request, result)
+	})
+}
+
+func (c *Client) queryOnce(request Request, result interface{}) error {
 	url := c.credentials.Url + request.Uri
 
 	if request.Params != nil {
@@ -90,10 +97,17 @@ func (c *Client) Query(request Request, result interface{}) error {
 	}
 	defer resp.Body.Close()
 
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("%s %s: %d %s", request.GetMethod(), request.Uri, resp.StatusCode, truncate(string(raw), 400))
+	}
 	if result == nil {
 		return nil
 	}
-	return json.NewDecoder(resp.Body).Decode(result)
+	return json.Unmarshal(raw, result)
 }
 
 // requestBodyReader normalises Query() body input into an io.Reader.
