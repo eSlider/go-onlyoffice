@@ -13,12 +13,10 @@ import (
 	"strings"
 )
 
-// Provider names for the composed backends. ProviderPG is reserved for the
-// read-only PostgreSQL store (F2 #36); it is not registered until it exists.
-const (
-	ProviderPG = "postgres"
-	ProviderES = "elasticsearch"
-)
+// ProviderES is the composed Elasticsearch searcher. The SQL store owns
+// ProviderPG/ProviderMySQL (file_pg.go); the facade references ProviderPG in
+// readOrder.
+const ProviderES = "elasticsearch"
 
 var (
 	errNoReadBackend  = errors.New("onlyoffice: no file backend registered for reads")

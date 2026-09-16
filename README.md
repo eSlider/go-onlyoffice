@@ -697,6 +697,27 @@ oo search "Rechnung" --json                   # shorthand for -o json
 Requires `ONLYOFFICE_ES_URL` (plus optional `ONLYOFFICE_ES_INDEX`,
 `ONLYOFFICE_TENANT`).
 
+#### PDF/scans: own index (`oo index` + `--backend own`)
+
+The OnlyOffice index covers Office formats only, so PDFs (`S1019`-style invoice
+numbers) are not searchable by content. `oo index` extracts PDF text with
+`internal/docpipe` (pdftotext, OCR for scans) — including the text of embedded
+PDF attachments (`pdfdetach`: `<doc>.md`, `.xml`, covers the original/scan and
+ZUGFeRD e-invoice XML) — into a separate index (`ONLYOFFICE_ES_TEXT_INDEX`,
+default `oo_docs_text`); the OnlyOffice server and its index are **not**
+modified. Then search it with `--backend own`.
+
+```bash
+oo index folder 634 --recursive --exts pdf    # populate (idempotent upsert)
+oo index files 3576 3578                      # specific files
+oo index folder 634 --dry-run                 # plan only
+oo search "S1021" --content --backend own     # finds the PDF
+oo search "Rechnung" --backend own --folder 634 --json
+```
+
+See [`docs/elasticsearch.md`](docs/elasticsearch.md) for the decision and
+trade-offs.
+
 ### Bulk tools (`cmd/`)
 
 Small single-purpose binaries for bulk Documents work. All of them pace
@@ -733,7 +754,8 @@ kontolink IN.xlsx oo-index.tsv OUT.xlsx [FILE_ID] [AMOUNTS_TSV]
 | `docs` | `tools`, `convert`, `optimize`, `ocr`, `hocr`, `as-md`, `put-md`, `put-txt`, `put-xlsx` |
 | `catalog` | `match`, `merge`, `apply`, `scan-contacts`, `scan-projects`, `scan-thunderbird` |
 | `dav` | `ls`, `move`, `copy`, `mkdir`, `rename-file`, `rename-folder`, `download`, `fileops` |
-| `search` | `QUERY` (`--content`, `--folder ID`, `--limit N`, `--json`) |
+| `search` | `QUERY` (`--content`, `--folder ID`, `--limit N`, `--backend oo\|own`, `--json`) |
+| `index` | `folder FOLDER_ID`, `files FILE_ID...` (`--recursive`, `--exts pdf`, `--limit N`, `--dry-run`) |
 
 The CLI reads only `.env` from the current working directory (godotenv is a
 CLI-only concern — the library itself never loads dotfiles).
