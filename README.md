@@ -678,6 +678,25 @@ oo dav download 22881 --to ./copy.pdf # default path: ./<server title>
 oo dav fileops                        # active move/copy operations (status polling)
 ```
 
+### Search (`oo search`)
+
+Full-text search over the Documents index. The REST endpoint
+`/api/2.0/files/@search/{query}` only searches file names in the database, so
+`oo search` talks to the OnlyOffice **Elasticsearch** directly (index
+`files_file`). Name search is default; `--content` also matches extracted
+document text (`document.attachment.content`, Office formats only).
+See [`docs/elasticsearch.md`](docs/elasticsearch.md) for the tunnel setup.
+
+```bash
+oo search "Rechnung"                          # names only
+oo search "Mahngebühr" --content              # names + document text
+oo search "Rechnung" --folder 649 --limit 50
+oo search "Rechnung" --json                   # shorthand for -o json
+```
+
+Requires `ONLYOFFICE_ES_URL` (plus optional `ONLYOFFICE_ES_INDEX`,
+`ONLYOFFICE_TENANT`).
+
 ### Bulk tools (`cmd/`)
 
 Small single-purpose binaries for bulk Documents work. All of them pace
@@ -714,6 +733,7 @@ kontolink IN.xlsx oo-index.tsv OUT.xlsx [FILE_ID] [AMOUNTS_TSV]
 | `docs` | `tools`, `convert`, `optimize`, `ocr`, `hocr`, `as-md`, `put-md`, `put-txt`, `put-xlsx` |
 | `catalog` | `match`, `merge`, `apply`, `scan-contacts`, `scan-projects`, `scan-thunderbird` |
 | `dav` | `ls`, `move`, `copy`, `mkdir`, `rename-file`, `rename-folder`, `download`, `fileops` |
+| `search` | `QUERY` (`--content`, `--folder ID`, `--limit N`, `--json`) |
 
 The CLI reads only `.env` from the current working directory (godotenv is a
 CLI-only concern — the library itself never loads dotfiles).
