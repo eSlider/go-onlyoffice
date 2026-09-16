@@ -22,52 +22,8 @@ import (
 	"time"
 )
 
-// Canonical file/search model (epic #34, F1 #35). Declared here because F1 is
-// not merged yet; move to file_core.go and drop these when it lands. Keep the
-// shape identical to the contract in #35.
-type (
-	// Kind distinguishes a file from a folder.
-	Kind int
-	// Entry is a canonical file/folder record.
-	Entry struct {
-		ID       string
-		ParentID string
-		Title    string
-		Kind     Kind
-		Size     int64
-		MIME     string
-		Created  time.Time
-		Modified time.Time
-		Version  int
-		Provider string
-	}
-	// SearchQuery is a backend-agnostic search request.
-	SearchQuery struct {
-		Text       string
-		InContent  bool
-		FolderID   string
-		Extensions []string
-		Limit      int
-	}
-	// SearchHit is a search result entry plus its relevance data.
-	SearchHit struct {
-		Entry
-		Score     float64
-		Highlight string
-		Path      []string
-	}
-	// Searcher searches a document store by name and optionally content.
-	Searcher interface {
-		Search(ctx context.Context, q SearchQuery) ([]SearchHit, error)
-		Name() string
-	}
-)
-
-// Kind values (epic #34).
-const (
-	File Kind = iota
-	Folder
-)
+// The canonical model (Kind, Entry, SearchQuery, SearchHit, Searcher) lives in
+// file_core.go (F1 #35).
 
 const (
 	defaultESIndex    = "files_file"
