@@ -43,6 +43,11 @@ func (c *Client) Authenticate() error { return c.ensureToken() }
 // cached token is still valid it returns immediately; otherwise it performs
 // a POST to /api/2.0/authentication.json that is cancellable via ctx.
 //
+// Transient answers from the edge (openresty 429/502/503/504) are retried with
+// the same deterministic policy as every other request (see retry.go), because
+// the server rate-limits authentication and the integration suite otherwise
+// fails with a raw HTML 429 page.
+//
 // This is the recommended entry point for long-running syncs (cron,
 // watchers) because it guarantees that a stalled auth call will not block
 // the caller past its deadline.
@@ -50,6 +55,14 @@ func (c *Client) AuthenticateContext(ctx context.Context) error {
 	if c.tokenValid() {
 		return nil
 	}
+	return DoRetry(ctx, DefaultRetryPolicy(), func() error {
+		return c.authenticateOnce(ctx)
+	})
+}
+
+// authenticateOnce performs a single authentication POST. Callers must handle
+// retries; use AuthenticateContext.
+func (c *Client) authenticateOnce(ctx context.Context) error {
 	body, err := json.Marshal(c.credentials)
 	if err != nil {
 		return fmt.Errorf("marshal credentials: %w", err)
@@ -99,17 +112,13 @@ func (c *Client) tokenValid() bool {
 
 // ensureToken refreshes the authentication token when missing or expired.
 // Mirrors the logic inline in Query() but is safe to call from helpers that
-// bypass the typed Request abstraction.
+// bypass the typed Request abstraction. It shares AuthenticateContext so the
+// transient-retry policy applies to every code path.
 func (c *Client) ensureToken() error {
 	if c.tokenValid() {
 		return nil
 	}
-	tok, err := c.Auth(c.credentials)
-	if err != nil {
-		return err
-	}
-	c.token = tok
-	return nil
+	return c.AuthenticateContext(context.Background())
 }
 
 // authHeader returns the value for the Authorization header, ensuring a token.

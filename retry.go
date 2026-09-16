@@ -2,6 +2,7 @@ package onlyoffice
 
 import (
 	"context"
+	"encoding/json"
 	"regexp"
 	"time"
 )
@@ -57,4 +58,17 @@ func DoRetry(ctx context.Context, p RetryPolicy, fn func() error) error {
 		}
 	}
 	return err
+}
+
+// retryRaw runs a transport attempt under the default transient-retry policy
+// and returns its raw payload. All HTTP helpers and Query() go through it, so
+// an openresty 429/502/503/504 is retried exactly like every bulk tool.
+func retryRaw(ctx context.Context, fn func() (json.RawMessage, error)) (json.RawMessage, error) {
+	var raw json.RawMessage
+	err := DoRetry(ctx, DefaultRetryPolicy(), func() error {
+		var e error
+		raw, e = fn()
+		return e
+	})
+	return raw, err
 }
