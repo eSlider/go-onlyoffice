@@ -154,6 +154,9 @@ func findWithinFolderDuplicates(indexed []ProjectFolderFile) []DedupGroup {
 			byKey[k] = append(byKey[k], it.File)
 		}
 		for k, group := range byKey {
+			if k == "" {
+				continue // dotfiles etc. have no stem: never treat as duplicates
+			}
 			if len(group) < 2 {
 				continue
 			}
@@ -178,6 +181,9 @@ func findCrossFolderDuplicates(indexed []ProjectFolderFile) []DedupGroup {
 	}
 	var out []DedupGroup
 	for k, items := range byKey {
+		if k == "" {
+			continue // dotfiles etc. have no stem: never treat as duplicates
+		}
 		if len(items) < 2 {
 			continue
 		}
