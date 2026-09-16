@@ -250,6 +250,36 @@ func TestFileClientMySQLStoreIsPreferredForReads(t *testing.T) {
 	}
 }
 
+// TestFileClientWriteToReadOnlyStore guarantees the facade surfaces ErrReadOnly
+// when the configured write backend is the read-only SQL store.
+func TestFileClientWriteToReadOnlyStore(t *testing.T) {
+	pg := &pgStore{driver: ProviderPG}
+	f := newFacadeTestClient(
+		map[string]FileStore{ProviderREST: &fakeStore{name: ProviderREST}, ProviderPG: pg},
+		[]string{ProviderPG, ProviderREST},
+		[]string{ProviderPG, ProviderREST},
+	)
+	ctx := context.Background()
+	if _, err := f.CreateFolder(ctx, "1", "x"); !errors.Is(err, ErrReadOnly) {
+		t.Errorf("CreateFolder err = %v", err)
+	}
+	if _, err := f.Upload(ctx, "1", "x", strings.NewReader("x")); !errors.Is(err, ErrReadOnly) {
+		t.Errorf("Upload err = %v", err)
+	}
+	if err := f.Move(ctx, []string{"1"}, "2"); !errors.Is(err, ErrReadOnly) {
+		t.Errorf("Move err = %v", err)
+	}
+	if err := f.Copy(ctx, []string{"1"}, "2"); !errors.Is(err, ErrReadOnly) {
+		t.Errorf("Copy err = %v", err)
+	}
+	if err := f.Rename(ctx, "1", "x"); !errors.Is(err, ErrReadOnly) {
+		t.Errorf("Rename err = %v", err)
+	}
+	if err := f.Delete(ctx, []string{"1"}); !errors.Is(err, ErrReadOnly) {
+		t.Errorf("Delete err = %v", err)
+	}
+}
+
 func TestFileClientSearchSelection(t *testing.T) {
 	f := &FileClient{searchers: map[string]Searcher{}, searchOrder: []string{ProviderES}}
 	_, err := f.Search()
