@@ -274,13 +274,19 @@ func parseESSearchResponse(raw []byte) ([]SearchHit, error) {
 		if h.Source.ID == 0 {
 			id = h.ID
 		}
+		// Folders is the ancestor breadcrumb in root → leaf order, so the last
+		// entry is the immediate parent (the previous "first" value was the
+		// project root, which made every result look like it lived in #522).
 		var parent string
 		path := make([]string, 0, len(h.Source.Folders))
-		for i, f := range h.Source.Folders {
-			path = append(path, f.FolderID)
-			if i == 0 {
-				parent = f.FolderID
+		for _, f := range h.Source.Folders {
+			if strings.TrimSpace(f.FolderID) == "" {
+				continue
 			}
+			path = append(path, f.FolderID)
+		}
+		if len(path) > 0 {
+			parent = path[len(path)-1]
 		}
 		hits = append(hits, SearchHit{
 			Entry: Entry{
