@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/eslider/go-onlyoffice/internal/docpipe"
 )
 
 // TestIntegrationESTextIndex verifies the own full-text index end to end
@@ -88,5 +90,69 @@ func TestIntegrationESTextIndex(t *testing.T) {
 		t.Fatalf("Search after delete: %v", err)
 	} else if len(hits) != 0 {
 		t.Errorf("after delete search returned %d hits, want 0", len(hits))
+	}
+}
+
+// TestIntegrationESTextIndexPDFAttachment indexes testdata/pdf-with-attachment.pdf
+// through the real pipeline (TextIndexer + docpipe: pdfdetach + pdftotext) and
+// verifies that text living only in the embedded attachment is searchable.
+//
+// Requires ONLYOFFICE_ES_URL plus poppler (pdfdetach/pdftotext). No OnlyOffice
+// credentials are needed: a fixture FileStore serves the PDF bytes.
+func TestIntegrationESTextIndexPDFAttachment(t *testing.T) {
+	esURL := strings.TrimSpace(os.Getenv("ONLYOFFICE_ES_URL"))
+	if esURL == "" {
+		t.Skip("ONLYOFFICE_ES_URL not set — skipping Elasticsearch integration test")
+	}
+	if docpipe.LookPath().PDFDetach == "" {
+		t.Skip("pdfdetach not on PATH — skipping PDF attachment integration test")
+	}
+	pdf, err := os.ReadFile("testdata/pdf-with-attachment.pdf")
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+
+	stamp := time.Now().UTC().Format("20060102150405")
+	idx, err := NewESTextIndex(ESTextConfig{URL: esURL, Index: "oo_docs_text_it_att_" + stamp})
+	if err != nil {
+		t.Fatalf("NewESTextIndex: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	t.Cleanup(func() {
+		cleanupCtx, done := context.WithTimeout(context.Background(), 30*time.Second)
+		defer done()
+		_, _, _ = idx.do(cleanupCtx, http.MethodDelete, "/"+idx.Index(), nil, "")
+	})
+	if err := idx.Ensure(ctx); err != nil {
+		t.Fatalf("Ensure: %v", err)
+	}
+
+	store := &textFakeStore{files: map[string][]byte{"9001": pdf}}
+	ix := NewTextIndexer(store, idx)
+	res, err := ix.IndexEntries(ctx, []Entry{{ID: "9001", Title: "scan.pdf", ParentID: "777", Kind: File}}, IndexOptions{MinChars: 1})
+	if err != nil {
+		t.Fatalf("IndexEntries: %v", err)
+	}
+	if res.Indexed != 1 || res.Failed != 0 {
+		t.Fatalf("result = %+v, want one indexed doc", res)
+	}
+
+	// Token appears only inside the embedded goo-note.txt attachment.
+	hits, err := idx.Search(ctx, SearchQuery{Text: "gooattachmenttoken"})
+	if err != nil {
+		t.Fatalf("Search attachment token: %v", err)
+	}
+	if len(hits) != 1 || hits[0].ID != "9001" {
+		t.Fatalf("attachment-token hits = %+v, want doc 9001", hits)
+	}
+	if !strings.Contains(hits[0].Highlight, "gooattachmenttoken") {
+		t.Errorf("highlight = %q, want attachment token", hits[0].Highlight)
+	}
+	// Body text is indexed as before.
+	if hits, err := idx.Search(ctx, SearchQuery{Text: "goobodytoken"}); err != nil {
+		t.Fatalf("Search body token: %v", err)
+	} else if len(hits) != 1 {
+		t.Errorf("body-token hits = %d, want 1", len(hits))
 	}
 }

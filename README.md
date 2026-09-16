@@ -701,9 +701,11 @@ Requires `ONLYOFFICE_ES_URL` (plus optional `ONLYOFFICE_ES_INDEX`,
 
 The OnlyOffice index covers Office formats only, so PDFs (`S1019`-style invoice
 numbers) are not searchable by content. `oo index` extracts PDF text with
-`internal/docpipe` (pdftotext, OCR for scans) into a separate index
-(`ONLYOFFICE_ES_TEXT_INDEX`, default `oo_docs_text`); the OnlyOffice server and
-its index are **not** modified. Then search it with `--backend own`.
+`internal/docpipe` (pdftotext, OCR for scans) — including the text of embedded
+PDF attachments (`pdfdetach`: `<doc>.md`, `.xml`, covers the original/scan and
+ZUGFeRD e-invoice XML) — into a separate index (`ONLYOFFICE_ES_TEXT_INDEX`,
+default `oo_docs_text`); the OnlyOffice server and its index are **not**
+modified. Then search it with `--backend own`.
 
 ```bash
 oo index folder 634 --recursive --exts pdf    # populate (idempotent upsert)
