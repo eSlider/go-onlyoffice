@@ -199,5 +199,7 @@ go test ./ -run 'FileStore|Facade|ESText|PG'
 
 ## См. также
 
+- [README.md](README.md) — индекс справочников.
 - [elasticsearch.md](elasticsearch.md) — индекс OnlyOffice и свой `oo_docs_text`.
 - [community-server-db.md](community-server-db.md) — SQL-стор и схема БД.
+- [rclone-webdav.md](rclone-webdav.md) — монтирование Documents как ФС.
