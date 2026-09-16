@@ -243,16 +243,25 @@ func fileopsError(raw json.RawMessage) error {
 func (c *Client) DeleteDavItems(ctx context.Context, folderIDs, fileIDs []string) error {
 	body := map[string]any{"DeleteAfter": true, "Immediately": true}
 	for _, id := range folderIDs {
-		if _, err := c.deleteJSON(ctx, "/api/2.0/files/folder/"+url.PathEscape(id), body); err != nil {
+		if err := c.deleteDavItem(ctx, "/api/2.0/files/folder/"+url.PathEscape(id), body); err != nil {
 			return err
 		}
 	}
 	for _, id := range fileIDs {
-		if _, err := c.deleteJSON(ctx, "/api/2.0/files/file/"+url.PathEscape(id), body); err != nil {
+		if err := c.deleteDavItem(ctx, "/api/2.0/files/file/"+url.PathEscape(id), body); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// deleteDavItem deletes one item, retrying transient 429/502/503/504 answers
+// through DoRetry like every other bulk path (deletes are idempotent).
+func (c *Client) deleteDavItem(ctx context.Context, path string, body any) error {
+	return DoRetry(ctx, DefaultRetryPolicy(), func() error {
+		_, err := c.deleteJSON(ctx, path, body)
+		return err
+	})
 }
 
 // UploadDavFile uploads src (fileName) into folderID, streaming from src.
