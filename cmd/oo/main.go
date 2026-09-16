@@ -18,7 +18,8 @@
 //	oo docs          tools | convert | optimize | ocr | hocr | as-md | put-md | put-txt | put-xlsx
 //	oo catalog       match | merge | apply | scan-contacts | scan-projects | scan-thunderbird
 //	oo dav           ls | move | copy | mkdir | rename-file | rename-folder | download | fileops
-//	oo search        QUERY [--content] [--folder ID] [--limit N] [--json]
+//	oo search        QUERY [--content] [--folder ID] [--limit N] [--backend oo|own] [--json]
+//	oo index         folder FOLDER_ID | files FILE_ID... [--recursive] [--exts pdf] [--dry-run]
 //
 // CRM association rules: docs/crm-associations.md
 //

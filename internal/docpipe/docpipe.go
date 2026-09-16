@@ -5,6 +5,7 @@
 //   - pandoc     — md↔docx
 //   - ocrmypdf   — OCR into a searchable PDF
 //   - pdftotext  — extract text layer
+//   - pdfdetach  — list/save embedded PDF attachments
 //   - tesseract  — OCR single images when ocrmypdf is unsuitable
 //   - ghostscript (gs) — PDF rewrite/optimize via PostScript (pdfwrite)
 package docpipe
@@ -26,6 +27,7 @@ type Tools struct {
 	Pandoc      string
 	OCRMyPDF    string
 	PDFToText   string
+	PDFDetach   string
 	Tesseract   string
 	Ghostscript string
 }
@@ -44,6 +46,7 @@ func LookPath() Tools {
 		Pandoc:      find("pandoc"),
 		OCRMyPDF:    find("ocrmypdf"),
 		PDFToText:   find("pdftotext"),
+		PDFDetach:   find("pdfdetach"),
 		Tesseract:   find("tesseract"),
 		Ghostscript: find("gs", "ghostscript"),
 	}
