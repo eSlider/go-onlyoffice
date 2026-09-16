@@ -108,17 +108,62 @@ type Searcher interface {
 	Name() string
 }
 
-// FileStore returns the adapter for a backend name: ProviderREST (default) or
-// ProviderDAV. Unknown or empty names select the REST backend. The composed
-// facade (backend selection/fallback) lives on FileClient in file_facade.go.
+// FileStore returns the adapter for a backend name: ProviderREST (default),
+// ProviderDAV (alias "webdav") or the read-only SQL store (ProviderPG,
+// ProviderMySQL and the aliases "pg"/"sql"). The SQL store is opened from the
+// environment (ONLYOFFICE_DSN / ONLYOFFICE_PG_*); when it cannot be opened the
+// returned store surfaces that error on every operation instead of returning
+// nil. Use SQLFileStore when the open error itself is needed. Unknown or empty
+// names select the REST backend. The composed facade (backend
+// selection/fallback) lives on FileClient in file_facade.go.
 func (c *Client) FileStore(backend string) FileStore {
 	switch strings.ToLower(strings.TrimSpace(backend)) {
 	case ProviderDAV, "webdav":
 		return &davStore{c: c}
+	case ProviderPG, ProviderMySQL, "pg", "sql":
+		s, err := c.SQLFileStore()
+		if err != nil {
+			return &errStore{name: strings.ToLower(strings.TrimSpace(backend)), err: err}
+		}
+		return s
 	default:
 		return &restStore{c: c}
 	}
 }
+
+// errStore is the FileStore placeholder returned when a backend cannot be
+// opened (for example SQL without a DSN). Every operation returns the recorded
+// error instead of panicking on a nil interface.
+type errStore struct {
+	name string
+	err  error
+}
+
+func (s *errStore) Name() string { return s.name }
+
+func (s *errStore) List(context.Context, string) ([]Entry, error) { return nil, s.err }
+
+func (s *errStore) Stat(context.Context, string) (Entry, error) { return Entry{}, s.err }
+
+func (s *errStore) CreateFolder(context.Context, string, string) (Entry, error) {
+	return Entry{}, s.err
+}
+
+func (s *errStore) Upload(context.Context, string, string, io.Reader) (Entry, error) {
+	return Entry{}, s.err
+}
+
+func (s *errStore) Download(context.Context, string, io.Writer) (int64, error) {
+	return 0, s.err
+}
+
+func (s *errStore) Move(context.Context, []string, string) error { return s.err }
+
+func (s *errStore) Copy(context.Context, []string, string) error { return s.err }
+
+func (s *errStore) Rename(context.Context, string, string) error { return s.err }
+
+func (s *errStore) Delete(context.Context, []string) error { return s.err }
 
 // Files returns the composed file facade. The returned *FileClient implements
 // FileStore, so callers that used Files() as the plain REST store keep working.
