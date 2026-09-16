@@ -13,7 +13,9 @@ require (
 	github.com/emersion/go-vcard v0.0.0-20260618161152-d854b7e0e2d3
 	github.com/eslider/go-hocr v0.2.2-0.20260827163626-8ff01582b002
 	github.com/eslider/go-xls/v2 v2.1.0
+	github.com/go-sql-driver/mysql v1.10.1
 	github.com/google/go-querystring v1.2.0
+	github.com/jackc/pgx/v5 v5.11.0
 	github.com/joho/godotenv v1.5.1
 	github.com/mattn/go-runewidth v0.0.15
 	github.com/muesli/termenv v0.16.0
@@ -24,6 +26,7 @@ require (
 )
 
 require (
+	filippo.io/edwards25519 v1.2.0 // indirect
 	github.com/JohannesKaufmann/dom v0.3.1 // indirect
 	github.com/alecthomas/chroma/v2 v2.14.0 // indirect
 	github.com/atotto/clipboard v0.1.4 // indirect
@@ -36,6 +39,10 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/css v1.0.1 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/jackc/pgpassfile v1.0.0 // indirect
+	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
+	github.com/jackc/puddle/v2 v2.2.2 // indirect
+	github.com/kr/text v0.2.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.4.0 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/mattn/go-localereader v0.0.1 // indirect
@@ -48,6 +55,7 @@ require (
 	github.com/richardlehane/mscfb v1.0.7 // indirect
 	github.com/richardlehane/msoleps v1.0.6 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
+	github.com/rogpeppe/go-internal v1.16.0 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/tiendc/go-deepcopy v1.7.2 // indirect
 	github.com/xuri/efp v0.0.1 // indirect
