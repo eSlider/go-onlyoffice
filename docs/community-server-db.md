@@ -65,14 +65,22 @@ MySQL слушает только `127.0.0.1:3306` внутри VM. Снаруж
 ```bash
 ssh -f -N -o ControlMaster=no -o ControlPath=none \
     -p 32 -i ~/.ssh/id_ed25519 \
-    -L 13306:127.0.0.1:3306 root@127.0.0.1
+    -L 3306:127.0.0.1:3306 root@127.0.0.1
 
 # MySQL DSN затем:
-# root:<pw>@tcp(127.0.0.1:13306)/onlyoffice?parseTime=true
+# root:<pw>@tcp(127.0.0.1:3306)/onlyoffice?parseTime=true
 ```
 
-`-o ControlMaster=no -o ControlPath=none` обязательны: иначе forward уходит в
-persistent master из `~/.ssh/config`.
+Любой свободный локальный порт подойдёт (напр. `13306`); тогда тот же порт —
+в DSN. `-o ControlMaster=no -o ControlPath=none` обязательны: иначе forward
+уходит в persistent master из `~/.ssh/config`.
+
+Креды MySQL — в конфиге Community Server внутри VM:
+`/etc/onlyoffice/communityserver/appsettings.production.json` →
+`ConnectionStrings.connectionString` (поля `User ID`, `Password`), база
+`onlyoffice`. В самом MySQL-контейнере (`onlyoffice-mysql-server`) база пустая;
+рабочий сервер — host-mysqld на `127.0.0.1:3306` (207 таблиц). Не печатать
+пароль.
 
 ## Переменные
 
@@ -84,6 +92,31 @@ persistent master из `~/.ssh/config`.
 | `ONLYOFFICE_PG_HOST/PORT/USER/PASSWORD/DBNAME/SSLMODE` | — | собрать PG DSN, если `ONLYOFFICE_DSN` пуст |
 
 Имена — в [`.env.example`](../.env.example). Секретов нет.
+
+## Использование
+
+Напрямую: `NewPGStore(PGConfigFromEnv())`.
+
+Через фасад (эпик #34): SQL-стор регистрируется на `FileClient`. После этого
+`Read()` и все чтения (`Stat`/`List`) идут в БД, `Write()` остаётся REST/DAV.
+
+```go
+c := onlyoffice.NewClient(onlyoffice.GetEnvironmentCredentials())
+
+sql, err := c.SQLFileStore()            // открыть из env; caller закрывает
+if err != nil { /* нет DSN / нет связи */ }
+if closer, ok := sql.(interface{ Close() error }); ok { defer closer.Close() }
+
+f := c.Files()
+f.RegisterStore(onlyoffice.ProviderPG, sql)
+e, _ := f.Stat(ctx, "19423")            // e.Provider == "mysql" — ответил SQL
+```
+
+`Client.FileStore("pg"|"sql"|"postgres"|"mysql")` тоже отдаёт SQL-стор
+(открывает из env). Если DSN нет/битый — возвращается не `nil`, а заглушка,
+чей метод отдаёт ошибку открытия; ошибку как таковую даёт `SQLFileStore()`.
+Различить бэкенд в ответе можно по `Entry.Provider` (`mysql` у SQL, `rest` у
+REST).
 
 ## Download (MinIO)
 
@@ -100,6 +133,12 @@ shard = (id/1000 + 1) * 1000
 Стриминг переиспользует `downloadMinioObject` из `storage_fallback.go`
 (та же подпись SigV4 и `MINIO_*`), без дублирования.
 
+Ограничение: схема валидна только для файлов, лежащих в **MinIO/S3** (старые
+папки). Файлы в **Disc**-хранилище портала (`Data/Products/Files/...`, новые
+папки) по этому ключу недоступны — `Download` вернёт `404`. Если
+`MINIO_ACCESS_KEY`/`MINIO_SECRET_KEY` не заданы, `Download` вернёт явную
+ошибку; `Stat`/`List`/`Search` работают и без них.
+
 ## Тесты
 
 ```bash
@@ -107,16 +146,26 @@ go test ./...                              # unit: rebind, csObjectKey, мапп
 go test -race ./...
 
 # integration (нужен DSN; skip без него)
-ONLYOFFICE_DSN='root:<pw>@tcp(127.0.0.1:13306)/onlyoffice?parseTime=true' \
+ONLYOFFICE_DSN='root:<pw>@tcp(127.0.0.1:3306)/onlyoffice?parseTime=true' \
 ONLYOFFICE_PG_TENANT=1 \
-ONLYOFFICE_PG_TEST_FILE_ID=22484 \
-ONLYOFFICE_PG_TEST_FOLDER_ID=649 \
+ONLYOFFICE_PG_TEST_FILE_ID=19423 \
+ONLYOFFICE_PG_TEST_FOLDER_ID=676 \
+  go test -tags=integration -run 'TestIntegrationPGStore|TestIntegrationSQLFacade' -v ./...
+
+# плюс MINIO_* для сверки Download с REST (иначе этот шаг skip)
+MINIO_ENDPOINT=http://127.0.0.1:9000 MINIO_BUCKET=office \
 MINIO_ACCESS_KEY=... MINIO_SECRET_KEY=... \
   go test -tags=integration -run TestIntegrationPGStore -v ./...
 ```
 
-Integration сверяет `Stat`/`List`/`Download` с REST (`c.Files()`) и проверяет,
-что write-методы дают `ErrReadOnly`.
+- `TestIntegrationPGStore` — `Stat`/`List`/`Download` SQL против REST и
+  `ErrReadOnly` у write-методов.
+- `TestIntegrationSQLFacade` — SQL-стор, зарегистрированный на фасаде, реально
+  обслуживает чтения: `Read().Name()` = SQL-бэкенд, `Entry.Provider == "mysql"`
+  (у REST — `"rest"`), сверка `Stat`/`List` с REST, и прямой
+  `Client.FileStore("pg")`.
+
+Без `ONLYOFFICE_DSN` оба теста делают чистый `skip`.
 
 ## Грабли
 
