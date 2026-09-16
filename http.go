@@ -144,8 +144,13 @@ func unmarshalResponseObject(raw json.RawMessage) (map[string]any, error) {
 	}
 }
 
-// getJSON issues an authenticated GET and returns the raw response body.
+// getJSON issues an authenticated GET and returns the raw response body,
+// retrying transient answers (see retryRaw).
 func (c *Client) getJSON(ctx context.Context, path string) (json.RawMessage, error) {
+	return retryRaw(ctx, func() (json.RawMessage, error) { return c.getJSONOnce(ctx, path) })
+}
+
+func (c *Client) getJSONOnce(ctx context.Context, path string) (json.RawMessage, error) {
 	auth, err := c.authHeader()
 	if err != nil {
 		return nil, err
@@ -187,6 +192,12 @@ func (c *Client) deleteForm(ctx context.Context, path string, fields url.Values)
 }
 
 func (c *Client) formRequest(ctx context.Context, method, path string, fields url.Values) (json.RawMessage, error) {
+	return retryRaw(ctx, func() (json.RawMessage, error) {
+		return c.formRequestOnce(ctx, method, path, fields)
+	})
+}
+
+func (c *Client) formRequestOnce(ctx context.Context, method, path string, fields url.Values) (json.RawMessage, error) {
 	auth, err := c.authHeader()
 	if err != nil {
 		return nil, err
@@ -215,6 +226,10 @@ func (c *Client) formRequest(ctx context.Context, method, path string, fields ur
 
 // deleteReq issues an authenticated DELETE.
 func (c *Client) deleteReq(ctx context.Context, path string) (json.RawMessage, error) {
+	return retryRaw(ctx, func() (json.RawMessage, error) { return c.deleteReqOnce(ctx, path) })
+}
+
+func (c *Client) deleteReqOnce(ctx context.Context, path string) (json.RawMessage, error) {
 	auth, err := c.authHeader()
 	if err != nil {
 		return nil, err
@@ -260,6 +275,10 @@ func (c *Client) postJSONObject(ctx context.Context, path string, body any) (map
 
 // postJSON issues an authenticated POST with application/json body.
 func (c *Client) postJSON(ctx context.Context, path string, body any) (json.RawMessage, error) {
+	return retryRaw(ctx, func() (json.RawMessage, error) { return c.postJSONOnce(ctx, path, body) })
+}
+
+func (c *Client) postJSONOnce(ctx context.Context, path string, body any) (json.RawMessage, error) {
 	auth, err := c.authHeader()
 	if err != nil {
 		return nil, err
@@ -303,6 +322,10 @@ func (c *Client) postJSON(ctx context.Context, path string, body any) (json.RawM
 
 // putJSON issues an authenticated PUT with application/json body.
 func (c *Client) putJSON(ctx context.Context, path string, body any) (json.RawMessage, error) {
+	return retryRaw(ctx, func() (json.RawMessage, error) { return c.putJSONOnce(ctx, path, body) })
+}
+
+func (c *Client) putJSONOnce(ctx context.Context, path string, body any) (json.RawMessage, error) {
 	auth, err := c.authHeader()
 	if err != nil {
 		return nil, err
@@ -352,8 +375,15 @@ func (c *Client) uploadMultipart(ctx context.Context, path, fieldName, filePath 
 // uploadMultipartMethod sends a single-file multipart request with the given
 // HTTP method. The OnlyOffice Documents API needs PUT for /update (a new
 // version) and POST for /upload (a new file); sending POST to /update answers
-// 500 on current servers.
+// 500 on current servers. The file is re-opened per attempt, so transient
+// answers are retried like every other request.
 func (c *Client) uploadMultipartMethod(ctx context.Context, method, path, fieldName, filePath string) (json.RawMessage, error) {
+	return retryRaw(ctx, func() (json.RawMessage, error) {
+		return c.uploadMultipartOnce(ctx, method, path, fieldName, filePath)
+	})
+}
+
+func (c *Client) uploadMultipartOnce(ctx context.Context, method, path, fieldName, filePath string) (json.RawMessage, error) {
 	auth, err := c.authHeader()
 	if err != nil {
 		return nil, err
