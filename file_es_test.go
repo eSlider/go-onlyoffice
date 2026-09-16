@@ -183,8 +183,9 @@ func TestParseESSearchResponse(t *testing.T) {
 	if h0.ID != "2395" || h0.Title != "Rechnung-4711.pdf" || h0.Kind != File {
 		t.Errorf("hit0 entry = %+v", h0.Entry)
 	}
-	if h0.ParentID != "438" || !reflect.DeepEqual(h0.Path, []string{"438", "11"}) {
-		t.Errorf("hit0 path = %v parent = %q", h0.Path, h0.ParentID)
+	// folders is root → leaf; the immediate parent is the last entry.
+	if h0.ParentID != "11" || !reflect.DeepEqual(h0.Path, []string{"438", "11"}) {
+		t.Errorf("hit0 path = %v parent = %q, want parent 11", h0.Path, h0.ParentID)
 	}
 	if h0.Score != 7.31 {
 		t.Errorf("hit0 score = %v", h0.Score)

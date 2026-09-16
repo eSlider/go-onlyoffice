@@ -71,7 +71,12 @@ func searchCmd() *cobra.Command {
 			}
 			rows := make([]map[string]any, 0, len(hits))
 			for _, h := range hits {
+				folderPath := h.Path
+				if len(folderPath) == 0 && h.ParentID != "" {
+					folderPath = []string{h.ParentID}
+				}
 				rows = append(rows, map[string]any{
+					"path":      c.UniquePath(cmd.Context(), folderPath, h.Title),
 					"id":        h.ID,
 					"title":     h.Title,
 					"folder":    h.ParentID,
@@ -83,7 +88,7 @@ func searchCmd() *cobra.Command {
 				printJSON(rows)
 				return nil
 			}
-			printTable([]string{"id", "title", "folder", "score", "highlight"}, rows)
+			printTable([]string{"path", "id", "title", "folder", "score", "highlight"}, rows)
 			return nil
 		},
 	}

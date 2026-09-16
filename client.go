@@ -14,6 +14,7 @@ import (
 	"net/http/cookiejar"
 	"os"
 	"strings"
+	"sync"
 )
 
 // Client of OnlyOffice API uses credentials to get a token and query the API
@@ -32,6 +33,9 @@ type Client struct {
 	defaults  Defaults // optional fallbacks for calendar/project IDs
 	selfID    string   // cached /api/2.0/people/@self id
 	noteCatID int      // cached CRM history category id for "note"
+
+	folderTitles   map[string]string // cached Documents folder id -> title (F9)
+	folderTitlesMu sync.Mutex
 }
 
 // NewClient returns a new Client backed by http.DefaultClient.
