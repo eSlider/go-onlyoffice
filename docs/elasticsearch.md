@@ -83,6 +83,11 @@ oo search "Rechnung" --folder 649 --limit 50 --json
 `folders.folderId`), `--limit N` (по умолчанию 20, максимум 200),
 `--json` = `-o json`.
 
+## Обновление индекса и карта поиска
+
+Обзор всех контуров поиска и как обновлять индексы (`oo index`,
+`ooscan`/`pdfamount` для match) — [index-and-search.md](index-and-search.md).
+
 ## Библиотека
 
 `file_es.go` — `ESSearcher` (`Name() = "elasticsearch"`), прямой ES REST на
