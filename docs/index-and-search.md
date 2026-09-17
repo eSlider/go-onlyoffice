@@ -17,7 +17,7 @@ related:
 | REST `@search` | только имена в БД | нет | — (живой запрос) | `oo search` (по умолчанию `--backend oo`) |
 | ES `files_file` | имя + текст Office | Elasticsearch портала | сервер, асинхронно | `oo search --content` |
 | ES `oo_docs_text` | PDF/сканы (свой) | Elasticsearch портала | `oo index` | `oo search --backend own` |
-| TSV `ooscan` | файлы папок (для match) | файл `*.tsv` | `ooscan <folder...>` | `match -index` |
+| TSV `ooscan` | файлы папок | файл `*.tsv` | `ooscan <folder...>` | потребитель (не библиотека) |
 
 ## Карта кода
 
@@ -81,30 +81,24 @@ oo index folder 649 --recursive --dry-run
   не индексируй корень целиком.
 - Индексация PDF в `files_file` не делается — только `oo_docs_text`.
 
-## Индекс для match (`ooscan` → TSV)
+## Bulk-инструменты `ooscan` / `pdfamount`
 
-`cmd/match` (office-assistant) не использует ES: он читает плоский TSV
-`file_id\tfolder_id\tpath\ttitle` и опционально суммы
-`file_id\ttitle\tamount`.
+Плоский TSV без Elasticsearch, для внешних потребителей.
 
 ```bash
-# TSV-индекс: рекурсивный обход папок (троттлинг 350 мс на папку, retry на 429)
-ooscan 647 666 > /tmp/oo-index.tsv
-# суммы по папке (напр. O2, id 671)
-pdfamount 671 > /tmp/o2-amounts.tsv
-# сверка (office-assistant)
-match -xlsx liste.xlsx -index /tmp/oo-index.tsv -amounts /tmp/o2-amounts.tsv \
-      -url-base https://office.pro-dukt.de
+# рекурсивный индекс папок: file_id, folder_id, path, title
+ooscan <FOLDER_ID>... > index.tsv
+# суммы по PDF папки: file_id, title, amount
+pdfamount <FOLDER_ID> [TITLE_FILTER] > amounts.tsv
 ```
 
-- `ooscan` печатает `file_id, folder_id, path, title`; `path` — путь внутри
-  просканированной папки (для подсказок и `gesendet`).
-- Обновление — просто повторить `ooscan` по нужным корням; выход перезаписывается.
-- Папки-источники задаёт потребитель (match): входные счета — корни
-  `Eingangsrechnungen` (#647) и `external` (#666); суммы — папка провайдера.
-- Полный обход большого дерева — минуты; сканируй только нужные корни.
-- У `pdfamount` строка с `%`/`MwSt`/`USt`/`Prozent`/`Steuer` суммой не считается;
+- `ooscan`: троттлинг 350 мс на папку, `DoRetry` на 429, глубина до 8, `path` —
+  путь внутри просканированного корня.
+- `pdfamount`: строка с `%`/`MwSt`/`USt`/`Prozent`/`Steuer` суммой не считается;
   приоритет меток (`zu zahlender betrag` > `rechnungsbetrag` > … > `summe`).
+- Какие корни сканировать и как обновлять индекс — решает потребитель; это не
+  часть библиотеки. Сверка Excel — `office-assistant` (`cmd/match`,
+  `docs/reference/match-index.md`).
 
 ## Грабли
 
