@@ -150,7 +150,7 @@ func (c *Client) downloadFileEntry(ctx context.Context, f *FileEntry, dst io.Wri
 			}
 			return 0, fmt.Errorf("GET viewUrl: %d (stale S3) and minio fallback: %w", resp.StatusCode, merr)
 		}
-		return 0, fmt.Errorf("GET viewUrl: %d %s", resp.StatusCode, truncate(string(b), 400))
+		return 0, statusError(resp.StatusCode, retryAfterOf(resp), "GET viewUrl: %d %s", resp.StatusCode, truncate(string(b), 400))
 	}
 	return io.Copy(dst, resp.Body)
 }
