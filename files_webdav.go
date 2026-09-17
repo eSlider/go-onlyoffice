@@ -325,7 +325,7 @@ func (c *Client) deleteJSON(ctx context.Context, path string, body any) (json.Ra
 		return nil, err
 	}
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("DELETE %s: %d %s", path, resp.StatusCode, truncate(string(raw), 400))
+		return nil, statusError(resp.StatusCode, retryAfterOf(resp), "DELETE %s: %d %s", path, resp.StatusCode, truncate(string(raw), 400))
 	}
 	return raw, nil
 }
@@ -365,7 +365,7 @@ func (c *Client) uploadReader(ctx context.Context, path, fieldName, fileName str
 		return nil, err
 	}
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("upload %s: %d %s", path, resp.StatusCode, truncate(string(raw), 400))
+		return nil, statusError(resp.StatusCode, retryAfterOf(resp), "upload %s: %d %s", path, resp.StatusCode, truncate(string(raw), 400))
 	}
 	return raw, nil
 }

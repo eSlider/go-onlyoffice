@@ -83,7 +83,7 @@ func (c *Client) authenticateOnce(ctx context.Context) error {
 		return err
 	}
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("auth: %d %s", resp.StatusCode, truncate(string(raw), 400))
+		return statusError(resp.StatusCode, retryAfterOf(resp), "auth: %d %s", resp.StatusCode, truncate(string(raw), 400))
 	}
 	var env struct {
 		Response *Token `json:"response"`
