@@ -125,7 +125,7 @@ func (c *Client) DownloadMailAttachment(ctx context.Context, attachmentID string
 		return nil, err
 	}
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("DownloadMailAttachment %s: %d %s", id, resp.StatusCode, truncate(string(raw), 400))
+		return nil, statusError(resp.StatusCode, retryAfterOf(resp), "DownloadMailAttachment %s: %d %s", id, resp.StatusCode, truncate(string(raw), 400))
 	}
 	return raw, nil
 }
