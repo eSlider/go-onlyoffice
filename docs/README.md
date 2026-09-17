@@ -22,6 +22,9 @@ related:
 - [rclone-webdav.md](rclone-webdav.md) — rclone-монтирование Documents
   (`deploy/docker-compose.rclone-webdav.yml`), smoke, ограничения.
 - [crm-associations.md](crm-associations.md) — правила ассоциаций CRM.
+- [rate-limiting.md](rate-limiting.md) — rate limit, exponential backoff,
+  `Retry-After`, общий cooldown против 429; env `OO_RATE_LIMIT`/`OO_BURST`/
+  `OO_RETRY_*`.
 
 ## Тесты
 Команды и туннели — раздел Testing в [README.md](../README.md#testing).
