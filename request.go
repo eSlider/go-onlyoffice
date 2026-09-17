@@ -102,7 +102,7 @@ func (c *Client) queryOnce(request Request, result interface{}) error {
 		return err
 	}
 	if resp.StatusCode >= 400 {
-		return fmt.Errorf("%s %s: %d %s", request.GetMethod(), request.Uri, resp.StatusCode, truncate(string(raw), 400))
+		return statusError(resp.StatusCode, retryAfterOf(resp), "%s %s: %d %s", request.GetMethod(), request.Uri, resp.StatusCode, truncate(string(raw), 400))
 	}
 	if result == nil {
 		return nil

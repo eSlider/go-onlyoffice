@@ -38,11 +38,15 @@ type Client struct {
 	folderTitlesMu sync.Mutex
 }
 
-// NewClient returns a new Client backed by http.DefaultClient.
+// NewClient returns a new Client whose transport is paced by the process-wide
+// rate limiter and 429 cooldown gate (OO_RATE_LIMIT/OO_BURST; see ratelimit.go).
 func NewClient(c Credentials) *Client {
 	jar, _ := cookiejar.New(nil)
 	return &Client{
-		client:      &http.Client{Jar: jar},
+		client: &http.Client{
+			Jar:       jar,
+			Transport: &pacedTransport{base: http.DefaultTransport},
+		},
 		credentials: &c,
 	}
 }

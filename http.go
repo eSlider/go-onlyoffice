@@ -171,7 +171,7 @@ func (c *Client) getJSONOnce(ctx context.Context, path string) (json.RawMessage,
 		return nil, err
 	}
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("GET %s: %d %s", path, resp.StatusCode, truncate(string(raw), 400))
+		return nil, statusError(resp.StatusCode, retryAfterOf(resp), "GET %s: %d %s", path, resp.StatusCode, truncate(string(raw), 400))
 	}
 	return raw, nil
 }
@@ -219,7 +219,7 @@ func (c *Client) formRequestOnce(ctx context.Context, method, path string, field
 		return nil, err
 	}
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("%s form %s: %d %s", method, path, resp.StatusCode, truncate(string(raw), 400))
+		return nil, statusError(resp.StatusCode, retryAfterOf(resp), "%s form %s: %d %s", method, path, resp.StatusCode, truncate(string(raw), 400))
 	}
 	return raw, nil
 }
@@ -250,7 +250,7 @@ func (c *Client) deleteReqOnce(ctx context.Context, path string) (json.RawMessag
 		return nil, err
 	}
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("DELETE %s: %d %s", path, resp.StatusCode, truncate(string(raw), 400))
+		return nil, statusError(resp.StatusCode, retryAfterOf(resp), "DELETE %s: %d %s", path, resp.StatusCode, truncate(string(raw), 400))
 	}
 	return raw, nil
 }
@@ -315,7 +315,7 @@ func (c *Client) postJSONOnce(ctx context.Context, path string, body any) (json.
 		return nil, err
 	}
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("POST JSON %s: %d %s", path, resp.StatusCode, truncate(string(raw), 400))
+		return nil, statusError(resp.StatusCode, retryAfterOf(resp), "POST JSON %s: %d %s", path, resp.StatusCode, truncate(string(raw), 400))
 	}
 	return raw, nil
 }
@@ -362,7 +362,7 @@ func (c *Client) putJSONOnce(ctx context.Context, path string, body any) (json.R
 		return nil, err
 	}
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("PUT JSON %s: %d %s", path, resp.StatusCode, truncate(string(raw), 400))
+		return nil, statusError(resp.StatusCode, retryAfterOf(resp), "PUT JSON %s: %d %s", path, resp.StatusCode, truncate(string(raw), 400))
 	}
 	return raw, nil
 }
@@ -423,7 +423,7 @@ func (c *Client) uploadMultipartOnce(ctx context.Context, method, path, fieldNam
 		return nil, err
 	}
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("upload %s: %d %s", path, resp.StatusCode, truncate(string(raw), 400))
+		return nil, statusError(resp.StatusCode, retryAfterOf(resp), "upload %s: %d %s", path, resp.StatusCode, truncate(string(raw), 400))
 	}
 	return raw, nil
 }
