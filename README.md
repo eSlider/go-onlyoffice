@@ -522,9 +522,9 @@ type Task struct {
 | `ListFileOps(ctx)` | Active file operations (move/copy status polling) |
 | `FolderFiles(ctx, folderID)` | Flat file list of a folder (stem helpers) |
 | `DeleteFilesByStem(ctx, folderID, stem)` | Remove `stem\|ext` copies |
-| `DoRetry(ctx, policy, fn)` | Deterministic linear backoff (N·Base, no jitter) on 429/502/503/504 |
-| `DefaultRetryPolicy()` | 5 attempts, 1s·2s·3s·4s waits, 30s cap |
-| `Transient(err)` | True for retriable OnlyOffice answers |
+| `DoRetry(ctx, policy, fn)` | Deterministic exponential backoff (`Base·2^(N-1)`, no jitter) on 429/502/503/504; honours `Retry-After` and the process-wide cooldown gate |
+| `DefaultRetryPolicy()` | From env: 7 attempts, 2s base, 2m cap (`OO_RETRY_ATTEMPTS/_BASE/_MAX`) |
+| `Transient(err)` | True for retriable OnlyOffice answers (`*TransientError` or HTTP 429/502/503/504 text) |
 
 ### Helper Types
 
@@ -732,9 +732,12 @@ fallback rules, env names and how to add a backend:
 ### Bulk tools (`cmd/`)
 
 Small single-purpose binaries for bulk Documents work. All of them pace
-requests and retry transient OnlyOffice answers (429/502/503/504) with a
-deterministic linear backoff — no jitter, same waits on every run
-(see `DoRetry` below). Build with `go build ./cmd/<tool>`.
+requests through a process-wide token bucket (default ~4 req/s, `OO_RATE_LIMIT`/
+`OO_BURST`) and retry transient OnlyOffice answers (429/502/503/504) with a
+deterministic exponential backoff — no jitter, same waits on every run. A 429
+opens a shared cooldown gate and `Retry-After` is honoured (see `DoRetry` and
+[`docs/rate-limiting.md`](docs/rate-limiting.md)). Build with
+`go build ./cmd/<tool>`.
 
 ```bash
 ooscan 659                             # recursive index → TSV: file_id, folder_id, path, title
@@ -999,6 +1002,11 @@ oo projects files list 33
 | `ONLYOFFICE_CALENDAR_ID` | Default calendar id used when omitted (default `1`) |
 | `ONLYOFFICE_PROJECT_ID` | Default project id used when omitted (default `33`) |
 | `OO_URL`, `OO_USER`, `OO_PASS` | Optional CLI-only aliases for `ONLYOFFICE_*` |
+| `OO_RATE_LIMIT` | Process-wide request pacing, req/s (default `4`; `0` disables) |
+| `OO_BURST` | Token-bucket burst (default `1`) |
+| `OO_RETRY_ATTEMPTS` | Transient retries, total attempts (default `7`) |
+| `OO_RETRY_BASE` | Exponential backoff base (default `2s`) |
+| `OO_RETRY_MAX` | Backoff cap (default `2m`) |
 | `ONLYOFFICE_ES_URL` | Elasticsearch base URL (`oo search`, own index); see [`docs/elasticsearch.md`](docs/elasticsearch.md) |
 | `ONLYOFFICE_ES_INDEX` | OnlyOffice index (default `files_file`) |
 | `ONLYOFFICE_ES_TEXT_INDEX` | Own PDF/scan index (default `oo_docs_text`) |

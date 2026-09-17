@@ -6,6 +6,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+
+### Features
+
+* **retry:** global token-bucket rate limit (`OO_RATE_LIMIT`/`OO_BURST`), typed
+  `TransientError` with `Retry-After`, exponential backoff
+  (`OO_RETRY_ATTEMPTS`/`_BASE`/`_MAX`) and a process-wide 429 cooldown gate.
+  All HTTP paths are paced via `pacedTransport`.
+
 ## [0.18.0](https://github.com/eSlider/go-onlyoffice/compare/v0.17.0...v0.18.0) (2026-09-04)
 
 
