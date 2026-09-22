@@ -12,25 +12,38 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Address is one postal address of a catalog row. Category is the OO
+// AddressCategory label (Home|Postal|Office|Billing|Other|Work).
+type Address struct {
+	Street   string `yaml:"street,omitempty"`
+	City     string `yaml:"city,omitempty"`
+	State    string `yaml:"state,omitempty"`
+	Zip      string `yaml:"zip,omitempty"`
+	Country  string `yaml:"country,omitempty"`
+	Category string `yaml:"category,omitempty"`
+	Primary  bool   `yaml:"primary,omitempty"`
+}
+
 // Entry is one catalog row (person or company).
 type Entry struct {
-	ID      string   `yaml:"id"`
-	Kind    string   `yaml:"kind"` // person | company
-	Name    string   `yaml:"name,omitempty"`
-	First   string   `yaml:"first,omitempty"`
-	Last    string   `yaml:"last,omitempty"`
-	Emails  []string `yaml:"emails,omitempty"`
-	Phones  []string `yaml:"phones,omitempty"`
-	Org     string   `yaml:"org,omitempty"`
-	Sources []string `yaml:"sources,omitempty"`
-	Zone    string   `yaml:"zone"`
-	Role    string   `yaml:"role"`
-	OOID    string   `yaml:"oo_id,omitempty"`
-	Approve bool     `yaml:"approve"`
-	Status  string   `yaml:"status,omitempty"` // new | exists | conflict | applied | skipped
-	Notes   string   `yaml:"notes,omitempty"`
-	Remote  string   `yaml:"remote,omitempty"`
-	GitRoot string   `yaml:"git_root,omitempty"`
+	ID        string    `yaml:"id"`
+	Kind      string    `yaml:"kind"` // person | company
+	Name      string    `yaml:"name,omitempty"`
+	First     string    `yaml:"first,omitempty"`
+	Last      string    `yaml:"last,omitempty"`
+	Emails    []string  `yaml:"emails,omitempty"`
+	Phones    []string  `yaml:"phones,omitempty"`
+	Addresses []Address `yaml:"addresses,omitempty"`
+	Org       string    `yaml:"org,omitempty"`
+	Sources   []string  `yaml:"sources,omitempty"`
+	Zone      string    `yaml:"zone"`
+	Role      string    `yaml:"role"`
+	OOID      string    `yaml:"oo_id,omitempty"`
+	Approve   bool      `yaml:"approve"`
+	Status    string    `yaml:"status,omitempty"` // new | exists | conflict | applied | skipped
+	Notes     string    `yaml:"notes,omitempty"`
+	Remote    string    `yaml:"remote,omitempty"`
+	GitRoot   string    `yaml:"git_root,omitempty"`
 }
 
 // Document is the on-disk catalog file.
@@ -136,6 +149,7 @@ func mergeEntry(dst, src *Entry) {
 	dst.Sources = uniqueStrings(append(dst.Sources, src.Sources...))
 	dst.Emails = uniqueEmails(append(dst.Emails, src.Emails...))
 	dst.Phones = uniqueStrings(append(dst.Phones, src.Phones...))
+	dst.Addresses = mergeAddresses(dst.Addresses, src.Addresses)
 	if dst.First == "" {
 		dst.First = src.First
 	}
@@ -174,6 +188,25 @@ func mergeEntry(dst, src *Entry) {
 	if dst.Status == "" {
 		dst.Status = src.Status
 	}
+}
+
+// mergeAddresses appends src addresses not already present (by street/city/zip).
+func mergeAddresses(dst, src []Address) []Address {
+	for _, a := range src {
+		exists := false
+		for _, b := range dst {
+			if strings.EqualFold(strings.TrimSpace(a.Street), strings.TrimSpace(b.Street)) &&
+				strings.EqualFold(strings.TrimSpace(a.City), strings.TrimSpace(b.City)) &&
+				strings.EqualFold(strings.TrimSpace(a.Zip), strings.TrimSpace(b.Zip)) {
+				exists = true
+				break
+			}
+		}
+		if !exists {
+			dst = append(dst, a)
+		}
+	}
+	return dst
 }
 
 func uniqueEmails(in []string) []string {
