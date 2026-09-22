@@ -2,16 +2,15 @@ package onlyoffice
 
 // Deep links to OnlyOffice portal objects.
 //
-// Where this is used: third-party-facing document packs (e.g. the arc-1
-// office.produktor.io "Lisbon apartment" project) embed per-file links of the
-// form /Products/Files/DocEditor.aspx?fileid=<id> in a cover document and in
-// chat messages. Those links must be generated consistently so they match the
-// file ids returned by `oo projects files list` / `oo link`.
+// Used by tools that embed per-file links of the form
+// /Products/Files/DocEditor.aspx?fileid=<id> in a cover document or a chat
+// message. Those links must be consistent so they match the file ids returned
+// by `oo projects files list` / `oo link`.
 //
-// Caveat proven on the arc-1 portal: file ids are server-assigned and a
-// re-upload/delete yields a NEW id, so an already-shared link can go stale.
-// Use `oo projects files replace-in` (keep the id clean) and, if a legacy link
-// must keep working, an nginx alias can 302 the old fileid to the new one.
+// Caveat: file ids are server-assigned and a re-upload/delete yields a NEW id,
+// so an already-shared link can go stale. Use `oo projects files replace-in`
+// (keeps the id stable) and, if a legacy link must keep working, an nginx alias
+// can 302 the old fileid to the new one.
 
 import (
 	"fmt"

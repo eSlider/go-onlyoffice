@@ -5,7 +5,7 @@ import "testing"
 func TestFileEditorURL(t *testing.T) {
 	cases := []struct{ base, id, want string }{
 		{"https://office.example.com", "3651", "https://office.example.com/Products/Files/DocEditor.aspx?fileid=3651"},
-		{"https://office.example.com/", " 3687 ", "https://office.example.com/Products/Files/DocEditor.aspx?fileid=3687"},
+		{"https://office.example.com/", " 1234 ", "https://office.example.com/Products/Files/DocEditor.aspx?fileid=1234"},
 		{"http://localhost:8087", "a/b", "http://localhost:8087/Products/Files/DocEditor.aspx?fileid=a%2Fb"},
 	}
 	for _, c := range cases {

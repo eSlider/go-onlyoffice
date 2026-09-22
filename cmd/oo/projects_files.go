@@ -159,9 +159,8 @@ func prjFilesReplaceInCmd() *cobra.Command {
 delete is permanent) and uploads the local file fresh. Unlike 'update' this
 leaves a single clean version.
 
-Why it exists: on the arc-1 portal, repeated 'update' of a shared document
-(the apartment "Info" cover and the Edelweiss contract) accumulated a visible
-version history and a stale id. replace-in yields one clean revision; then
+Why it exists: repeated 'update' of a shared document accumulated a visible
+version history and left a stale id. replace-in yields one clean revision; then
 point links at the returned id (or keep an nginx alias for the legacy fileid).
 
 Note: file ids are server-assigned; a fresh upload gets a new id.`,
