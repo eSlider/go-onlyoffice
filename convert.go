@@ -4,7 +4,7 @@ package onlyoffice
 //
 // The DocumentServer (the same engine behind the portal's "Download as PDF")
 // converts any office format. From a portal-reachable host the converter is
-// exposed at "<portal>/ds-vpath/converter" (nginx proxy) or directly at
+// exposed at "<portal>/ds-vpath/converter" (reverse proxy) or directly at
 // "http://<docs-server>:8083/converter" (legacy path: /ConvertService.ashx).
 //
 // Flow: PresignedURI(fileId) → Convert(docsBase, secret, req) → download
