@@ -9,6 +9,11 @@ func init() {
 	rootCmd.AddCommand(linkCmd())
 }
 
+// linkCmd prints deep links for file ids. Used to build the third-party
+// document packs (e.g. the internal "example-city apartment" Info cover embeds links to
+// passports, contracts and the income documents). File ids come from
+// `oo projects files list` / `oo dav ls`; `oo projects files replace-in` keeps
+// them clean when a document is re-uploaded.
 func linkCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "link FILE_ID [FILE_ID...]",

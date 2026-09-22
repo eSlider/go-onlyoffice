@@ -103,8 +103,10 @@ func (c *Client) authenticateOnce(ctx context.Context) error {
 // token, and the portal error otherwise.
 //
 // OnlyOffice accepts either the userName or the account email as the login. On
-// some portals the userName login fails while the email works — use this probe
-// to tell them apart before sharing credentials.
+// the internal portal (office.example.com) the account userName login returns
+// HTTP 500 "User authentication failed" while the account email succeeds —
+// confirmed for a freshly created guest user. Use this probe before sharing
+// credentials (see `oo users check`), and prefer the email as the login.
 func (c *Client) AuthenticateAs(ctx context.Context, login, password string) error {
 	body, err := json.Marshal(Credentials{User: login, Password: password})
 	if err != nil {
