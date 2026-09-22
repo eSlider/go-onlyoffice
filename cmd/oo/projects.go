@@ -24,6 +24,7 @@ func init() {
 	projectsCmd.AddCommand(prjGetCmd())
 	projectsCmd.AddCommand(prjMilestonesCmd())
 	projectsCmd.AddCommand(prjMilestoneCreateCmd())
+	projectsCmd.AddCommand(prjMilestoneDeleteCmd())
 	projectsCmd.AddCommand(prjCreateCmd())
 	projectsCmd.AddCommand(prjUpdateCmd())
 	projectsCmd.AddCommand(prjDeleteCmd())
@@ -295,6 +296,32 @@ func prjMilestoneCreateCmd() *cobra.Command {
 	cmd.Flags().StringVar(&desc, "description", "", "description")
 	cmd.Flags().BoolVar(&key, "key", false, "mark as key milestone")
 	return cmd
+}
+
+func prjMilestoneDeleteCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:     "milestone-delete MILESTONE_ID [MILESTONE_ID...]",
+		Aliases: []string{"milestone-rm"},
+		Short:   "Delete project milestone(s) by id",
+		Args:    cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			for _, raw := range args {
+				id, err := strconv.ParseInt(raw, 10, 64)
+				if err != nil {
+					return fmt.Errorf("milestone id %q must be integer: %w", raw, err)
+				}
+				if err := c.DeleteMilestone(id); err != nil {
+					return fmt.Errorf("delete milestone %d: %w", id, err)
+				}
+				printObject(map[string]any{"milestone_id": id, "deleted": true})
+			}
+			return nil
+		},
+	}
 }
 
 func prjCreateCmd() *cobra.Command {

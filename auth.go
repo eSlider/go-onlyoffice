@@ -98,6 +98,50 @@ func (c *Client) authenticateOnce(ctx context.Context) error {
 	return nil
 }
 
+// AuthenticateAs verifies a login/password pair against the portal WITHOUT
+// mutating the client's cached token. It returns nil when the portal issues a
+// token, and the portal error otherwise.
+//
+// OnlyOffice accepts either the userName or the account email as the login. On
+// some portals the account userName login returns HTTP 500 "User authentication
+// failed" while the account email succeeds — confirmed for a freshly created
+// guest user. Use this probe before sharing credentials (see `oo users check`),
+// and prefer the email as the login.
+func (c *Client) AuthenticateAs(ctx context.Context, login, password string) error {
+	body, err := json.Marshal(Credentials{User: login, Password: password})
+	if err != nil {
+		return fmt.Errorf("marshal credentials: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL()+"/api/2.0/authentication.json", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("auth request: %w", err)
+	}
+	defer resp.Body.Close()
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("auth: %d %s", resp.StatusCode, truncate(string(raw), 400))
+	}
+	var env struct {
+		Response *Token `json:"response"`
+	}
+	if err := json.Unmarshal(raw, &env); err != nil {
+		return fmt.Errorf("auth decode: %w", err)
+	}
+	if env.Response == nil || env.Response.Value == "" {
+		return fmt.Errorf("auth: empty token in response")
+	}
+	return nil
+}
+
 // InvalidateToken clears the cached authentication token. The next request
 // (or call to Authenticate / AuthenticateContext) will re-authenticate.
 //
