@@ -322,10 +322,10 @@ func usersCheckCmd() *cobra.Command {
 discards the token.
 
 Where this is used: before handing portal credentials to an external party
-(e.g. a landlord given read access to the apartment document pack), verify the
-login actually works. On the internal portal the account email is the reliable
-login identifier — the userName login fails with 500 for a freshly created
-user, so share the email, not the userName.`,
+(e.g. a guest given read access to a document pack), verify the login actually
+works. On some portals the account email is the reliable login identifier — the
+userName login fails with 500 for a freshly created user — so share the email,
+not the userName.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if login == "" {
 				return fmt.Errorf("--login is required (userName or email)")

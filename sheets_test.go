@@ -17,7 +17,7 @@ func TestWorkbookSheetExport(t *testing.T) {
 	_ = f.SetCellValue("first", "B2", 30)
 	_, _ = f.NewSheet("second")
 	_ = f.SetCellValue("second", "A1", "city")
-	_ = f.SetCellValue("second", "A2", "example-city")
+	_ = f.SetCellValue("second", "A2", "Berlin")
 	var buf bytes.Buffer
 	if err := f.Write(&buf); err != nil {
 		t.Fatal(err)
@@ -34,7 +34,7 @@ func TestWorkbookSheetExport(t *testing.T) {
 		t.Fatalf("sheet0 csv=%q err=%v", csv0, err)
 	}
 	csv1, err := WorkbookSheetCSV(data, 1, 0)
-	if err != nil || !strings.Contains(csv1, "example-city") || strings.Contains(csv1, "Alice") {
+	if err != nil || !strings.Contains(csv1, "Berlin") || strings.Contains(csv1, "Alice") {
 		t.Fatalf("sheet1 csv=%q err=%v", csv1, err)
 	}
 	// negative index = first sheet
@@ -44,7 +44,7 @@ func TestWorkbookSheetExport(t *testing.T) {
 	}
 
 	js, err := WorkbookSheetJSON(data, 1)
-	if err != nil || len(js) != 1 || js[0]["city"] != "example-city" {
+	if err != nil || len(js) != 1 || js[0]["city"] != "Berlin" {
 		t.Fatalf("sheet1 json=%#v err=%v", js, err)
 	}
 

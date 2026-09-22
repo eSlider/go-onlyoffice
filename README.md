@@ -557,7 +557,7 @@ Example — convert a portal file (or a local file) to PDF with the native engin
 
 ```bash
 export ONLYOFFICE_DS_SECRET=<DocumentServer CoAuthoring secret>
-oo docs pdf 3684 --out out.pdf          # OO file id → PDF
+oo docs pdf 1234 --out out.pdf          # OO file id → PDF
 oo docs pdf ./report.docx --to pdf      # local file → PDF (temp upload, auto-cleanup)
 ```
 
@@ -619,35 +619,35 @@ oo cases list
 oo crm-tasks categories
 
 # Deep links & native document conversion
-oo link 3684 3694                        # DocEditor URL for file ids (title + url)
-oo docs presigned 3684                   # short-lived fetchable URL of an OO file
-oo docs pdf 3684 --out out.pdf           # OO file → PDF (via DocumentServer)
+oo link 1234 2345                        # DocEditor URL for file ids (title + url)
+oo docs presigned 1234                   # short-lived fetchable URL of an OO file
+oo docs pdf 1234 --out out.pdf           # OO file → PDF (via DocumentServer)
 oo docs pdf ./report.docx --to pdf       # local file → PDF on the fly (temp upload+cleanup)
-oo docs pdf 3684 --stream > out.pdf      # pipe: bytes to stdout (alias --pipe)
+oo docs pdf 1234 --stream > out.pdf      # pipe: bytes to stdout (alias --pipe)
 
 # Spreadsheet export (sheet-aware; local reader — the DS csv output is first-sheet-only)
-oo docs csv  227 --sheet 2                 # XLS/XLSX/ODS worksheet → CSV (--sheet N, 1-based)
-oo docs csv  227 --delimiter ';'           # ; | | \t via --delimiter
-oo docs json 227 --sheet 2                 # worksheet → JSON rows (first row = header)
+oo docs csv  1234 --sheet 2                 # XLS/XLSX/ODS worksheet → CSV (--sheet N, 1-based)
+oo docs csv  1234 --delimiter ';'           # ; | | \t via --delimiter
+oo docs json 1234 --sheet 2                 # worksheet → JSON rows (first row = header)
 oo docs csv  ./book.xlsx --sheet 1 --out sheet1.csv
 #   export ONLYOFFICE_DS_SECRET=<DocumentServer CoAuthoring secret>
 #   docs base: $ONLYOFFICE_DOCS_URL, else $ONLYOFFICE_URL + /ds-vpath
 
 # Project team (portal users) CRUD
-oo projects team list 219
-oo projects team add 219 <user_id> [<user_id>...]
-oo projects team remove 219 <user_id>
-oo projects team set 219 <user_id> [...]          # replace team (may lag; verify with list)
-oo projects milestone-delete 38
+oo projects team list 42
+oo projects team add 42 <user_id> [<user_id>...]
+oo projects team remove 42 <user_id>
+oo projects team set 42 <user_id> [...]          # replace team (may lag; verify with list)
+oo projects milestone-delete 7
 
 # Project documents: fresh re-upload (single clean version) / new version
-oo projects files replace-in 495 ./contract.pdf   # hard delete same stem|ext in folder + upload
-oo projects files update 3647 ./contract.docx     # overwrite content, same file id
+oo projects files replace-in 1 ./contract.pdf   # hard delete same stem|ext in folder + upload
+oo projects files update 1 ./contract.docx      # overwrite content, same file id
 
 # Users lifecycle
 oo users list ; oo users get <user_id>
-oo users create --first Jane --last Doe --email Jane@example.com --password '…'
-oo users check  --login Jane@example.com       # verify login (email works when userName 500s)
+oo users create --first Jane --last Doe --email jane.doe@example.com --password '…'
+oo users check  --login jane.doe@example.com      # verify login (email works when userName 500s)
 oo users update <user_id> --title "…" --location "…"
 oo users block <user_id> ; oo users unblock <user_id>
 oo users password <user_id>                       # reads the new password from stdin
@@ -835,7 +835,7 @@ kontolink IN.xlsx oo-index.tsv OUT.xlsx [FILE_ID] [AMOUNTS_TSV]
 | `mails` | `accounts`, `folders`, `list`, `get`, `download-attachment`, `draft`, `attach`, `draft-invoice`, `send`, `delete` |
 | `cases` | `list`, `create`, `delete`, `member-add` |
 | `crm-tasks` | `list`, `create`, `delete`, `categories`, `reassign-self` |
-| `docs` | `tools`, `convert`, `optimize`, `ocr`, `hocr`, `as-md`, `put-md`, `put-txt`, `put-xlsx` |
+| `docs` | `tools`, `convert`, `pdf`, `presigned`, `csv`, `json`, `optimize`, `ocr`, `hocr`, `as-md`, `put-md`, `put-txt`, `put-xlsx` |
 | `catalog` | `match`, `merge`, `apply`, `scan-contacts`, `scan-projects`, `scan-thunderbird` |
 | `dav` | `ls`, `move`, `copy`, `mkdir`, `rename-file`, `rename-folder`, `download`, `fileops` |
 | `search` | `QUERY` (`--content`, `--folder ID`, `--limit N`, `--backend oo\|own`, `--json`) |
@@ -846,6 +846,12 @@ CLI-only concern — the library itself never loads dotfiles).
 
 Canonical `ONLYOFFICE_*` variables win over aliases. Optional CLI-only aliases:
 `OO_URL` / `OO_USER` / `OO_PASS` → `ONLYOFFICE_URL` / `ONLYOFFICE_USER` / `ONLYOFFICE_PASS`.
+
+Catalog scanning (`oo catalog scan-projects` / `scan-thunderbird`) classifies
+clients from rules in `$OO_CATALOG_CONFIG` (or `--config`); see
+[`catalog/classify.example.yaml`](catalog/classify.example.yaml). Without rules
+nothing is classified as work. The MinIO download fallback is off unless
+`MINIO_ENDPOINT` + `MINIO_ACCESS_KEY` + `MINIO_SECRET_KEY` are set.
 
 Run `oo --help` or `oo <subject> --help` for the full command reference.
 

@@ -87,7 +87,7 @@ uploaded to the scratch folder (--folder, default 2 = "My documents"), converted
 downloaded and then removed — so any local document yields a PDF on the fly.
 
 Docs base defaults to $ONLYOFFICE_DOCS_URL, else $ONLYOFFICE_URL + "/ds-vpath"
-(the portal nginx proxies /ds-vpath to the DocumentServer). The JWT secret is
+(/ds-vpath is the usual reverse-proxy mount for the DocumentServer). The JWT secret is
 $ONLYOFFICE_DS_SECRET (DocumentServer services.CoAuthoring.secret).`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -334,7 +334,7 @@ Each data row becomes an object keyed by the header cells of that sheet.`,
 }
 
 // docsBaseURL resolves the DocumentServer base: --docs-url, $ONLYOFFICE_DOCS_URL,
-// else the portal's /ds-vpath proxy.
+// else the standard /ds-vpath reverse-proxy mount.
 func docsBaseURL(flag string) string {
 	if flag != "" {
 		return flag
