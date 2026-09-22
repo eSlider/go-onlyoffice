@@ -10,9 +10,18 @@ import (
 
 // ScanProjectsRoot finds git roots under root (max depth) and emits company rows.
 func ScanProjectsRoot(root string, maxDepth int) (*Document, error) {
+	return ScanProjectsRootOpts(root, maxDepth, ScanOptions{})
+}
+
+// ScanProjectsRootOpts is ScanProjectsRoot with deployment classification rules.
+func ScanProjectsRootOpts(root string, maxDepth int, opts ScanOptions) (*Document, error) {
 	root = filepath.Clean(root)
 	if maxDepth <= 0 {
 		maxDepth = 4
+	}
+	cl := opts.Classifier
+	if cl == nil {
+		cl = DefaultClassifier()
 	}
 	st, err := os.Stat(root)
 	if err != nil {
@@ -23,7 +32,7 @@ func ScanProjectsRoot(root string, maxDepth int) (*Document, error) {
 	}
 
 	var entries []Entry
-	err = walkGitRoots(root, root, 0, maxDepth, &entries)
+	err = walkGitRoots(root, root, 0, maxDepth, cl, &entries)
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +52,7 @@ func ScanProjectsRoot(root string, maxDepth int) (*Document, error) {
 		}
 		path := filepath.Join(root, name)
 		id := EntryID("company", "", name)
-		role, zone := classifyProjectName(name, "")
+		role, zone := cl.ClassifyProject(name, "")
 		entries = append(entries, Entry{
 			ID:      id,
 			Kind:    "company",
@@ -59,7 +68,7 @@ func ScanProjectsRoot(root string, maxDepth int) (*Document, error) {
 	return MergeDocs(&Document{Entries: entries}), nil
 }
 
-func walkGitRoots(root, dir string, depth, maxDepth int, out *[]Entry) error {
+func walkGitRoots(root, dir string, depth, maxDepth int, cl *Classifier, out *[]Entry) error {
 	if depth > maxDepth {
 		return nil
 	}
@@ -67,7 +76,7 @@ func walkGitRoots(root, dir string, depth, maxDepth int, out *[]Entry) error {
 	if st, err := os.Stat(filepath.Join(dir, ".git")); err == nil && (st.IsDir() || st.Mode().IsRegular()) {
 		name := filepath.Base(dir)
 		remote := gitRemoteOrigin(dir)
-		role, zone := classifyProjectName(name, remote)
+		role, zone := cl.ClassifyProject(name, remote)
 		*out = append(*out, Entry{
 			ID:      EntryID("company", "", name),
 			Kind:    "company",
@@ -93,7 +102,7 @@ func walkGitRoots(root, dir string, depth, maxDepth int, out *[]Entry) error {
 		if name == ".git" || name == "node_modules" || name == "vendor" || name == ".venv" || name == "dist" {
 			continue
 		}
-		_ = walkGitRoots(root, filepath.Join(dir, name), depth+1, maxDepth, out)
+		_ = walkGitRoots(root, filepath.Join(dir, name), depth+1, maxDepth, cl, out)
 	}
 	return nil
 }
@@ -105,23 +114,4 @@ func gitRemoteOrigin(dir string) string {
 		return ""
 	}
 	return strings.TrimSpace(string(b))
-}
-
-func classifyProjectName(name, remote string) (role, zone string) {
-	lower := strings.ToLower(name)
-	remoteL := strings.ToLower(remote)
-	switch {
-	case strings.Contains(lower, "experiment") || strings.HasPrefix(lower, "test"):
-		return "experiment", "cold"
-	case lower == "mama" || lower == "personal" || strings.Contains(lower, "private"):
-		return "personal", "private"
-	case strings.Contains(remoteL, "git.example.com") || strings.Contains(remoteL, "github.com/eslider"):
-		return "work", "hot"
-	case strings.Contains(lower, "example") || strings.Contains(lower, "eslider") ||
-		strings.Contains(lower, "vendor-c") || strings.Contains(lower, "vendor-a") ||
-		strings.Contains(lower, "onlyoffice"):
-		return "work", "warm"
-	default:
-		return "unknown", "warm"
-	}
 }

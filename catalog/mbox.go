@@ -16,6 +16,8 @@ type ScanOptions struct {
 	MboxHeaders bool
 	// MboxMaxBytes skips individual mbox files larger than this (0 = 256 MiB default).
 	MboxMaxBytes int64
+	// Classifier supplies deployment classification rules; nil → neutral default.
+	Classifier *Classifier
 }
 
 // ScanThunderbirdRoot finds Thunderbird profiles under root and emits person rows
@@ -36,6 +38,10 @@ func ScanThunderbirdRootOpts(root string, opts ScanOptions) (*Document, error) {
 	}
 	if opts.MboxMaxBytes <= 0 {
 		opts.MboxMaxBytes = 256 << 20
+	}
+	cl := opts.Classifier
+	if cl == nil {
+		cl = DefaultClassifier()
 	}
 
 	var entries []Entry
@@ -64,7 +70,7 @@ func ScanThunderbirdRootOpts(root string, opts ScanOptions) (*Document, error) {
 				return nil
 			}
 			seenDB[path] = struct{}{}
-			parsed, perr := parseGlodaContacts(path)
+			parsed, perr := parseGlodaContacts(path, cl)
 			if perr != nil {
 				entries = append(entries, Entry{
 					ID:      EntryID("person", "", filepath.Base(path)),
@@ -84,7 +90,7 @@ func ScanThunderbirdRootOpts(root string, opts ScanOptions) (*Document, error) {
 				return nil
 			}
 			seenMAB[path] = struct{}{}
-			parsed, perr := parseMABEmails(path)
+			parsed, perr := parseMABEmails(path, cl)
 			if perr != nil {
 				return nil
 			}
@@ -101,7 +107,7 @@ func ScanThunderbirdRootOpts(root string, opts ScanOptions) (*Document, error) {
 			if info.Size() > opts.MboxMaxBytes {
 				return nil
 			}
-			parsed, perr := parseMboxHeaderEmails(path)
+			parsed, perr := parseMboxHeaderEmails(path, cl)
 			if perr != nil {
 				return nil
 			}
@@ -150,7 +156,7 @@ func isLikelyMboxFile(name, path string) bool {
 }
 
 // parseMboxHeaderEmails extracts addresses from From/To/Cc/Reply-To headers only.
-func parseMboxHeaderEmails(path string) ([]Entry, error) {
+func parseMboxHeaderEmails(path string, cl *Classifier) ([]Entry, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -220,7 +226,7 @@ func parseMboxHeaderEmails(path string) ([]Entry, error) {
 
 	var out []Entry
 	for em := range emails {
-		org, zone, role := classifyMailIdentity("", em)
+		org, zone, role := cl.ClassifyMail("", em)
 		out = append(out, Entry{
 			ID:      EntryID("person", em, ""),
 			Kind:    "person",

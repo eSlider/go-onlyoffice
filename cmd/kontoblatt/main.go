@@ -162,7 +162,7 @@ func main() {
 	}
 	fmt.Printf("source: id=%s title=%q folder=%s\n", fileID, title, folder)
 
-	name := "Kontoblatt-1591-2025-Zusammenfassung.xlsx"
+	name := "Kontoblatt-Zusammenfassung.xlsx"
 	tmp := "/tmp/opencode/" + name
 	data, _ := os.ReadFile(outPath)
 	if err := os.WriteFile(tmp, data, 0o600); err != nil {
