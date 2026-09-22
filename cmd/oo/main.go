@@ -16,7 +16,7 @@
 //	oo crm           cleanup
 //	oo mails         accounts | folders | list | get | download-attachment | draft | attach | draft-invoice | send | delete
 //	oo invoices      list | get | create | update | pdf | pdf-cleanup | status | delete | items …
-//	oo docs          tools | convert | optimize | ocr | hocr | as-md | put-md | put-txt | put-xlsx
+//	oo docs          tools | convert | pdf | presigned | optimize | ocr | hocr | as-md | put-md | put-txt | put-xlsx
 //	oo catalog       match | merge | apply | scan-contacts | scan-projects | scan-thunderbird
 //	oo dav           ls | move | copy | mkdir | rename-file | rename-folder | download | fileops
 //	oo search        QUERY [--content] [--folder ID] [--limit N] [--backend oo|own] [--json]
