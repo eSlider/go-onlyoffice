@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 
 	onlyoffice "github.com/eslider/go-onlyoffice"
 	"github.com/eslider/go-onlyoffice/internal/docpipe"
@@ -32,6 +34,8 @@ OCR a scan locally:       oo docs ocr scan.pdf --md out.md
 Structured OCR (hOCR→MD): oo docs hocr scan.jpg --md out.md --yaml out.yml`,
 	}
 	cmd.AddCommand(docsConvertCmd())
+	cmd.AddCommand(docsPDFCmd())
+	cmd.AddCommand(docsPresignedCmd())
 	cmd.AddCommand(docsOptimizeCmd())
 	cmd.AddCommand(docsOCRCmd())
 	cmd.AddCommand(docsHOCRCmd())
@@ -59,6 +63,156 @@ func docsToolsCmd() *cobra.Command {
 			return nil
 		},
 	}
+}
+
+func docsPDFCmd() *cobra.Command {
+	var out, docsURL, secret, output, folder string
+	cmd := &cobra.Command{
+		Use:   "pdf FILE_ID | PATH [ARG...]",
+		Short: "Convert files to PDF via the DocumentServer converter (OO file ids or local paths)",
+		Long: `Native OnlyOffice conversion (the engine behind the portal's "Download as PDF"):
+
+  1. GET /api/2.0/files/file/{id}/presigneduri   → fetchable source URL
+  2. POST <docs>/converter with a JWT            → converted file URL
+  3. download the result
+
+Arguments may be OnlyOffice file ids OR local file paths. A local path is
+uploaded to the scratch folder (--folder, default 2 = "My documents"), converted,
+downloaded and then removed — so any local document yields a PDF on the fly.
+
+Docs base defaults to $ONLYOFFICE_DOCS_URL, else $ONLYOFFICE_URL + "/ds-vpath"
+(the portal nginx proxies /ds-vpath to the DocumentServer). The JWT secret is
+$ONLYOFFICE_DS_SECRET (DocumentServer services.CoAuthoring.secret).`,
+		Args: cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			base := docsBaseURL(docsURL)
+			if base == "" {
+				return fmt.Errorf("docs base url unknown; set --docs-url or ONLYOFFICE_DOCS_URL")
+			}
+			sec := secret
+			if sec == "" {
+				sec = firstEnv("ONLYOFFICE_DS_SECRET", "OO_DS_SECRET")
+			}
+			if sec == "" {
+				return fmt.Errorf("JWT secret required: --secret or ONLYOFFICE_DS_SECRET")
+			}
+			ot := output
+			if ot == "" {
+				ot = "pdf"
+			}
+			for _, arg := range args {
+				id, local := arg, false
+				title := ""
+				if fi, statErr := os.Stat(arg); statErr == nil && !fi.IsDir() {
+					// Local file → temporary upload into the scratch folder.
+					ent, uerr := c.UploadToFolder(cmd.Context(), folder, arg)
+					if uerr != nil {
+						return fmt.Errorf("upload %s: %w", arg, uerr)
+					}
+					id = strconv.FormatInt(onlyoffice.FileEntryNumericID(ent), 10)
+					local = true
+					title = filepath.Base(arg)
+				} else {
+					if f, ferr := c.GetFile(cmd.Context(), id); ferr == nil && f != nil && f.Title != nil {
+						title = *f.Title
+					}
+				}
+				src, err := c.PresignedURI(cmd.Context(), id)
+				if err != nil {
+					return fmt.Errorf("presigneduri %s: %w", id, err)
+				}
+				res, err := c.ConvertDocument(cmd.Context(), base, sec, onlyoffice.ConvertRequest{
+					URL:        src,
+					OutputType: ot,
+					FileType:   strings.TrimPrefix(filepath.Ext(title), "."),
+					Title:      title,
+					Key:        fmt.Sprintf("oo-%s-%d", id, time.Now().UnixNano()),
+				})
+				if err != nil {
+					return fmt.Errorf("convert %s: %w", id, err)
+				}
+				dst := out
+				if dst == "" {
+					stem := strings.TrimSuffix(title, filepath.Ext(title))
+					if stem == "" {
+						stem = "file-" + id
+					}
+					dst = stem + "." + ot
+				}
+				f, err := os.Create(dst)
+				if err != nil {
+					return err
+				}
+				n, derr := c.DownloadURLTo(cmd.Context(), res.FileURL, f)
+				f.Close()
+				if local {
+					// Best-effort cleanup of the temporary upload.
+					if nid, e := strconv.Atoi(id); e == nil {
+						_ = c.DeleteFiles(cmd.Context(), []int{nid})
+					}
+				}
+				if derr != nil {
+					return fmt.Errorf("download: %w", derr)
+				}
+				printObject(map[string]any{"source": arg, "fileid": id, "title": title, "output": dst, "bytes": n, "type": ot})
+			}
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&out, "out", "", "output path (default: ./<title>.<format>)")
+	cmd.Flags().StringVar(&output, "to", "pdf", "output format (pdf, docx, xlsx, …)")
+	cmd.Flags().StringVar(&docsURL, "docs-url", "", "DocumentServer base (default $ONLYOFFICE_DOCS_URL or $ONLYOFFICE_URL/ds-vpath)")
+	cmd.Flags().StringVar(&secret, "secret", "", "JWT secret (default $ONLYOFFICE_DS_SECRET)")
+	cmd.Flags().StringVar(&folder, "folder", "2", "scratch folder id for local-file uploads")
+	return cmd
+}
+
+func docsPresignedCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "presigned FILE_ID",
+		Short: "Print a short-lived fetchable URI for a portal file",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			u, err := c.PresignedURI(cmd.Context(), args[0])
+			if err != nil {
+				return err
+			}
+			printObject(map[string]any{"fileid": args[0], "uri": u})
+			return nil
+		},
+	}
+}
+
+// docsBaseURL resolves the DocumentServer base: --docs-url, $ONLYOFFICE_DOCS_URL,
+// else the portal's /ds-vpath proxy.
+func docsBaseURL(flag string) string {
+	if flag != "" {
+		return flag
+	}
+	if v := os.Getenv("ONLYOFFICE_DOCS_URL"); v != "" {
+		return v
+	}
+	if v := firstEnv("ONLYOFFICE_URL", "ONLYOFFICE_HOST", "OO_URL"); v != "" {
+		return strings.TrimRight(v, "/") + "/ds-vpath"
+	}
+	return ""
+}
+
+func firstEnv(keys ...string) string {
+	for _, k := range keys {
+		if v := os.Getenv(k); v != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 func strOrNil(s string) any {
