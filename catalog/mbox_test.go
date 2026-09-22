@@ -10,22 +10,22 @@ func TestParseMboxHeaderEmails(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "INBOX")
 	body := `From - Mon Jul 1 00:00:00 2016
-From: Axel Schaefer <axel.schaefer@wheregroup.com>
-To: Andriy Oblivantsev <andriy.oblivantsev@wheregroup.com>
+From: Alice Smith <alice.smith@acme.example>
+To: Bob Jones <bob.jones@acme.example>
 Cc: noreply@example.com, client@stadt-example.de
 Subject: test
 
 Body line ignored
 From - Mon Jul 2 00:00:00 2016
-From: Someone <paul.schmidt@wheregroup.com>
-To: list@wheregroup.com
+From: Someone <paul.schmidt@acme.example>
+To: list@acme.example
 
 more body
 `
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	ents, err := parseMboxHeaderEmails(path)
+	ents, err := parseMboxHeaderEmails(path, DefaultClassifier())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -35,7 +35,7 @@ more body
 			got[e.Emails[0]] = true
 		}
 	}
-	if !got["axel.schaefer@wheregroup.com"] || !got["andriy.oblivantsev@wheregroup.com"] {
+	if !got["alice.smith@acme.example"] || !got["bob.jones@acme.example"] {
 		t.Fatalf("%v", got)
 	}
 	if got["noreply@example.com"] {
@@ -53,7 +53,7 @@ func TestScanThunderbirdRootOptsMbox(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(imap, "INBOX"), []byte(
-		"From - x\nFrom: a@wheregroup.com\nTo: b@wheregroup.com\n\nbody\n",
+		"From - x\nFrom: a@acme.example\nTo: b@acme.example\n\nbody\n",
 	), 0o644); err != nil {
 		t.Fatal(err)
 	}

@@ -161,7 +161,7 @@ func (c *Client) RemoveMailMessages(ctx context.Context, ids ...int) (map[string
 // Id 0 creates a new draft. Body is HTML; the API field name is "body" (not htmlBody).
 type SaveMailDraftParams struct {
 	ID      int64  // 0 = create
-	From    string // mailbox address, e.g. eslider@gmail.com
+	From    string // mailbox address, e.g. user@example.com
 	To      string // comma-separated or single address
 	Cc      string
 	Bcc     string
@@ -372,7 +372,7 @@ func mailMessagesPath(f MailMessagesFilter, page, count int) string {
 // ParseMailAddress splits a RFC 5322 mailbox string into display name and email.
 // Examples:
 //   - `"LinkedIn" <a@b.com>` → name LinkedIn, address a@b.com
-//   - `eslider@gmail.com` → address only
+//   - `user@example.com` → address only
 func ParseMailAddress(raw string) (name, address string) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {

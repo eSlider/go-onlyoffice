@@ -52,7 +52,7 @@ func TestIntegrationESTextIndex(t *testing.T) {
 	token := "gotes" + stamp
 	doc := TextDoc{
 		ID:       "3578",
-		Title:    "2026-07-28-S1021-Edelweiss-rechnung.pdf",
+		Title:    "2026-07-28-S1021-acme-rechnung.pdf",
 		FolderID: "634",
 		Ext:      "pdf",
 		Content:  "Begleitzettel SGB XI — Rechnung " + token,

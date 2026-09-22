@@ -56,7 +56,7 @@ func TestParseMailAddress(t *testing.T) {
 	}{
 		{`"LinkedIn Jobbenachrichtigungen" <jobalerts-noreply@linkedin.com>`, "LinkedIn Jobbenachrichtigungen", "jobalerts-noreply@linkedin.com"},
 		{`"Bitfinex" <no-reply@bitfinex.com>`, "Bitfinex", "no-reply@bitfinex.com"},
-		{"eslider@gmail.com", "", "eslider@gmail.com"},
+		{"user@example.com", "", "user@example.com"},
 		{`"Glassdoor-Jobs" <noreply@glassdoor.com>`, "Glassdoor-Jobs", "noreply@glassdoor.com"},
 		{"", "", ""},
 	}
