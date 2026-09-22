@@ -620,6 +620,7 @@ oo link 3684 3694                        # DocEditor URL for file ids (title + u
 oo docs presigned 3684                   # short-lived fetchable URL of an OO file
 oo docs pdf 3684 --out out.pdf           # OO file → PDF (via DocumentServer)
 oo docs pdf ./report.docx --to pdf       # local file → PDF on the fly (temp upload+cleanup)
+oo docs pdf 3684 --stream > out.pdf      # pipe: bytes to stdout (alias --pipe)
 #   export ONLYOFFICE_DS_SECRET=<DocumentServer CoAuthoring secret>
 #   docs base: $ONLYOFFICE_DOCS_URL, else $ONLYOFFICE_URL + /ds-vpath
 
