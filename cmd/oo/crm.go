@@ -7,7 +7,7 @@ import (
 
 var crmCmd = &cobra.Command{
 	Use:   "crm",
-	Short: "CRM maintenance (dedupe, cleanup)",
+	Short: "CRM maintenance (audit, dedupe, cleanup)",
 }
 
 func init() {
