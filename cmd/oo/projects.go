@@ -28,6 +28,137 @@ func init() {
 	projectsCmd.AddCommand(prjUpdateCmd())
 	projectsCmd.AddCommand(prjDeleteCmd())
 	projectsCmd.AddCommand(prjContactsCmd())
+	projectsCmd.AddCommand(prjTeamCmd())
+}
+
+func prjTeamCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "team",
+		Short: "Project team (portal users) — CRUD",
+		Long: `Project team members are portal users (People), not CRM contacts.
+CRM companies/persons linked to a project live under 'oo projects contacts'.`,
+	}
+	cmd.AddCommand(prjTeamListCmd())
+	cmd.AddCommand(prjTeamAddCmd())
+	cmd.AddCommand(prjTeamRemoveCmd())
+	cmd.AddCommand(prjTeamSetCmd())
+	return cmd
+}
+
+func prjTeamListCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "list PROJECT_ID",
+		Short: "List portal users on the project team",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			pid, err := strconv.Atoi(args[0])
+			if err != nil {
+				return fmt.Errorf("project id: %w", err)
+			}
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			list, err := c.ListProjectTeam(cmd.Context(), pid)
+			if err != nil {
+				return err
+			}
+			printTable([]string{"id", "displayName", "userName", "email", "isAdmin"}, teamRows(list))
+			return nil
+		},
+	}
+}
+
+func prjTeamAddCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "add PROJECT_ID USER_ID [USER_ID...]",
+		Short: "Add portal user(s) to the project team",
+		Args:  cobra.MinimumNArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			pid, err := strconv.Atoi(args[0])
+			if err != nil {
+				return fmt.Errorf("project id: %w", err)
+			}
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			for _, uid := range args[1:] {
+				if _, err := c.AddProjectTeamUser(cmd.Context(), pid, uid); err != nil {
+					return fmt.Errorf("add %s: %w", uid, err)
+				}
+				printObject(map[string]any{"project_id": pid, "user_id": uid, "added": true})
+			}
+			return nil
+		},
+	}
+}
+
+func prjTeamRemoveCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "remove PROJECT_ID USER_ID [USER_ID...]",
+		Short: "Remove portal user(s) from the project team",
+		Args:  cobra.MinimumNArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			pid, err := strconv.Atoi(args[0])
+			if err != nil {
+				return fmt.Errorf("project id: %w", err)
+			}
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			for _, uid := range args[1:] {
+				if _, err := c.RemoveProjectTeamUser(cmd.Context(), pid, uid); err != nil {
+					return fmt.Errorf("remove %s: %w", uid, err)
+				}
+				printObject(map[string]any{"project_id": pid, "user_id": uid, "removed": true})
+			}
+			return nil
+		},
+	}
+}
+
+func prjTeamSetCmd() *cobra.Command {
+	var notify bool
+	cmd := &cobra.Command{
+		Use:   "set PROJECT_ID USER_ID [USER_ID...]",
+		Short: "Replace the project team with the given users (register several at once)",
+		Args:  cobra.MinimumNArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			pid, err := strconv.Atoi(args[0])
+			if err != nil {
+				return fmt.Errorf("project id: %w", err)
+			}
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			team, err := c.SetProjectTeam(cmd.Context(), pid, args[1:], notify)
+			if err != nil {
+				return err
+			}
+			printTable([]string{"id", "displayName", "userName", "email", "isAdmin"}, teamRows(team))
+			return nil
+		},
+	}
+	cmd.Flags().BoolVar(&notify, "notify", false, "notify added members")
+	return cmd
+}
+
+// teamRows maps raw team member maps into table rows.
+func teamRows(list []map[string]any) []map[string]any {
+	rows := make([]map[string]any, 0, len(list))
+	for _, m := range list {
+		rows = append(rows, map[string]any{
+			"id":          idString(m, "id"),
+			"displayName": m["displayName"],
+			"userName":    m["userName"],
+			"email":       m["email"],
+			"isAdmin":     m["isAdmin"],
+		})
+	}
+	return rows
 }
 
 func prjListCmd() *cobra.Command {
