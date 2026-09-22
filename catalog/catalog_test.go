@@ -100,25 +100,37 @@ END:VCARD
 
 func TestScanProjectsRoot(t *testing.T) {
 	root := t.TempDir()
-	repo := filepath.Join(root, "example-demo")
+	repo := filepath.Join(root, "acme-demo")
 	if err := os.MkdirAll(filepath.Join(repo, ".git"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	doc, err := ScanProjectsRoot(root, 3)
+	cl := &Classifier{WorkNames: []string{"acme"}}
+	doc, err := ScanProjectsRootOpts(root, 3, ScanOptions{Classifier: cl})
 	if err != nil {
 		t.Fatal(err)
 	}
 	found := false
 	for _, e := range doc.Entries {
-		if e.Kind == "company" && e.Name == "example-demo" {
+		if e.Kind == "company" && e.Name == "acme-demo" {
 			found = true
-			if e.Role != "work" {
-				t.Fatalf("role=%q", e.Role)
+			if e.Role != "work" || e.Zone != "warm" {
+				t.Fatalf("role=%q zone=%q", e.Role, e.Zone)
 			}
 		}
 	}
 	if !found {
 		t.Fatalf("missing company: %+v", doc.Entries)
+	}
+
+	// Neutral default leaves it unclassified.
+	doc, err = ScanProjectsRoot(root, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range doc.Entries {
+		if e.Kind == "company" && e.Name == "acme-demo" && e.Role != "unknown" {
+			t.Fatalf("neutral role=%q", e.Role)
+		}
 	}
 }
 

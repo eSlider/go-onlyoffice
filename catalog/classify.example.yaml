@@ -1,0 +1,26 @@
+# Deployment classification rules for `oo catalog scan-projects` /
+# `oo catalog scan-thunderbird`. Point OO_CATALOG_CONFIG (or --config) at a copy
+# of this file. Keep your real rules out of the repository — they name your
+# clients and hosts. The library defaults to no rules (nothing is "work").
+#
+# work_remotes: a git remote containing any of these substrings → work/hot.
+work_remotes:
+  - git.internal.example
+  - github.com/acme
+#
+# work_names: a project directory name containing any of these substrings → work/warm.
+work_names:
+  - acme
+#
+# mail_orgs: ordered rules for Thunderbird/mbox identities; the first match wins.
+# Match by exact `domain`, `suffix` (e.g. ".example.com") and/or display `name`.
+# `zone` defaults to hot, `role` to work.
+mail_orgs:
+  - domain: acme.example
+    org: Acme GmbH
+    zone: hot
+    role: work
+  - suffix: .gov.example
+    org: Public Sector
+    zone: warm
+    role: work
