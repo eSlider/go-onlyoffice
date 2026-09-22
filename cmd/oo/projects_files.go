@@ -22,6 +22,7 @@ func projectFilesCmd() *cobra.Command {
 	}
 	cmd.AddCommand(prjFilesListCmd())
 	cmd.AddCommand(prjFilesUploadCmd())
+	cmd.AddCommand(prjFilesUpdateCmd())
 	cmd.AddCommand(prjFilesDownloadCmd())
 	cmd.AddCommand(prjFilesRenameCmd())
 	cmd.AddCommand(prjFilesDeleteCmd())
@@ -147,6 +148,26 @@ Pass --no-replace to fail when the name is taken; --allow-duplicate to always cr
 	cmd.Flags().BoolVar(&replace, "replace", true, "replace same stem|ext in project folder (default)")
 	cmd.Flags().BoolVar(&allowDuplicate, "allow-duplicate", false, "always create a new file even when the name exists")
 	return cmd
+}
+
+func prjFilesUpdateCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "update FILE_ID LOCAL_PATH",
+		Short: "Overwrite an existing Documents file with new content (new version)",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			entry, err := c.UpdateFile(cmd.Context(), args[0], args[1])
+			if err != nil {
+				return err
+			}
+			printObject(fileEntryToMap(entry))
+			return nil
+		},
+	}
 }
 
 func prjFilesDownloadCmd() *cobra.Command {
