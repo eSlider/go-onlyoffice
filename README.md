@@ -549,6 +549,8 @@ type Task struct {
 | `SignJWT(secret, payload)` | HS256 JWT, stdlib only |
 | `ConvertDocument(ctx, docsBase, secret, req)` | OnlyOffice DocumentServer conversion (`/converter`; legacy `/ConvertService.ashx`) |
 | `DownloadURLTo(ctx, url, w)` | Stream an absolute URL into a writer |
+| `SyncBoard(ctx, board, apply)` | Upsert project milestones/tasks from a YAML board (dry-run when apply=false) |
+| `AuditOpportunities(ctx)` | Opportunities with file/task/member counts and a coarse class |
 | `WorkbookSheetNames(data)` | Worksheet names of an XLS/XLSX/ODS workbook |
 | `WorkbookSheetCSV(data, sheet, delim)` | One worksheet → CSV (sheet-aware, excelize) |
 | `WorkbookSheetJSON(data, sheet)` | One worksheet → rows as objects (first row = header) |
@@ -823,7 +825,7 @@ kontolink IN.xlsx oo-index.tsv OUT.xlsx [FILE_ID] [AMOUNTS_TSV]
 | Subject | Verbs |
 |---|---|
 | `calendar` | `list`, `events`, `add`, `delete` |
-| `projects` | `list`, `get`, `milestones`, `milestone-create`, `create`, `update`, `delete`, `contacts` (`add`, `remove`), `link-authors`, `link-git`, **`files`** (`list`, `upload`, `download`, `rename`, `delete`, `dedupe`, `as-md`, `put-md`, `put-txt`, `put-xlsx`) |
+| `projects` | `list`, `get`, `milestones`, `milestone-create`, `board-sync`, `create`, `update`, `delete`, `contacts` (`add`, `remove`), `link-authors`, `link-git`, **`files`** (`list`, `upload`, `download`, `rename`, `delete`, `dedupe`, `as-md`, `put-md`, `put-txt`, `put-xlsx`) |
 | `tasks` | `list`, `get`, `create`, `update`, `delete`, `subtask add`, **`files`** (`list`, `upload`, `detach`) |
 | `users` | `list`, `self` (alias: `oo whoami`) |
 | `contacts` | `list`, `get`, `delete`, `info-add`, `merge`, `dedupe-info`, `tags`, `tag-add`, `tag-create`, `tag-remove` |
@@ -831,7 +833,7 @@ kontolink IN.xlsx oo-index.tsv OUT.xlsx [FILE_ID] [AMOUNTS_TSV]
 | `companies` | `list`, `create`, `delete`, `dedupe`, `dedupe-persons` |
 | `opportunities` | `list`, `get`, `create`, `update`, `delete`, `stages`, `member-add`, `dedupe`, `dedupe-members`, `fix-titles` |
 | `invoices` | `list`, `get`, `create`, `update`, `pdf`, `pdf-cleanup`, `status`, `delete`, `items …` |
-| `crm` | `cleanup` |
+| `crm` | `audit`, `cleanup` |
 | `mails` | `accounts`, `folders`, `list`, `get`, `download-attachment`, `draft`, `attach`, `draft-invoice`, `send`, `delete` |
 | `cases` | `list`, `create`, `delete`, `member-add` |
 | `crm-tasks` | `list`, `create`, `delete`, `categories`, `reassign-self` |
