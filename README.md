@@ -476,6 +476,11 @@ type Task struct {
 | `UpdateProject(req)` | Update project details |
 | `DeleteProject(id)` | Delete a project |
 | `GetProjectMilestones(project)` | Get milestones with task counts |
+| `DeleteMilestone(id)` | Remove a milestone |
+| `ListProjectTeam(ctx, id)` | Portal users on the project team |
+| `AddProjectTeamUser(ctx, id, userID)` | Add a portal user to the team |
+| `RemoveProjectTeamUser(ctx, id, userID)` | Remove a portal user from the team |
+| `SetProjectTeam(ctx, id, participants, notify)` | Replace the team with the given user ids |
 
 ### Tasks
 
@@ -502,6 +507,14 @@ type Task struct {
 | Method | Description |
 |---|---|
 | `GetUsers()` | List all users with profiles |
+| `GetUser(ctx, id)` | One user profile by id |
+| `CreateUser(ctx, NewUserRequest)` | Add a portal user |
+| `UpdateUser(ctx, id, body)` | Update profile fields (JSON PUT) |
+| `DeleteUser(ctx, id)` | Delete permanently (auto-terminates first — OO refuses active users) |
+| `BlockUser(ctx, id)` / `UnblockUser(ctx, id)` | Terminate / reactivate (login kept/denied) |
+| `ChangeUserPassword(ctx, id, pw)` | Set a new password |
+| `ChangeUserStatus(ctx, id, active)` | Activate / Terminate via `people/status` |
+| `AuthenticateAs(ctx, login, pw)` | Verify a login without mutating the cached token |
 
 ### Documents Files
 
@@ -525,6 +538,25 @@ type Task struct {
 | `DoRetry(ctx, policy, fn)` | Deterministic exponential backoff (`Base·2^(N-1)`, no jitter) on 429/502/503/504; honours `Retry-After` and the process-wide cooldown gate |
 | `DefaultRetryPolicy()` | From env: 7 attempts, 2s base, 2m cap (`OO_RETRY_ATTEMPTS/_BASE/_MAX`) |
 | `Transient(err)` | True for retriable OnlyOffice answers (`*TransientError` or HTTP 429/502/503/504 text) |
+
+### Deep links & conversion
+
+| Method | Description |
+|---|---|
+| `FileEditorURL(portalBase, id)` / `(c *Client).FileEditorURL(id)` | DocEditor deep link `/Products/Files/DocEditor.aspx?fileid=` |
+| `FolderURL(portalBase, id)` / `(c *Client).FolderURL(id)` | Documents folder link |
+| `PresignedURI(ctx, fileID)` | Short-lived fetchable URL of a portal file (`presigneduri`) |
+| `SignJWT(secret, payload)` | HS256 JWT, stdlib only |
+| `ConvertDocument(ctx, docsBase, secret, req)` | OnlyOffice DocumentServer conversion (`/converter`; legacy `/ConvertService.ashx`) |
+| `DownloadURLTo(ctx, url, w)` | Stream an absolute URL into a writer |
+
+Example — convert a portal file (or a local file) to PDF with the native engine:
+
+```bash
+export ONLYOFFICE_DS_SECRET=<DocumentServer CoAuthoring secret>
+oo docs pdf 3684 --out out.pdf          # OO file id → PDF
+oo docs pdf ./report.docx --to pdf      # local file → PDF (temp upload, auto-cleanup)
+```
 
 ### Helper Types
 
@@ -582,6 +614,34 @@ oo opportunities list
 oo opportunities stages
 oo cases list
 oo crm-tasks categories
+
+# Deep links & native document conversion
+oo link 3684 3694                        # DocEditor URL for file ids (title + url)
+oo docs presigned 3684                   # short-lived fetchable URL of an OO file
+oo docs pdf 3684 --out out.pdf           # OO file → PDF (via DocumentServer)
+oo docs pdf ./report.docx --to pdf       # local file → PDF on the fly (temp upload+cleanup)
+#   export ONLYOFFICE_DS_SECRET=<DocumentServer CoAuthoring secret>
+#   docs base: $ONLYOFFICE_DOCS_URL, else $ONLYOFFICE_URL + /ds-vpath
+
+# Project team (portal users) CRUD
+oo projects team list 219
+oo projects team add 219 <user_id> [<user_id>...]
+oo projects team remove 219 <user_id>
+oo projects team set 219 <user_id> [...]          # replace team (may lag; verify with list)
+oo projects milestone-delete 38
+
+# Project documents: fresh re-upload (single clean version) / new version
+oo projects files replace-in 495 ./contract.pdf   # hard delete same stem|ext in folder + upload
+oo projects files update 3647 ./contract.docx     # overwrite content, same file id
+
+# Users lifecycle
+oo users list ; oo users get <user_id>
+oo users create --first Morgane --last Avéus --email morgane@example.com --password '…'
+oo users check  --login morgane@example.com       # verify login (email works when userName 500s)
+oo users update <user_id> --title "…" --location "…"
+oo users block <user_id> ; oo users unblock <user_id>
+oo users password <user_id>                       # reads the new password from stdin
+oo users delete <user_id> [<user_id>...]
 ```
 
 ### office (TUI)
