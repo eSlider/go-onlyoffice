@@ -26,6 +26,7 @@ func init() {
 	usersCmd.AddCommand(usersBlockCmd())
 	usersCmd.AddCommand(usersUnblockCmd())
 	usersCmd.AddCommand(usersPasswordCmd())
+	usersCmd.AddCommand(usersCheckCmd())
 	rootCmd.AddCommand(whoamiCmd())
 }
 
@@ -310,6 +311,49 @@ func usersPasswordCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&password, "password", "", "new password (omit to read one line from stdin)")
 	return cmd
+}
+
+func usersCheckCmd() *cobra.Command {
+	var login, password string
+	cmd := &cobra.Command{
+		Use:   "check",
+		Short: "Check that a login can authenticate (userName or email)",
+		Long: `Probes POST /api/2.0/authentication.json with the given credentials and
+discards the token. On this portal the account email is the reliable login
+identifier (userName login may fail); use this before sharing credentials.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if login == "" {
+				return fmt.Errorf("--login is required (userName or email)")
+			}
+			if password == "" {
+				if b, err := readLine(os.Stdin); err == nil {
+					password = b
+				}
+			}
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			if err := c.AuthenticateAs(cmd.Context(), login, password); err != nil {
+				printObject(map[string]any{"login": login, "ok": false, "error": trimAuthErr(err)})
+				return fmt.Errorf("login failed for %s", login)
+			}
+			printObject(map[string]any{"login": login, "ok": true})
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&login, "login", "", "userName or email")
+	cmd.Flags().StringVar(&password, "password", "", "password (omit to read one line from stdin)")
+	return cmd
+}
+
+// trimAuthErr keeps the error short for table output.
+func trimAuthErr(err error) string {
+	s := err.Error()
+	if len(s) > 160 {
+		s = s[:160] + "…"
+	}
+	return s
 }
 
 // readLine reads a single trimmed line from r.
