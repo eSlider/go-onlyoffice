@@ -64,6 +64,7 @@ func catalogScanContactsCmd() *cobra.Command {
 func catalogScanProjectsCmd() *cobra.Command {
 	var outPath string
 	var maxDepth int
+	var configPath string
 	cmd := &cobra.Command{
 		Use:   "scan-projects",
 		Short: "Git roots / remotes / top-level dirs → company rows",
@@ -72,7 +73,11 @@ func catalogScanProjectsCmd() *cobra.Command {
 			if root == "" {
 				return fmt.Errorf("--root is required")
 			}
-			doc, err := catalog.ScanProjectsRoot(root, maxDepth)
+			cl, err := catalogClassifier(configPath)
+			if err != nil {
+				return err
+			}
+			doc, err := catalog.ScanProjectsRootOpts(root, maxDepth, catalog.ScanOptions{Classifier: cl})
 			if err != nil {
 				return err
 			}
@@ -81,6 +86,7 @@ func catalogScanProjectsCmd() *cobra.Command {
 	}
 	cmd.Flags().String("root", "", "projects directory (local path)")
 	cmd.Flags().IntVar(&maxDepth, "max-depth", 4, "max directory depth for git roots")
+	cmd.Flags().StringVar(&configPath, "config", "", "classification rules YAML (default $OO_CATALOG_CONFIG)")
 	cmd.Flags().StringVarP(&outPath, "out", "O", "", "write YAML to this path")
 	_ = cmd.MarkFlagRequired("root")
 	return cmd
@@ -89,6 +95,7 @@ func catalogScanProjectsCmd() *cobra.Command {
 func catalogScanThunderbirdCmd() *cobra.Command {
 	var outPath string
 	var mboxHeaders bool
+	var configPath string
 	cmd := &cobra.Command{
 		Use:   "scan-thunderbird",
 		Short: "Thunderbird profiles: abook/history.mab + Gloda SQLite contacts",
@@ -98,13 +105,18 @@ func catalogScanThunderbirdCmd() *cobra.Command {
   - optional --mbox-headers: From/To/Cc/Reply-To from mbox folder files (no bodies)
 
 Noisy senders (noreply, Amazon marketplace, GitHub reply, …) are skipped.
-Default zone is private; known work domains (e.g. acme.example) get zone=warm role=work.`,
+Default zone is private; work domains/names are classified from the rules in
+$OO_CATALOG_CONFIG (or --config) — none are hardcoded.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root, _ := cmd.Flags().GetString("root")
 			if root == "" {
 				return fmt.Errorf("--root is required")
 			}
-			doc, err := catalog.ScanThunderbirdRootOpts(root, catalog.ScanOptions{MboxHeaders: mboxHeaders})
+			cl, err := catalogClassifier(configPath)
+			if err != nil {
+				return err
+			}
+			doc, err := catalog.ScanThunderbirdRootOpts(root, catalog.ScanOptions{MboxHeaders: mboxHeaders, Classifier: cl})
 			if err != nil {
 				return err
 			}
@@ -113,9 +125,19 @@ Default zone is private; known work domains (e.g. acme.example) get zone=warm ro
 	}
 	cmd.Flags().String("root", "", "Thunderbird profile or parent directory (local path)")
 	cmd.Flags().BoolVar(&mboxHeaders, "mbox-headers", false, "also extract emails from mbox From/To/Cc headers")
+	cmd.Flags().StringVar(&configPath, "config", "", "classification rules YAML (default $OO_CATALOG_CONFIG)")
 	cmd.Flags().StringVarP(&outPath, "out", "O", "", "write YAML to this path")
 	_ = cmd.MarkFlagRequired("root")
 	return cmd
+}
+
+// catalogClassifier loads classification rules from --config, else
+// $OO_CATALOG_CONFIG, else the neutral default (no rules).
+func catalogClassifier(configPath string) (*catalog.Classifier, error) {
+	if configPath == "" {
+		return catalog.LoadClassifierFromEnv()
+	}
+	return catalog.LoadClassifier(configPath)
 }
 
 func catalogMergeCmd() *cobra.Command {

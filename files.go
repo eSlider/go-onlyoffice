@@ -278,7 +278,7 @@ func (c *Client) RenameFile(ctx context.Context, fileID, newTitle string) (*File
 
 // DeleteFiles permanently deletes files by numeric id (Documents module).
 // Uses per-file DELETE (DeleteDavItems); fileops/delete returns 200 on some
-// portals (e.g. example.com) without removing the file.
+// portals without actually removing the file.
 //
 // Deprecated: use FileStore.Delete via Client.Files()/Client.FileStore.
 func (c *Client) DeleteFiles(ctx context.Context, fileIDs []int) error {

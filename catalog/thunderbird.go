@@ -64,7 +64,7 @@ func noisyEmail(email string) bool {
 	return false
 }
 
-func parseMABEmails(path string) ([]Entry, error) {
+func parseMABEmails(path string, cl *Classifier) ([]Entry, error) {
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -76,7 +76,7 @@ func parseMABEmails(path string) ([]Entry, error) {
 		if noisyEmail(em) {
 			continue
 		}
-		org, zone, role := classifyMailIdentity("", em)
+		org, zone, role := cl.ClassifyMail("", em)
 		out = append(out, Entry{
 			ID:      EntryID("person", em, ""),
 			Kind:    "person",
@@ -93,7 +93,7 @@ func parseMABEmails(path string) ([]Entry, error) {
 	return out, nil
 }
 
-func parseGlodaContacts(dbPath string) ([]Entry, error) {
+func parseGlodaContacts(dbPath string, cl *Classifier) ([]Entry, error) {
 	// read-only URI; immutable=1 helps when WAL/shm are missing
 	dsn := "file:" + dbPath + "?mode=ro&_pragma=query_only(1)"
 	db, err := sql.Open("sqlite", dsn)
@@ -137,7 +137,7 @@ func parseGlodaContacts(dbPath string) ([]Entry, error) {
 		if display != "" {
 			first, last = SplitDisplayName(display)
 		}
-		org, zone, role := classifyMailIdentity(display, em)
+		org, zone, role := cl.ClassifyMail(display, em)
 		out = append(out, Entry{
 			ID:      EntryID("person", em, display),
 			Kind:    "person",
@@ -155,25 +155,6 @@ func parseGlodaContacts(dbPath string) ([]Entry, error) {
 		})
 	}
 	return out, rows.Err()
-}
-
-func classifyMailIdentity(name, email string) (org, zone, role string) {
-	em := NormalizeEmail(email)
-	_, domain, _ := strings.Cut(em, "@")
-	switch {
-	case domain == "acme.example" || strings.Contains(strings.ToLower(name), "acme"):
-		return "acme", "warm", "work"
-	case domain == "example.com" || domain == "eslider.example" || strings.HasSuffix(domain, ".example.com"):
-		return "example.com", "hot", "work"
-	case domain == "vendor-a.example":
-		return "vendor-a", "warm", "work"
-	case domain == "vendor-b.example" || domain == "vendor-b.example":
-		return "vendor-b", "warm", "work"
-	case strings.HasSuffix(domain, ".de") && looksPublicSector(domain):
-		return domain, "warm", "work"
-	default:
-		return "", "private", "unknown"
-	}
 }
 
 func looksPublicSector(domain string) bool {

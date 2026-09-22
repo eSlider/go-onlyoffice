@@ -2,11 +2,13 @@ package onlyoffice
 
 // MinIO download fallback for the portal's stale AWS S3 consumer.
 //
-// On the Fibu EDL portal some older Documents files live in S3/MinIO, but the
-// portal's storage consumer still points at s3.us-east-1.amazonaws.com with
-// access key "minio". Downloads of those files answer 403 InvalidAccessKeyId.
-// The bytes are present in the local MinIO store under a deterministic object
-// key, so the client retries the GET there.
+// On some portals older Documents files live in S3/MinIO, but the portal's
+// storage consumer still points at s3.us-east-1.amazonaws.com with access key
+// "minio". Downloads of those files answer 403 InvalidAccessKeyId. The bytes are
+// present in the local MinIO store under a deterministic object key, so the
+// client retries the GET there. Endpoint/bucket/keys come from the environment
+// (MINIO_ENDPOINT, MINIO_BUCKET, MINIO_ACCESS_KEY, MINIO_SECRET_KEY); without
+// them the fallback is disabled.
 
 import (
 	"context"
@@ -25,9 +27,8 @@ import (
 )
 
 const (
-	defaultMinioEndpoint = "http://minio.internal.example:9000"
-	defaultMinioBucket   = "office"
-	minioRegion          = "us-east-1"
+	defaultMinioBucket = "office"
+	minioRegion        = "us-east-1"
 )
 
 // minioObjectKey is the fallback object key layout the portal's S3 consumer
@@ -96,7 +97,7 @@ type minioConfig struct {
 // Secrets are never defaulted; without access/secret keys the fallback is off.
 func loadMinioConfig() minioConfig {
 	return minioConfig{
-		Endpoint:  strings.TrimRight(firstNonEmpty(os.Getenv("MINIO_ENDPOINT"), defaultMinioEndpoint), "/"),
+		Endpoint:  strings.TrimRight(strings.TrimSpace(os.Getenv("MINIO_ENDPOINT")), "/"),
 		Bucket:    firstNonEmpty(os.Getenv("MINIO_BUCKET"), defaultMinioBucket),
 		AccessKey: os.Getenv("MINIO_ACCESS_KEY"),
 		SecretKey: os.Getenv("MINIO_SECRET_KEY"),

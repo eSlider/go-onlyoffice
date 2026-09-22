@@ -120,5 +120,5 @@ oo mails draft-invoice --invoice INVOICE_ID --to billing@example.com
 ## Related
 
 - README § invoices / mail / CRM cleanup  
-- Personal workspace tooling (disk inventory, dossier sync): private
-  `git.example.com/eSlider/oo-workspace` (`oow` CLI)
+- Personal workspace tooling (disk inventory, dossier sync) lives in a private
+  companion repo (`oo-workspace`, the `oow` CLI).

@@ -31,7 +31,9 @@ func init() {
 }
 
 // execute runs the root command. Exported only to main.go in the same package.
-func execute() error { return rootCmd.Execute() }
+// .env is loaded CLI-wide so non-authenticating commands (e.g. catalog scans)
+// also see configuration such as OO_CATALOG_CONFIG.
+func execute() error { bootstrap.LoadEnv(); return rootCmd.Execute() }
 
 // newOO loads env (only .env in CWD) and returns an authenticated client.
 // godotenv is a CLI-only concern; the library itself never loads dotfiles.
