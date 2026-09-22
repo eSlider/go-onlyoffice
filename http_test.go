@@ -48,3 +48,26 @@ func TestUnmarshalResponseObjectNull(t *testing.T) {
 		t.Fatalf("expected nil, got %#v", out)
 	}
 }
+
+func TestUnmarshalResponseArrayList(t *testing.T) {
+	raw := json.RawMessage(`{"response":[{"id":"a","displayName":"A"},{"id":"b","displayName":"B"}]}`)
+	out, err := unmarshalResponseArray(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out) != 2 || out[0]["id"] != "a" || out[1]["displayName"] != "B" {
+		t.Fatalf("unexpected list: %#v", out)
+	}
+}
+
+func TestUnmarshalResponseArrayNullAndScalar(t *testing.T) {
+	for _, raw := range []string{`{"response":null}`, `{"response":{}}`, `{"response":"x"}`} {
+		out, err := unmarshalResponseArray(json.RawMessage(raw))
+		if err != nil {
+			t.Fatalf("%s: %v", raw, err)
+		}
+		if out != nil {
+			t.Fatalf("%s: expected nil, got %#v", raw, out)
+		}
+	}
+}

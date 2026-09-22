@@ -106,6 +106,53 @@ func (c *Client) ChangeUserPassword(ctx context.Context, userID, password string
 	return err
 }
 
+// NewUserRequest is the payload for CreateUser. Field names follow the
+// OnlyOffice REST contract (lowercase firstname/lastname).
+type NewUserRequest struct {
+	FirstName  string   `json:"firstname"`
+	LastName   string   `json:"lastname"`
+	Email      string   `json:"email"`
+	Password   string   `json:"password,omitempty"`
+	Title      string   `json:"title,omitempty"`
+	Location   string   `json:"location,omitempty"`
+	Sex        string   `json:"sex,omitempty"`
+	Comment    string   `json:"comment,omitempty"`
+	IsVisitor  *bool    `json:"isVisitor,omitempty"`
+	Department []string `json:"department,omitempty"`
+}
+
+// CreateUser adds a portal user (POST /api/2.0/people). Returns the created
+// user profile. When Password is empty the portal generates one and the account
+// stays NotActivated until the user follows the activation link.
+func (c *Client) CreateUser(ctx context.Context, req NewUserRequest) (map[string]any, error) {
+	return c.postJSONObject(ctx, "/api/2.0/people", req)
+}
+
+// DeleteUser removes a portal user permanently (DELETE /api/2.0/people/{id}).
+// OnlyOffice refuses to delete an active user ("The user is not suspended"),
+// so a blocked/terminated account is deactivated first and deletion retried.
+func (c *Client) DeleteUser(ctx context.Context, userID string) (map[string]any, error) {
+	u, err := c.deleteObject(ctx, fmt.Sprintf("/api/2.0/people/%s", url.PathEscape(userID)))
+	if err == nil {
+		return u, nil
+	}
+	if bErr := c.BlockUser(ctx, userID); bErr != nil {
+		return nil, err
+	}
+	return c.deleteObject(ctx, fmt.Sprintf("/api/2.0/people/%s", url.PathEscape(userID)))
+}
+
+// BlockUser terminates (blocks) the user: login is denied but the profile and
+// data are kept. Reversible with UnblockUser.
+func (c *Client) BlockUser(ctx context.Context, userID string) error {
+	return c.ChangeUserStatus(ctx, userID, false)
+}
+
+// UnblockUser reactivates a terminated/blocked user.
+func (c *Client) UnblockUser(ctx context.Context, userID string) error {
+	return c.ChangeUserStatus(ctx, userID, true)
+}
+
 // SelfUserID returns the ID of the authenticated user (people/@self), cached.
 func (c *Client) SelfUserID(ctx context.Context) (string, error) {
 	if c.selfID != "" {
