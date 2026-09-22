@@ -319,8 +319,13 @@ func usersCheckCmd() *cobra.Command {
 		Use:   "check",
 		Short: "Check that a login can authenticate (userName or email)",
 		Long: `Probes POST /api/2.0/authentication.json with the given credentials and
-discards the token. On this portal the account email is the reliable login
-identifier (userName login may fail); use this before sharing credentials.`,
+discards the token.
+
+Where this is used: before handing portal credentials to an external party
+(e.g. a landlord given read access to the apartment document pack), verify the
+login actually works. On the arc-1 portal the account email is the reliable
+login identifier — the userName login fails with 500 for a freshly created
+user, so share the email, not the userName.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if login == "" {
 				return fmt.Errorf("--login is required (userName or email)")
