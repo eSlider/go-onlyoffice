@@ -195,5 +195,16 @@ func ensureContactInfos(ctx context.Context, client *onlyoffice.Client, contactI
 			return fmt.Errorf("add phone %s: %w", ph, err)
 		}
 	}
+	for _, a := range e.Addresses {
+		if strings.TrimSpace(a.Street) == "" && strings.TrimSpace(a.City) == "" && strings.TrimSpace(a.Zip) == "" {
+			continue
+		}
+		if onlyoffice.HasContactAddress(existing, a.Street, a.City, a.Zip, a.Category) {
+			continue
+		}
+		if _, err := client.AddContactAddress(ctx, contactID, a.Street, a.City, a.State, a.Zip, a.Country, a.Category, a.Primary); err != nil {
+			return fmt.Errorf("add address %s: %w", strings.TrimSpace(a.Street), err)
+		}
+	}
 	return nil
 }
