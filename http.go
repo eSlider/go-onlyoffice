@@ -111,6 +111,25 @@ func (c *Client) deleteObject(ctx context.Context, path string) (map[string]any,
 	return unmarshalResponseObject(raw)
 }
 
+// unmarshalResponseArray extracts the "response" field from a raw OnlyOffice
+// envelope and decodes it into a list of maps. Returns (nil, nil) for a null,
+// empty or scalar payload. Companion to unmarshalResponseObject for endpoints
+// whose response is a list (project team, people/status, …).
+func unmarshalResponseArray(raw json.RawMessage) ([]map[string]any, error) {
+	resp, err := responseField(raw, "response")
+	if err != nil {
+		return nil, err
+	}
+	if len(resp) == 0 || string(resp) == "null" || resp[0] != '[' {
+		return nil, nil
+	}
+	var list []map[string]any
+	if err := json.Unmarshal(resp, &list); err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
 // unmarshalResponseObject extracts the "response" field from a raw OnlyOffice
 // envelope and decodes it into map[string]any. Returns (nil, nil) for a null
 // response, an empty array, or scalar payloads. When the API returns a list
@@ -273,6 +292,52 @@ func (c *Client) postJSONObject(ctx context.Context, path string, body any) (map
 	return unmarshalResponseObject(raw)
 }
 
+// jsonBodyReader turns a request body value into an io.Reader. nil becomes
+// "{}", []byte/string pass through, anything else is JSON-marshalled.
+func jsonBodyReader(body any) (io.Reader, error) {
+	switch b := body.(type) {
+	case nil:
+		return strings.NewReader("{}"), nil
+	case []byte:
+		return bytes.NewReader(b), nil
+	case string:
+		return strings.NewReader(b), nil
+	default:
+		buf, err := json.Marshal(b)
+		if err != nil {
+			return nil, err
+		}
+		return bytes.NewReader(buf), nil
+	}
+}
+
+// postJSONArray is postJSON + unmarshalResponseArray.
+func (c *Client) postJSONArray(ctx context.Context, path string, body any) ([]map[string]any, error) {
+	raw, err := c.postJSON(ctx, path, body)
+	if err != nil {
+		return nil, err
+	}
+	return unmarshalResponseArray(raw)
+}
+
+// putJSONArray is putJSON + unmarshalResponseArray.
+func (c *Client) putJSONArray(ctx context.Context, path string, body any) ([]map[string]any, error) {
+	raw, err := c.putJSON(ctx, path, body)
+	if err != nil {
+		return nil, err
+	}
+	return unmarshalResponseArray(raw)
+}
+
+// deleteJSONArray is deleteJSON + unmarshalResponseArray.
+func (c *Client) deleteJSONArray(ctx context.Context, path string, body any) ([]map[string]any, error) {
+	raw, err := c.deleteJSON(ctx, path, body)
+	if err != nil {
+		return nil, err
+	}
+	return unmarshalResponseArray(raw)
+}
+
 // postJSON issues an authenticated POST with application/json body.
 func (c *Client) postJSON(ctx context.Context, path string, body any) (json.RawMessage, error) {
 	return retryRaw(ctx, func() (json.RawMessage, error) { return c.postJSONOnce(ctx, path, body) })
@@ -283,20 +348,9 @@ func (c *Client) postJSONOnce(ctx context.Context, path string, body any) (json.
 	if err != nil {
 		return nil, err
 	}
-	var rdr io.Reader
-	switch b := body.(type) {
-	case nil:
-		rdr = strings.NewReader("{}")
-	case []byte:
-		rdr = bytes.NewReader(b)
-	case string:
-		rdr = strings.NewReader(b)
-	default:
-		buf, err := json.Marshal(b)
-		if err != nil {
-			return nil, err
-		}
-		rdr = bytes.NewReader(buf)
+	rdr, err := jsonBodyReader(body)
+	if err != nil {
+		return nil, err
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL()+path, rdr)
 	if err != nil {
@@ -330,20 +384,9 @@ func (c *Client) putJSONOnce(ctx context.Context, path string, body any) (json.R
 	if err != nil {
 		return nil, err
 	}
-	var rdr io.Reader
-	switch b := body.(type) {
-	case nil:
-		rdr = strings.NewReader("{}")
-	case []byte:
-		rdr = bytes.NewReader(b)
-	case string:
-		rdr = strings.NewReader(b)
-	default:
-		buf, err := json.Marshal(b)
-		if err != nil {
-			return nil, err
-		}
-		rdr = bytes.NewReader(buf)
+	rdr, err := jsonBodyReader(body)
+	if err != nil {
+		return nil, err
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, c.baseURL()+path, rdr)
 	if err != nil {

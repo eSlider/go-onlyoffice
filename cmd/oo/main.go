@@ -3,9 +3,9 @@
 // Command tree is subject-based (mirrors the library split and the `tea` CLI):
 //
 //	oo calendar      list | events | add | delete
-//	oo projects      list | get | milestones | milestone-create | create | update | delete | contacts (add|remove) | link-authors | link-git | files (list|upload|download|rename|delete|dedupe|as-md|put-md|put-txt|put-xlsx)
+//	oo projects      list | get | milestones | milestone-create | create | update | delete | contacts (add|remove) | team (list|add|remove|set) | link-authors | link-git | files (list|upload|download|rename|delete|dedupe|as-md|put-md|put-txt|put-xlsx)
 //	oo tasks         list | get | create | update | delete | subtask add | files (list|upload|detach)
-//	oo users         list | self            (alias: oo whoami)
+//	oo users         list | self | get | create | update | delete | block | unblock | password   (alias: oo whoami)
 //	oo contacts      list | get | delete | info-add | merge | dedupe-info | tags | tag-add | tag-create | tag-remove
 //	oo persons       list | create | delete | dedupe
 //	oo companies     list | create | delete | dedupe | dedupe-persons
