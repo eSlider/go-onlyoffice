@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -67,6 +68,7 @@ func docsToolsCmd() *cobra.Command {
 
 func docsPDFCmd() *cobra.Command {
 	var out, docsURL, secret, output, folder string
+	var stream, pipe bool
 	cmd := &cobra.Command{
 		Use:   "pdf FILE_ID | PATH [ARG...]",
 		Short: "Convert files to PDF via the DocumentServer converter (OO file ids or local paths)",
@@ -104,6 +106,10 @@ $ONLYOFFICE_DS_SECRET (DocumentServer services.CoAuthoring.secret).`,
 			if ot == "" {
 				ot = "pdf"
 			}
+			toStdout := stream || pipe
+			if toStdout && len(args) > 1 {
+				return fmt.Errorf("--stream/--pipe writes one file to stdout; pass a single input")
+			}
 			for _, arg := range args {
 				id, local := arg, false
 				title := ""
@@ -135,20 +141,26 @@ $ONLYOFFICE_DS_SECRET (DocumentServer services.CoAuthoring.secret).`,
 				if err != nil {
 					return fmt.Errorf("convert %s: %w", id, err)
 				}
+				var w io.Writer
 				dst := out
-				if dst == "" {
-					stem := strings.TrimSuffix(title, filepath.Ext(title))
-					if stem == "" {
-						stem = "file-" + id
+				if toStdout {
+					w = os.Stdout
+				} else {
+					if dst == "" {
+						stem := strings.TrimSuffix(title, filepath.Ext(title))
+						if stem == "" {
+							stem = "file-" + id
+						}
+						dst = stem + "." + ot
 					}
-					dst = stem + "." + ot
+					fh, err := os.Create(dst)
+					if err != nil {
+						return err
+					}
+					w = fh
+					defer fh.Close()
 				}
-				f, err := os.Create(dst)
-				if err != nil {
-					return err
-				}
-				n, derr := c.DownloadURLTo(cmd.Context(), res.FileURL, f)
-				f.Close()
+				n, derr := c.DownloadURLTo(cmd.Context(), res.FileURL, w)
 				if local {
 					// Best-effort cleanup of the temporary upload.
 					if nid, e := strconv.Atoi(id); e == nil {
@@ -158,7 +170,12 @@ $ONLYOFFICE_DS_SECRET (DocumentServer services.CoAuthoring.secret).`,
 				if derr != nil {
 					return fmt.Errorf("download: %w", derr)
 				}
-				printObject(map[string]any{"source": arg, "fileid": id, "title": title, "output": dst, "bytes": n, "type": ot})
+				if toStdout {
+					// Keep stdout byte-clean for pipes; status goes to stderr.
+					fmt.Fprintf(os.Stderr, "converted %s -> stdout (%d bytes, %s)\n", arg, n, ot)
+				} else {
+					printObject(map[string]any{"source": arg, "fileid": id, "title": title, "output": dst, "bytes": n, "type": ot})
+				}
 			}
 			return nil
 		},
@@ -168,6 +185,8 @@ $ONLYOFFICE_DS_SECRET (DocumentServer services.CoAuthoring.secret).`,
 	cmd.Flags().StringVar(&docsURL, "docs-url", "", "DocumentServer base (default $ONLYOFFICE_DOCS_URL or $ONLYOFFICE_URL/ds-vpath)")
 	cmd.Flags().StringVar(&secret, "secret", "", "JWT secret (default $ONLYOFFICE_DS_SECRET)")
 	cmd.Flags().StringVar(&folder, "folder", "2", "scratch folder id for local-file uploads")
+	cmd.Flags().BoolVar(&stream, "stream", false, "write the converted bytes to stdout (pipe-friendly)")
+	cmd.Flags().BoolVar(&pipe, "pipe", false, "alias for --stream")
 	return cmd
 }
 
