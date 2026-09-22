@@ -78,7 +78,7 @@ func TestParseESTextResponse(t *testing.T) {
 	      {
 	        "_id": "3578",
 	        "_score": 3.21,
-	        "_source": {"id": "3578", "title": "2026-07-28-S1021-Edelweiss-rechnung.pdf", "folder": "634", "ext": "pdf"},
+	        "_source": {"id": "3578", "title": "2026-07-28-S1021-acme-rechnung.pdf", "folder": "634", "ext": "pdf"},
 	        "highlight": {"content": ["Begleitzettel … <em>S1021</em> …"]}
 	      }
 	    ]
@@ -92,7 +92,7 @@ func TestParseESTextResponse(t *testing.T) {
 		t.Fatalf("hits = %d, want 1", len(hits))
 	}
 	h := hits[0]
-	if h.ID != "3578" || h.Title != "2026-07-28-S1021-Edelweiss-rechnung.pdf" || h.Kind != File {
+	if h.ID != "3578" || h.Title != "2026-07-28-S1021-acme-rechnung.pdf" || h.Kind != File {
 		t.Errorf("entry = %+v", h.Entry)
 	}
 	if h.ParentID != "634" || !reflect.DeepEqual(h.Path, []string{"634"}) {

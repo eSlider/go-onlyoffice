@@ -21,7 +21,7 @@ Canonical Go client for OnlyOffice Workspace (Projects + Calendar + CRM) and the
   - **List table (`DataTable`)** — `cmd/office/ui/table*.go`. Column layout policies live in `cmd/office/model/table_layout.go` (`TableFlexLayoutFor`); cell rendering uses the bubbles/table inline pattern in `table_render.go` (`renderTableCell`, `padANSIWidth`). See `.cursor/skills/office-tui-table/SKILL.md` before changing center-pane tables.
 - **Shared bootstrap — `cmd/internal/bootstrap/`.** `LoadEnv()` + `NewClient(ctx)` extracted from `oo`; both binaries import it.
 - **Bulk Documents tools — `cmd/ooscan/`, `cmd/pdfamount/`, `cmd/kontoblatt/`, `cmd/kontolink/`.** Single-purpose binaries (folder index, PDF amounts, Kontoblatt summary/linking). Pace requests, route API calls through `DoRetry`; usage in README.
-- **Personal ops tooling** (disk inventory, dossier→CRM sync, SearXNG) lives in private [`eSlider/oo-workspace`](https://git.produktor.io/eSlider/oo-workspace) (`oow`), not in this public tree.
+- **Personal ops tooling** (disk inventory, dossier→CRM sync, SearXNG) lives in a private companion repo `eSlider/oo-workspace` (the `oow` CLI), not in this public tree.
 
 ## Rules
 
@@ -33,6 +33,11 @@ Canonical Go client for OnlyOffice Workspace (Projects + Calendar + CRM) and the
 - **Documents for agents:** prefer Markdown in git; OnlyOffice UI is weak for `.md`/`.txt`. Use `oo docs put-md` (md→docx) and `oo docs put-txt` (txt→docx, preserves line breaks). All upload paths default to **upsert** by `stem|ext` (`--replace`, default true); `--no-replace` fails on conflict; `--allow-duplicate` opts into raw OO append. `oo projects files dedupe PROJECT_ID` reports/removes duplicate stem|ext copies (`--apply`, `--cross`; includes project root folder).
 - Every table output goes through `printTable(headers, rows)`; every single-object through `printObject(v)`. Do not `fmt.Println` rows ad-hoc or the `--output json` flag breaks for that command.
 - No secrets in the repo; use `.env` (gitignored). Commit `.env.example` only.
+- **No host/client specifics in the tree.** Endpoints, IPs/ports, client mail
+  domains, project remotes/names and personal names stay out of source and
+  fixtures — they come from env/config (`MINIO_*`, `OO_CATALOG_CONFIG`, see
+  [`catalog/classify.example.yaml`](catalog/classify.example.yaml)). This repo is
+  mirrored to GitHub as a public showroom, so the tree must stay project-generic.
 - Follow SemVer on tags; this repo is tagged at GitHub under `git@github.com:eSlider/go-onlyoffice.git`.
 
 ### Testing policy (2026-04-24)
@@ -57,6 +62,6 @@ write `mux.HandleFunc("/api/2.0/...")` to emulate OnlyOffice, we write an
 ## Related
 
 - [`docs/README.md`](docs/README.md) — reference index (file client, ES, SQL, rclone).
-- [`eSlider/inventar`](https://git.produktor.io/eSlider/inventar) — ASR/ADR (see ASR-0008 Go library module conventions).
-- [`eSlider/inventar-sync`](https://git.produktor.io/eSlider/inventar-sync) — OnlyOffice → Gitea issue sync, consumes this library.
-- [`produktor.io/vidarr`](https://git.produktor.io/produktor.io/vidarr) — legacy consumer being migrated from `pkg/onlyoffice` to this module.
+- `eSlider/inventar` — ASR/ADR (see ASR-0008 Go library module conventions).
+- `eSlider/inventar-sync` — OnlyOffice → Gitea issue sync, consumes this library.
+- `vidarr` — legacy consumer being migrated from `pkg/onlyoffice` to this module.

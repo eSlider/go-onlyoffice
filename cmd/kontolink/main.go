@@ -76,7 +76,15 @@ func nearest(cands []entry, rd time.Time) (entry, bool) {
 	return cands[best], true
 }
 
-const linkPrefix = "https://office.pro-dukt.de/Products/Files/DocEditor.aspx?fileid="
+// portalBaseFromEnv resolves the portal base URL used to build document links.
+func portalBaseFromEnv() string {
+	for _, k := range []string{"ONLYOFFICE_URL", "ONLYOFFICE_HOST", "OO_URL"} {
+		if v := strings.TrimSpace(os.Getenv(k)); v != "" {
+			return strings.TrimRight(v, "/")
+		}
+	}
+	return ""
+}
 
 type entry struct {
 	id, path, title, norm string
@@ -90,6 +98,12 @@ func main() {
 		os.Exit(2)
 	}
 	in, idxPath, out := os.Args[1], os.Args[2], os.Args[3]
+
+	portal := portalBaseFromEnv()
+	if portal == "" {
+		fmt.Fprintln(os.Stderr, "set ONLYOFFICE_URL (or ONLYOFFICE_HOST/OO_URL) to build document links")
+		os.Exit(2)
+	}
 
 	idxRaw, err := os.ReadFile(idxPath)
 	if err != nil {
@@ -153,7 +167,7 @@ func main() {
 			continue
 		}
 		ref, _ := excelize.CoordinatesToCellName(8, i+1)
-		if err := f.SetCellValue(sheet, ref, linkPrefix+e.id); err != nil {
+		if err := f.SetCellValue(sheet, ref, portal+"/Products/Files/DocEditor.aspx?fileid="+e.id); err != nil {
 			panic(err)
 		}
 		used[e.id] = true

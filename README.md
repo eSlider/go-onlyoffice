@@ -743,7 +743,7 @@ opens a shared cooldown gate and `Retry-After` is honoured (see `DoRetry` and
 ooscan 659                             # recursive index → TSV: file_id, folder_id, path, title
 ooscan 659 666 > oo-index.tsv          # several roots into one index
 pdfamount 671                          # "Zu zahlender Betrag" per PDF → TSV: file_id, title, amount
-kontoblatt 3906 ./kontoblatt.xlsx      # summary (Gegenkonto/Monat) uploaded next to source
+kontoblatt 1234 ./kontoblatt.xlsx      # summary (Gegenkonto/Monat) uploaded next to source
 kontolink IN.xlsx oo-index.tsv OUT.xlsx [FILE_ID] [AMOUNTS_TSV]
 # kontolink writes DocEditor links into the Link column: Beleg → supplier+month
 # → amount+date (5th arg = pdfamount output); with FILE_ID it updates the

@@ -105,10 +105,10 @@ func TestXMLToText(t *testing.T) {
 	raw := []byte(`<?xml version="1.0" encoding="UTF-8"?>
 <rsm:CrossIndustryInvoice><rsm:ExchangedDocument>
 <ram:ID>S1063</ram:ID></rsm:ExchangedDocument>
-<ram:Name>Edelweiss &amp; Co</ram:Name><ram:GrandTotalAmount>42.00</ram:GrandTotalAmount>
+<ram:Name>Acme &amp; Co</ram:Name><ram:GrandTotalAmount>42.00</ram:GrandTotalAmount>
 </rsm:CrossIndustryInvoice>`)
 	got := xmlToText(raw)
-	for _, want := range []string{"S1063", "Edelweiss & Co", "42.00"} {
+	for _, want := range []string{"S1063", "Acme & Co", "42.00"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("xmlToText missing %q:\n%s", want, got)
 		}
