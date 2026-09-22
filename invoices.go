@@ -443,21 +443,32 @@ func (c *Client) DeleteInvoiceItem(ctx context.Context, id string) (map[string]a
 	return c.deleteObject(ctx, fmt.Sprintf("/api/2.0/crm/invoiceitem/%s.json", url.PathEscape(id)))
 }
 
+// contactAddress is the JSON payload OO stores in a ContactInfo row of type
+// Address (ASC.Api.CRM.Wrappers.Address).
+type contactAddress struct {
+	Street  string `json:"street"`
+	City    string `json:"city"`
+	State   string `json:"state"`
+	Zip     string `json:"zip"`
+	Country string `json:"country"`
+}
+
 // AddContactAddress attaches a postal address to a contact.
-// category: Home|Postal|Office|Billing|Other|Work (or numeric string).
+// category: Home|Postal|Office|Billing|Other|Work.
+//
+// OO stores addresses as ContactInfo rows of infoType Address whose `data` is
+// the Address object as JSON (the dedicated /addressdata endpoint binds the
+// model from the body and is not accepted by all builds). The generic
+// /contact/{id}/data endpoint is the one `oo contacts info-add` uses.
 func (c *Client) AddContactAddress(ctx context.Context, contactID, street, city, state, zip, country, category string, isPrimary bool) (map[string]any, error) {
 	if category == "" {
 		category = "Billing"
 	}
-	fields := url.Values{}
-	fields.Set("street", street)
-	fields.Set("city", city)
-	fields.Set("state", state)
-	fields.Set("zip", zip)
-	fields.Set("country", country)
-	fields.Set("category", category)
-	fields.Set("isPrimary", strconv.FormatBool(isPrimary))
-	return c.postFormObject(ctx, fmt.Sprintf("/api/2.0/crm/contact/%s/address", url.PathEscape(contactID)), fields)
+	payload, err := json.Marshal(contactAddress{Street: street, City: city, State: state, Zip: zip, Country: country})
+	if err != nil {
+		return nil, err
+	}
+	return c.AddContactInfo(ctx, contactID, "Address", string(payload), category, isPrimary)
 }
 
 // UpdateCompany updates company name and optional about text.
