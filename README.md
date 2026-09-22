@@ -549,6 +549,9 @@ type Task struct {
 | `SignJWT(secret, payload)` | HS256 JWT, stdlib only |
 | `ConvertDocument(ctx, docsBase, secret, req)` | OnlyOffice DocumentServer conversion (`/converter`; legacy `/ConvertService.ashx`) |
 | `DownloadURLTo(ctx, url, w)` | Stream an absolute URL into a writer |
+| `WorkbookSheetNames(data)` | Worksheet names of an XLS/XLSX/ODS workbook |
+| `WorkbookSheetCSV(data, sheet, delim)` | One worksheet → CSV (sheet-aware, excelize) |
+| `WorkbookSheetJSON(data, sheet)` | One worksheet → rows as objects (first row = header) |
 
 Example — convert a portal file (or a local file) to PDF with the native engine:
 
@@ -621,6 +624,12 @@ oo docs presigned 3684                   # short-lived fetchable URL of an OO fi
 oo docs pdf 3684 --out out.pdf           # OO file → PDF (via DocumentServer)
 oo docs pdf ./report.docx --to pdf       # local file → PDF on the fly (temp upload+cleanup)
 oo docs pdf 3684 --stream > out.pdf      # pipe: bytes to stdout (alias --pipe)
+
+# Spreadsheet export (sheet-aware; local reader — the DS csv output is first-sheet-only)
+oo docs csv  227 --sheet 2                 # XLS/XLSX/ODS worksheet → CSV (--sheet N, 1-based)
+oo docs csv  227 --delimiter ';'           # ; | | \t via --delimiter
+oo docs json 227 --sheet 2                 # worksheet → JSON rows (first row = header)
+oo docs csv  ./book.xlsx --sheet 1 --out sheet1.csv
 #   export ONLYOFFICE_DS_SECRET=<DocumentServer CoAuthoring secret>
 #   docs base: $ONLYOFFICE_DOCS_URL, else $ONLYOFFICE_URL + /ds-vpath
 
