@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -37,6 +39,8 @@ Structured OCR (hOCR→MD): oo docs hocr scan.jpg --md out.md --yaml out.yml`,
 	cmd.AddCommand(docsConvertCmd())
 	cmd.AddCommand(docsPDFCmd())
 	cmd.AddCommand(docsPresignedCmd())
+	cmd.AddCommand(docsCSVCmd())
+	cmd.AddCommand(docsJSONCmd())
 	cmd.AddCommand(docsOptimizeCmd())
 	cmd.AddCommand(docsOCRCmd())
 	cmd.AddCommand(docsHOCRCmd())
@@ -208,6 +212,125 @@ func docsPresignedCmd() *cobra.Command {
 			return nil
 		},
 	}
+}
+
+// loadWorkbookBytes reads an argument that is either an OnlyOffice file id
+// (downloaded via the client) or a local path.
+func loadWorkbookBytes(cmd *cobra.Command, c *onlyoffice.Client, arg string) ([]byte, error) {
+	if fi, err := os.Stat(arg); err == nil && !fi.IsDir() {
+		return os.ReadFile(arg)
+	}
+	var buf bytes.Buffer
+	if _, err := c.DownloadFile(cmd.Context(), arg, &buf); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// parseDelimiter maps a flag value to a CSV delimiter rune ("," default).
+func parseDelimiter(s string) rune {
+	switch s {
+	case "", ",":
+		return ','
+	case "\\t", "tab", "\t":
+		return '\t'
+	case ";":
+		return ';'
+	case "|":
+		return '|'
+	default:
+		r := []rune(s)
+		return r[0]
+	}
+}
+
+func docsCSVCmd() *cobra.Command {
+	var sheet int
+	var delim, out string
+	cmd := &cobra.Command{
+		Use:   "csv SRC [SRC...]",
+		Short: "Export a worksheet (XLS/XLSX/ODS) to CSV (sheet-aware)",
+		Long: `SRC is an OnlyOffice file id or a local path. --sheet is 1-based (default 1 = first).
+
+Why not the DocumentServer: its csv output covers only the first worksheet and
+ignores a sheet selector (verified). Sheet selection and JSON use a local reader.`,
+		Args: cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			d := parseDelimiter(delim)
+			for _, arg := range args {
+				data, err := loadWorkbookBytes(cmd, c, arg)
+				if err != nil {
+					return fmt.Errorf("read %s: %w", arg, err)
+				}
+				text, err := onlyoffice.WorkbookSheetCSV(data, sheet-1, d)
+				if err != nil {
+					return fmt.Errorf("%s: %w", arg, err)
+				}
+				if out != "" {
+					if err := os.WriteFile(out, []byte(text), 0o644); err != nil {
+						return err
+					}
+					printObject(map[string]any{"source": arg, "sheet": sheet, "output": out, "bytes": len(text)})
+					continue
+				}
+				fmt.Print(text)
+			}
+			return nil
+		},
+	}
+	cmd.Flags().IntVar(&sheet, "sheet", 1, "worksheet number (1-based, default first)")
+	cmd.Flags().StringVar(&delim, "delimiter", ",", "CSV delimiter (',', ';', '|', 'tab')")
+	cmd.Flags().StringVar(&out, "out", "", "write to this file instead of stdout (single input)")
+	return cmd
+}
+
+func docsJSONCmd() *cobra.Command {
+	var sheet int
+	var out string
+	cmd := &cobra.Command{
+		Use:   "json SRC [SRC...]",
+		Short: "Export a worksheet (XLS/XLSX/ODS) to JSON rows (first row = header)",
+		Long: `SRC is an OnlyOffice file id or a local path. --sheet is 1-based (default 1 = first).
+Each data row becomes an object keyed by the header cells of that sheet.`,
+		Args: cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			for _, arg := range args {
+				data, err := loadWorkbookBytes(cmd, c, arg)
+				if err != nil {
+					return fmt.Errorf("read %s: %w", arg, err)
+				}
+				rows, err := onlyoffice.WorkbookSheetJSON(data, sheet-1)
+				if err != nil {
+					return fmt.Errorf("%s: %w", arg, err)
+				}
+				b, err := json.MarshalIndent(rows, "", "  ")
+				if err != nil {
+					return err
+				}
+				b = append(b, '\n')
+				if out != "" {
+					if err := os.WriteFile(out, b, 0o644); err != nil {
+						return err
+					}
+					printObject(map[string]any{"source": arg, "sheet": sheet, "rows": len(rows), "output": out})
+					continue
+				}
+				os.Stdout.Write(b)
+			}
+			return nil
+		},
+	}
+	cmd.Flags().IntVar(&sheet, "sheet", 1, "worksheet number (1-based, default first)")
+	cmd.Flags().StringVar(&out, "out", "", "write to this file instead of stdout (single input)")
+	return cmd
 }
 
 // docsBaseURL resolves the DocumentServer base: --docs-url, $ONLYOFFICE_DOCS_URL,
