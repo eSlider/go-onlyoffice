@@ -14,6 +14,64 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (`OO_RETRY_ATTEMPTS`/`_BASE`/`_MAX`) and a process-wide 429 cooldown gate.
   All HTTP paths are paced via `pacedTransport`.
 
+## [0.19.0](https://github.com/eSlider/go-onlyoffice/compare/v0.18.0...v0.19.0) (2026-09-22)
+
+
+### Features
+
+* **deploy:** rclone WebDAV mount compose + smoke + docs ([#54](https://github.com/eSlider/go-onlyoffice/issues/54)) ([6549fbf](https://github.com/eSlider/go-onlyoffice/commit/6549fbf7e25706b17f8342d86cfec3429a7b4365))
+* **files:** canonical Entry + FileStore REST/DAV adapters ([#35](https://github.com/eSlider/go-onlyoffice/issues/35)) ([94951fc](https://github.com/eSlider/go-onlyoffice/commit/94951fc6c5eef25cd257d039ad7cb3c5aee869d6))
+* **files:** Documents Dav ops + UpdateFile, fileops errors ([#152](https://github.com/eSlider/go-onlyoffice/issues/152)) ([c576bfe](https://github.com/eSlider/go-onlyoffice/commit/c576bfe2eed0b63cceb28b2e6ac753d71c3b01d0))
+* **files:** MinIO fallback for stale S3 downloads ([#152](https://github.com/eSlider/go-onlyoffice/issues/152)) ([8ac777c](https://github.com/eSlider/go-onlyoffice/commit/8ac777c031f72700b06ce54ea59f7f1d6af2b559))
+* **files:** read-only SQL file store over Community Server DB ([#36](https://github.com/eSlider/go-onlyoffice/issues/36)) ([bf3ef02](https://github.com/eSlider/go-onlyoffice/commit/bf3ef025aa2c929516a5e0e69181954f37035d05))
+* **files:** SQL file backend via Client.FileStore/SQLFileStore + live MySQL integration ([#55](https://github.com/eSlider/go-onlyoffice/issues/55)) ([a6bba30](https://github.com/eSlider/go-onlyoffice/commit/a6bba30438914da32c62c0d7f1de2ba6c1ea70d4))
+* **oo:** dav rm — удаление папок/файлов Documents ([#30](https://github.com/eSlider/go-onlyoffice/issues/30)) ([e49693a](https://github.com/eSlider/go-onlyoffice/commit/e49693ad2cb844c8278ee44fd78b4d93388a5957))
+* **oo:** docs pdf --stream/--pipe (converted bytes to stdout) ([7c089a6](https://github.com/eSlider/go-onlyoffice/commit/7c089a64399ef9b6a856be9f565fc0ffcc6721b0))
+* **oo:** file deep links, login check, replace-in (fresh upload) ([df38b75](https://github.com/eSlider/go-onlyoffice/commit/df38b750111e4a17826645c03204b5f942a3c924))
+* **oo:** kontoblatt bulk tools, oo dav, update, retry ([#22](https://github.com/eSlider/go-onlyoffice/issues/22)) ([af8e3b0](https://github.com/eSlider/go-onlyoffice/commit/af8e3b053a949c3c87b2db1f09bbdc2e96b592b1))
+* **oo:** native document conversion (docs pdf/presigned) ([58b905c](https://github.com/eSlider/go-onlyoffice/commit/58b905cc49a0a67c4d2c79b227a5adc6d5a29e21))
+* **oo:** project team CRUD and user lifecycle (block/unblock/password/delete) ([1dc99d6](https://github.com/eSlider/go-onlyoffice/commit/1dc99d699712694cdd6f5b0d6f5c3cb05acade76))
+* **oo:** projects files update (overwrite existing file content) ([ee8e88f](https://github.com/eSlider/go-onlyoffice/commit/ee8e88fb9bf385b5f7e1e00139c21c718825bb31))
+* **oo:** projects milestone-delete ([e323a43](https://github.com/eSlider/go-onlyoffice/commit/e323a433174beed881861f11cf4da9f5872c12a9))
+* **oo:** sheet-aware spreadsheet export (docs csv/json) ([5e73f6c](https://github.com/eSlider/go-onlyoffice/commit/5e73f6c335d44af1cf707074b86167fee8e510ad))
+* **search:** Elasticsearch searcher (name+content) and oo search ([#37](https://github.com/eSlider/go-onlyoffice/issues/37)) ([b5a61ad](https://github.com/eSlider/go-onlyoffice/commit/b5a61ad4206cdc954840fcad5c8af0431dc447cb))
+* **search:** full unique path first + immediate folder in results ([#51](https://github.com/eSlider/go-onlyoffice/issues/51)) ([a3ef83a](https://github.com/eSlider/go-onlyoffice/commit/a3ef83a9617e04d2b822912b5834d94a268db5ef))
+* **search:** index embedded PDF attachment text ([#42](https://github.com/eSlider/go-onlyoffice/issues/42)) ([3cc288d](https://github.com/eSlider/go-onlyoffice/commit/3cc288d281b22b06b734db33870c023b424bb944))
+* **search:** PDF content via own ES index and oo index ([#42](https://github.com/eSlider/go-onlyoffice/issues/42)) ([3fe43ee](https://github.com/eSlider/go-onlyoffice/commit/3fe43ee82c6426ef821f860d50bac1ee5a98822d))
+* **search:** substring/AND terms, nested folder scope, limit 1000 ([#49](https://github.com/eSlider/go-onlyoffice/issues/49)) ([6a4940b](https://github.com/eSlider/go-onlyoffice/commit/6a4940ba820a48f3de21fe6cea5dddaa7ed038d8))
+
+
+### Bug Fixes
+
+* **crm:** store contact addresses via ContactInfo Address type ([#288](https://github.com/eSlider/go-onlyoffice/issues/288)) ([c4beba5](https://github.com/eSlider/go-onlyoffice/commit/c4beba5173bb4b49cf35501d3c8bf90d76e388fb))
+* **docpipe:** index .yaml and extensionless PDF attachments ([#47](https://github.com/eSlider/go-onlyoffice/issues/47)) ([66a6b57](https://github.com/eSlider/go-onlyoffice/commit/66a6b57401d7f9240a991d86d88a0fd15269a193))
+* **files:** dedupe ProviderPG after facade/SQL merge, rename test fake ([ce4778b](https://github.com/eSlider/go-onlyoffice/commit/ce4778bdf1ad8eaca547ac2428a168c252b42b11))
+* **files:** REST FileStore resolves folders for stat/rename/move/delete ([#62](https://github.com/eSlider/go-onlyoffice/issues/62)) ([932cd28](https://github.com/eSlider/go-onlyoffice/commit/932cd2895ab3d44c7d42028d7c67caca58c33c7b))
+* **files:** UpdateFile uses PUT /api/2.0/files/{id}/update ([#25](https://github.com/eSlider/go-onlyoffice/issues/25)) ([504d13e](https://github.com/eSlider/go-onlyoffice/commit/504d13ed089dae819157075df1d0cbc0332251d7))
+* **files:** пропускать пустой dedup-ключ (dotfiles) ([#63](https://github.com/eSlider/go-onlyoffice/issues/63)) ([f8783b8](https://github.com/eSlider/go-onlyoffice/commit/f8783b86a80650203b8ec92c1d96cdea5f11c62d))
+* **files:** ретраить transient-ответы при удалении файлов ([#63](https://github.com/eSlider/go-onlyoffice/issues/63)) ([5588c2d](https://github.com/eSlider/go-onlyoffice/commit/5588c2d3f7f88da7402c248198c5e9efd98a9342))
+* **pdfamount:** widen amount labels and formats ([#27](https://github.com/eSlider/go-onlyoffice/issues/27)) ([ccabc11](https://github.com/eSlider/go-onlyoffice/commit/ccabc11153026381cdffde9942bcc7410c7be913))
+* **pdfamount:** не считать ставку НДС суммой; итог DKV ([#29](https://github.com/eSlider/go-onlyoffice/issues/29)) ([57b383d](https://github.com/eSlider/go-onlyoffice/commit/57b383d579ed61d1ceb0172d386f4b8b50b922bb))
+* **retry:** retry transient edge answers centrally, fix stale task test ([#57](https://github.com/eSlider/go-onlyoffice/issues/57)) ([d6b8eb7](https://github.com/eSlider/go-onlyoffice/commit/d6b8eb7777aeed945bd11dfb26eecef741fd152e))
+* **retry:** глобальный rate-limit + Retry-After + cooldown ([#70](https://github.com/eSlider/go-onlyoffice/issues/70)) ([c9e16c7](https://github.com/eSlider/go-onlyoffice/commit/c9e16c7169f92143bec88c664653bbe0258ba122))
+
+
+### Code Refactoring
+
+* **files:** single file client facade + CLI/TUI migration ([#38](https://github.com/eSlider/go-onlyoffice/issues/38)) ([ba29738](https://github.com/eSlider/go-onlyoffice/commit/ba29738482c71d18fc527b319fc7a2a86f5ed078))
+* **search:** use canonical model from file_core.go ([#37](https://github.com/eSlider/go-onlyoffice/issues/37)) ([b3dfff1](https://github.com/eSlider/go-onlyoffice/commit/b3dfff1a4c6f085143b4eecdf313ea9b5aaa7f73))
+
+
+### Documentation
+
+* **files:** add unified file client contract ([#39](https://github.com/eSlider/go-onlyoffice/issues/39)) ([c59ad64](https://github.com/eSlider/go-onlyoffice/commit/c59ad645eada71d0b6ba8d4c5f29e5db44471ae5))
+* **oo:** comment where the new helpers are used ([520d6d0](https://github.com/eSlider/go-onlyoffice/commit/520d6d05c8dc10bdde09afe2118d3471ce71980f))
+* **oo:** dav, documents files api, bulk tools, fix verbs ([#22](https://github.com/eSlider/go-onlyoffice/issues/22)) ([59caf5e](https://github.com/eSlider/go-onlyoffice/commit/59caf5e56002fe7a4caf607800b5caf6e133ea7e))
+* **readme:** examples for links, conversion, team/users CRUD ([4515a88](https://github.com/eSlider/go-onlyoffice/commit/4515a88fe82c80a449845b0678cfa543cc2fced8))
+* Testing section, rclone/SQL refs, docs index ([#53](https://github.com/eSlider/go-onlyoffice/issues/53)) ([a88fd5b](https://github.com/eSlider/go-onlyoffice/commit/a88fd5b40c4c6a31a2dcd10ba264d8600640e749))
+* карта поиска и обновления индексов ([#34](https://github.com/eSlider/go-onlyoffice/issues/34)) ([f22d714](https://github.com/eSlider/go-onlyoffice/commit/f22d714be70c878b3c210c7d7e30a392956cbaad))
+* убрать потребительские детали match из index-and-search ([#34](https://github.com/eSlider/go-onlyoffice/issues/34)) ([0d73146](https://github.com/eSlider/go-onlyoffice/commit/0d73146ebc2ad16b5841dda381c09e24769b5f21))
+
 ## [0.18.0](https://github.com/eSlider/go-onlyoffice/compare/v0.17.0...v0.18.0) (2026-09-04)
 
 
