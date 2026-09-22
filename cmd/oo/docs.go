@@ -1,11 +1,16 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 
 	onlyoffice "github.com/eslider/go-onlyoffice"
 	"github.com/eslider/go-onlyoffice/internal/docpipe"
@@ -32,6 +37,10 @@ OCR a scan locally:       oo docs ocr scan.pdf --md out.md
 Structured OCR (hOCR→MD): oo docs hocr scan.jpg --md out.md --yaml out.yml`,
 	}
 	cmd.AddCommand(docsConvertCmd())
+	cmd.AddCommand(docsPDFCmd())
+	cmd.AddCommand(docsPresignedCmd())
+	cmd.AddCommand(docsCSVCmd())
+	cmd.AddCommand(docsJSONCmd())
 	cmd.AddCommand(docsOptimizeCmd())
 	cmd.AddCommand(docsOCRCmd())
 	cmd.AddCommand(docsHOCRCmd())
@@ -59,6 +68,293 @@ func docsToolsCmd() *cobra.Command {
 			return nil
 		},
 	}
+}
+
+func docsPDFCmd() *cobra.Command {
+	var out, docsURL, secret, output, folder string
+	var stream, pipe bool
+	cmd := &cobra.Command{
+		Use:   "pdf FILE_ID | PATH [ARG...]",
+		Short: "Convert files to PDF via the DocumentServer converter (OO file ids or local paths)",
+		Long: `Native OnlyOffice conversion (the engine behind the portal's "Download as PDF"):
+
+  1. GET /api/2.0/files/file/{id}/presigneduri   → fetchable source URL
+  2. POST <docs>/converter with a JWT            → converted file URL
+  3. download the result
+
+Arguments may be OnlyOffice file ids OR local file paths. A local path is
+uploaded to the scratch folder (--folder, default 2 = "My documents"), converted,
+downloaded and then removed — so any local document yields a PDF on the fly.
+
+Docs base defaults to $ONLYOFFICE_DOCS_URL, else $ONLYOFFICE_URL + "/ds-vpath"
+(/ds-vpath is the usual reverse-proxy mount for the DocumentServer). The JWT secret is
+$ONLYOFFICE_DS_SECRET (DocumentServer services.CoAuthoring.secret).`,
+		Args: cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			base := docsBaseURL(docsURL)
+			if base == "" {
+				return fmt.Errorf("docs base url unknown; set --docs-url or ONLYOFFICE_DOCS_URL")
+			}
+			sec := secret
+			if sec == "" {
+				sec = firstEnv("ONLYOFFICE_DS_SECRET", "OO_DS_SECRET")
+			}
+			if sec == "" {
+				return fmt.Errorf("JWT secret required: --secret or ONLYOFFICE_DS_SECRET")
+			}
+			ot := output
+			if ot == "" {
+				ot = "pdf"
+			}
+			toStdout := stream || pipe
+			if toStdout && len(args) > 1 {
+				return fmt.Errorf("--stream/--pipe writes one file to stdout; pass a single input")
+			}
+			for _, arg := range args {
+				id, local := arg, false
+				title := ""
+				if fi, statErr := os.Stat(arg); statErr == nil && !fi.IsDir() {
+					// Local file → temporary upload into the scratch folder.
+					ent, uerr := c.UploadToFolder(cmd.Context(), folder, arg)
+					if uerr != nil {
+						return fmt.Errorf("upload %s: %w", arg, uerr)
+					}
+					id = strconv.FormatInt(onlyoffice.FileEntryNumericID(ent), 10)
+					local = true
+					title = filepath.Base(arg)
+				} else {
+					if f, ferr := c.GetFile(cmd.Context(), id); ferr == nil && f != nil && f.Title != nil {
+						title = *f.Title
+					}
+				}
+				src, err := c.PresignedURI(cmd.Context(), id)
+				if err != nil {
+					return fmt.Errorf("presigneduri %s: %w", id, err)
+				}
+				res, err := c.ConvertDocument(cmd.Context(), base, sec, onlyoffice.ConvertRequest{
+					URL:        src,
+					OutputType: ot,
+					FileType:   strings.TrimPrefix(filepath.Ext(title), "."),
+					Title:      title,
+					Key:        fmt.Sprintf("oo-%s-%d", id, time.Now().UnixNano()),
+				})
+				if err != nil {
+					return fmt.Errorf("convert %s: %w", id, err)
+				}
+				var w io.Writer
+				dst := out
+				if toStdout {
+					w = os.Stdout
+				} else {
+					if dst == "" {
+						stem := strings.TrimSuffix(title, filepath.Ext(title))
+						if stem == "" {
+							stem = "file-" + id
+						}
+						dst = stem + "." + ot
+					}
+					fh, err := os.Create(dst)
+					if err != nil {
+						return err
+					}
+					w = fh
+					defer fh.Close()
+				}
+				n, derr := c.DownloadURLTo(cmd.Context(), res.FileURL, w)
+				if local {
+					// Best-effort cleanup of the temporary upload.
+					if nid, e := strconv.Atoi(id); e == nil {
+						_ = c.DeleteFiles(cmd.Context(), []int{nid})
+					}
+				}
+				if derr != nil {
+					return fmt.Errorf("download: %w", derr)
+				}
+				if toStdout {
+					// Keep stdout byte-clean for pipes; status goes to stderr.
+					fmt.Fprintf(os.Stderr, "converted %s -> stdout (%d bytes, %s)\n", arg, n, ot)
+				} else {
+					printObject(map[string]any{"source": arg, "fileid": id, "title": title, "output": dst, "bytes": n, "type": ot})
+				}
+			}
+			return nil
+		},
+	}
+	cmd.Flags().StringVar(&out, "out", "", "output path (default: ./<title>.<format>)")
+	cmd.Flags().StringVar(&output, "to", "pdf", "output format (pdf, docx, xlsx, …)")
+	cmd.Flags().StringVar(&docsURL, "docs-url", "", "DocumentServer base (default $ONLYOFFICE_DOCS_URL or $ONLYOFFICE_URL/ds-vpath)")
+	cmd.Flags().StringVar(&secret, "secret", "", "JWT secret (default $ONLYOFFICE_DS_SECRET)")
+	cmd.Flags().StringVar(&folder, "folder", "2", "scratch folder id for local-file uploads")
+	cmd.Flags().BoolVar(&stream, "stream", false, "write the converted bytes to stdout (pipe-friendly)")
+	cmd.Flags().BoolVar(&pipe, "pipe", false, "alias for --stream")
+	return cmd
+}
+
+func docsPresignedCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "presigned FILE_ID",
+		Short: "Print a short-lived fetchable URI for a portal file",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			u, err := c.PresignedURI(cmd.Context(), args[0])
+			if err != nil {
+				return err
+			}
+			printObject(map[string]any{"fileid": args[0], "uri": u})
+			return nil
+		},
+	}
+}
+
+// loadWorkbookBytes reads an argument that is either an OnlyOffice file id
+// (downloaded via the client) or a local path.
+func loadWorkbookBytes(cmd *cobra.Command, c *onlyoffice.Client, arg string) ([]byte, error) {
+	if fi, err := os.Stat(arg); err == nil && !fi.IsDir() {
+		return os.ReadFile(arg)
+	}
+	var buf bytes.Buffer
+	if _, err := c.DownloadFile(cmd.Context(), arg, &buf); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// parseDelimiter maps a flag value to a CSV delimiter rune ("," default).
+func parseDelimiter(s string) rune {
+	switch s {
+	case "", ",":
+		return ','
+	case "\\t", "tab", "\t":
+		return '\t'
+	case ";":
+		return ';'
+	case "|":
+		return '|'
+	default:
+		r := []rune(s)
+		return r[0]
+	}
+}
+
+func docsCSVCmd() *cobra.Command {
+	var sheet int
+	var delim, out string
+	cmd := &cobra.Command{
+		Use:   "csv SRC [SRC...]",
+		Short: "Export a worksheet (XLS/XLSX/ODS) to CSV (sheet-aware)",
+		Long: `SRC is an OnlyOffice file id or a local path. --sheet is 1-based (default 1 = first).
+
+Why not the DocumentServer: its csv output covers only the first worksheet and
+ignores a sheet selector (verified). Sheet selection and JSON use a local reader.`,
+		Args: cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			d := parseDelimiter(delim)
+			for _, arg := range args {
+				data, err := loadWorkbookBytes(cmd, c, arg)
+				if err != nil {
+					return fmt.Errorf("read %s: %w", arg, err)
+				}
+				text, err := onlyoffice.WorkbookSheetCSV(data, sheet-1, d)
+				if err != nil {
+					return fmt.Errorf("%s: %w", arg, err)
+				}
+				if out != "" {
+					if err := os.WriteFile(out, []byte(text), 0o644); err != nil {
+						return err
+					}
+					printObject(map[string]any{"source": arg, "sheet": sheet, "output": out, "bytes": len(text)})
+					continue
+				}
+				fmt.Print(text)
+			}
+			return nil
+		},
+	}
+	cmd.Flags().IntVar(&sheet, "sheet", 1, "worksheet number (1-based, default first)")
+	cmd.Flags().StringVar(&delim, "delimiter", ",", "CSV delimiter (',', ';', '|', 'tab')")
+	cmd.Flags().StringVar(&out, "out", "", "write to this file instead of stdout (single input)")
+	return cmd
+}
+
+func docsJSONCmd() *cobra.Command {
+	var sheet int
+	var out string
+	cmd := &cobra.Command{
+		Use:   "json SRC [SRC...]",
+		Short: "Export a worksheet (XLS/XLSX/ODS) to JSON rows (first row = header)",
+		Long: `SRC is an OnlyOffice file id or a local path. --sheet is 1-based (default 1 = first).
+Each data row becomes an object keyed by the header cells of that sheet.`,
+		Args: cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			for _, arg := range args {
+				data, err := loadWorkbookBytes(cmd, c, arg)
+				if err != nil {
+					return fmt.Errorf("read %s: %w", arg, err)
+				}
+				rows, err := onlyoffice.WorkbookSheetJSON(data, sheet-1)
+				if err != nil {
+					return fmt.Errorf("%s: %w", arg, err)
+				}
+				b, err := json.MarshalIndent(rows, "", "  ")
+				if err != nil {
+					return err
+				}
+				b = append(b, '\n')
+				if out != "" {
+					if err := os.WriteFile(out, b, 0o644); err != nil {
+						return err
+					}
+					printObject(map[string]any{"source": arg, "sheet": sheet, "rows": len(rows), "output": out})
+					continue
+				}
+				os.Stdout.Write(b)
+			}
+			return nil
+		},
+	}
+	cmd.Flags().IntVar(&sheet, "sheet", 1, "worksheet number (1-based, default first)")
+	cmd.Flags().StringVar(&out, "out", "", "write to this file instead of stdout (single input)")
+	return cmd
+}
+
+// docsBaseURL resolves the DocumentServer base: --docs-url, $ONLYOFFICE_DOCS_URL,
+// else the standard /ds-vpath reverse-proxy mount.
+func docsBaseURL(flag string) string {
+	if flag != "" {
+		return flag
+	}
+	if v := os.Getenv("ONLYOFFICE_DOCS_URL"); v != "" {
+		return v
+	}
+	if v := firstEnv("ONLYOFFICE_URL", "ONLYOFFICE_HOST", "OO_URL"); v != "" {
+		return strings.TrimRight(v, "/") + "/ds-vpath"
+	}
+	return ""
+}
+
+func firstEnv(keys ...string) string {
+	for _, k := range keys {
+		if v := os.Getenv(k); v != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 func strOrNil(s string) any {
