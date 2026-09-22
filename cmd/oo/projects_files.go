@@ -22,6 +22,8 @@ func projectFilesCmd() *cobra.Command {
 	}
 	cmd.AddCommand(prjFilesListCmd())
 	cmd.AddCommand(prjFilesUploadCmd())
+	cmd.AddCommand(prjFilesReplaceInCmd())
+	cmd.AddCommand(prjFilesUpdateCmd())
 	cmd.AddCommand(prjFilesDownloadCmd())
 	cmd.AddCommand(prjFilesRenameCmd())
 	cmd.AddCommand(prjFilesDeleteCmd())
@@ -147,6 +149,68 @@ Pass --no-replace to fail when the name is taken; --allow-duplicate to always cr
 	cmd.Flags().BoolVar(&replace, "replace", true, "replace same stem|ext in project folder (default)")
 	cmd.Flags().BoolVar(&allowDuplicate, "allow-duplicate", false, "always create a new file even when the name exists")
 	return cmd
+}
+
+func prjFilesReplaceInCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "replace-in FOLDER_ID LOCAL_PATH [LOCAL_PATH...]",
+		Short: "Replace same-named file(s) in a folder: hard delete + fresh upload (no version history)",
+		Long: `Deletes any file in FOLDER_ID with the same stem|ext (hard delete — the CLI
+delete is permanent) and uploads the local file fresh. Unlike 'update' this
+leaves a single clean version.
+
+Why it exists: repeated 'update' of a shared document accumulated a visible
+version history and left a stale id. replace-in yields one clean revision; then
+point links at the returned id (or keep an nginx alias for the legacy fileid).
+
+Note: file ids are server-assigned; a fresh upload gets a new id.`,
+		Args: cobra.MinimumNArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			folderID := args[0]
+			for _, p := range args[1:] {
+				stem := onlyoffice.UploadStemFromLocal(p)
+				ext := onlyoffice.UploadExtFromLocal(p)
+				deleted, derr := c.DeleteFilesByDedupKey(cmd.Context(), folderID, stem, ext)
+				if derr != nil {
+					return derr
+				}
+				ent, uerr := c.UploadToFolder(cmd.Context(), folderID, p)
+				if uerr != nil {
+					return uerr
+				}
+				obj := fileEntryToMap(ent)
+				if len(deleted) > 0 {
+					obj["replaced_file_ids"] = deleted
+				}
+				printObject(obj)
+			}
+			return nil
+		},
+	}
+}
+
+func prjFilesUpdateCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "update FILE_ID LOCAL_PATH",
+		Short: "Overwrite an existing Documents file with new content (new version)",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := newOO(cmd)
+			if err != nil {
+				return err
+			}
+			entry, err := c.UpdateFile(cmd.Context(), args[0], args[1])
+			if err != nil {
+				return err
+			}
+			printObject(fileEntryToMap(entry))
+			return nil
+		},
+	}
 }
 
 func prjFilesDownloadCmd() *cobra.Command {
