@@ -22,7 +22,7 @@
 //	oo search        QUERY [--content] [--folder ID] [--limit N] [--backend oo|own] [--json]
 //	oo index         folder FOLDER_ID | files FILE_ID... [--recursive] [--exts pdf] [--dry-run]
 //
-// CRM association rules: docs/crm-associations.md
+// CRM association rules live with the private oo-workspace tooling.
 //
 // Every list supports `--output/-o json|table` (table is the default).
 //

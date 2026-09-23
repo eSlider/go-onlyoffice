@@ -131,7 +131,7 @@ type UpdateInvoiceParams struct {
 // UpdateInvoice PUTs a full invoice body (OnlyOffice requires complete payload).
 //
 // Linking an opportunity via EntityID on an existing invoice often returns HTTP 400
-// on this portal — prefer CreateInvoice with EntityID set. See docs/crm-associations.md.
+// on this portal — prefer CreateInvoice with EntityID set. See the CRM association rules.
 func (c *Client) UpdateInvoice(ctx context.Context, id string, p UpdateInvoiceParams) (map[string]any, error) {
 	inv, err := c.GetInvoice(ctx, id)
 	if err != nil {
@@ -249,7 +249,7 @@ const (
 
 // SetInvoiceStatus sets CRM invoice status for one or more invoice ids
 // (PUT /api/2.0/crm/invoice/status/{statusId} with invoiceids).
-// Note: Billed→Draft often does not stick; recreate Draft instead (see docs/crm-associations.md).
+// Note: Billed→Draft often does not stick; recreate Draft instead (see the CRM association rules).
 func (c *Client) SetInvoiceStatus(ctx context.Context, statusID int, invoiceIDs ...int64) (map[string]any, error) {
 	if statusID <= 0 {
 		return nil, fmt.Errorf("status id is required")

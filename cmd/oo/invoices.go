@@ -91,7 +91,7 @@ func invoiceCreateCmd() *cobra.Command {
 		Long: `Create a CRM invoice (Draft) with a single line.
 
 Always pass --opportunity when a deal exists (entity link at create). Updating
---opportunity later often fails with HTTP 400 — see docs/crm-associations.md.
+--opportunity later often fails with HTTP 400 — see the CRM association rules.
 
 Example:
   oo invoices create --number INV-2026-01 --contact CONTACT_ID --item ITEM_ID \
@@ -108,7 +108,7 @@ Example:
 				issueDate = issueDate + "T00:00:00.0000000+01:00"
 			}
 			if dueDate == "" {
-				dueDate = time.Now().Add(14 * 24 * time.Hour).Format("2006-01-02") + "T00:00:00.0000000+01:00"
+				dueDate = time.Now().Add(14*24*time.Hour).Format("2006-01-02") + "T00:00:00.0000000+01:00"
 			} else if !strings.Contains(dueDate, "T") {
 				dueDate = dueDate + "T00:00:00.0000000+01:00"
 			}
@@ -175,7 +175,7 @@ func invoiceUpdateCmd() *cobra.Command {
 		Long: `Update Draft invoice fields.
 
 --opportunity often returns HTTP 400 on existing invoices. Prefer
-oo invoices create … --opportunity, or delete+recreate. See docs/crm-associations.md.
+oo invoices create … --opportunity, or delete+recreate. See the CRM association rules.
 `,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -274,7 +274,7 @@ func invoiceStatusCmd() *cobra.Command {
 		Long: `PUT /api/2.0/crm/invoice/status/{id}.
 
 Billed invoices are not content-editable. Billed→Draft often does not work —
-recreate as Draft instead (docs/crm-associations.md).
+recreate as Draft instead (the CRM association rules).
 `,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
