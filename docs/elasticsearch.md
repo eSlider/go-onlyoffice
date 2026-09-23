@@ -3,7 +3,7 @@ type: reference
 status: current
 related:
   - README.md
-  - file_es.go
+  - filestore_es.go
 ---
 
 # Elasticsearch — полнотекстовый поиск OnlyOffice
@@ -85,12 +85,12 @@ oo search "Rechnung" --folder 649 --limit 50 --json
 
 ## Обновление индекса и карта поиска
 
-Обзор всех контуров поиска и как обновлять индексы (`oo index`,
-`ooscan`/`pdfamount` для match) — [index-and-search.md](index-and-search.md).
+Обзор всех контуров поиска и как обновлять индексы (`oo index`) —
+[index-and-search.md](index-and-search.md).
 
 ## Библиотека
 
-`file_es.go` — `ESSearcher` (`Name() = "elasticsearch"`), прямой ES REST на
+`filestore_es.go` — `ESSearcher` (`Name() = "elasticsearch"`), прямой ES REST на
 stdlib `net/http`:
 
 ```go
@@ -103,7 +103,7 @@ hits, _ := es.Search(ctx, onlyoffice.SearchQuery{
 Запрос: `multi_match` по `title^2` (+ `document.attachment.content` при
 `InContent`), фильтры `tenantId` и `folders.folderId`, `_source`
 id/title/folders, `highlight` для фрагмента. Ответ → `[]SearchHit` (модель из
-эпика #34; пока объявлена в `file_es.go`, переедет в `file_core.go` с F1 #35).
+эпика #34; пока объявлена в `filestore_es.go`, переедет в `filestore_core.go` с F1 #35).
 
 ## Тесты
 
@@ -168,11 +168,11 @@ OnlyOffice PDF лежит только по имени.
 
 ## Устройство
 
-- `file_es_text.go` — `ESTextIndex` (`Name() = "es-text"`):
+- `filestore_es_text.go` — `ESTextIndex` (`Name() = "es-text"`):
   `Ensure` (создаёт индекс с явным маппингом), `Put` (bulk, `refresh`),
   `Delete` (по `id`), `Search` (`multi_match` по `title^2` + `content`,
   фильтры `folder`/`ext`, highlight).
-- `file_text_index.go` — `TextIndexer`: листает папки (`FileStore.List`),
+- `filestore_text_index.go` — `TextIndexer`: листает папки (`FileStore.List`),
   качает файлы (`FileStore.Download`), извлекает текст через
   `internal/docpipe` (`pdftotext`, для сканов — `ocrmypdf`/`tesseract`),
   пишет в `TextIndex`. Пул воркеров (по умолчанию 3).

@@ -14,7 +14,6 @@ import (
 
 	onlyoffice "github.com/eslider/go-onlyoffice"
 	"github.com/eslider/go-onlyoffice/internal/docpipe"
-	"github.com/eslider/go-onlyoffice/internal/xlspipe"
 	"github.com/spf13/cobra"
 )
 
@@ -31,7 +30,7 @@ func docsCmd() *cobra.Command {
 OnlyOffice Documents UI is poor for .md/.txt — keep sources in git, store .docx in OO.
 Upload Markdown as DOCX:  oo docs put-md PROJECT_ID file.md
 Upload plain text:        oo docs put-txt PROJECT_ID file.txt  (preserves line breaks)
-Upload/generate XLSX:     oo docs put-xlsx PROJECT_ID [--template cutover-portugal | FILE.xlsx]
+Upload XLSX:              oo docs put-xlsx PROJECT_ID FILE.xlsx
 Read an OO file as MD:    oo docs as-md FILE_ID
 OCR a scan locally:       oo docs ocr scan.pdf --md out.md
 Structured OCR (hOCR→MD): oo docs hocr scan.jpg --md out.md --yaml out.yml`,
@@ -810,64 +809,27 @@ func docsPutTxtCmd() *cobra.Command {
 }
 
 func docsPutXlsxCmd() *cobra.Command {
-	var folderID, template, title, keepLocal string
+	var folderID, keepLocal string
 	var replace bool
 	cmd := &cobra.Command{
-		Use:   "put-xlsx PROJECT_ID [LOCAL_XLSX]",
-		Short: "Upload or generate an XLSX workbook into a project (excelize templates with formulas)",
-		Long: `Spreadsheets live in OnlyOffice — not in git. Generate multi-sheet workbooks with
-formulas (SUM/AVG, cross-sheet refs, named inputs) via --template, or upload an existing .xlsx.
+		Use:   "put-xlsx PROJECT_ID LOCAL_XLSX",
+		Short: "Upload an XLSX workbook into a project (upsert by stem|ext)",
+		Long: `Spreadsheets live in OnlyOffice — not in git. Uploads an existing .xlsx into the
+project Documents (or --folder), replacing the same stem|ext by default.
 
-  oo docs put-xlsx 218 --template cutover-portugal
-  oo docs put-xlsx 218 --template cutover-portugal --title 2026-08-28-cutover-budget.xlsx
   oo docs put-xlsx 218 ./my.xlsx`,
-		Args: cobra.RangeArgs(1, 2),
+		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			pid := args[0]
 			c, err := newOO(cmd)
 			if err != nil {
 				return err
 			}
-			dir, err := os.MkdirTemp("", "oo-docs-put-xlsx-*")
-			if err != nil {
-				return err
+			xlsxPath := args[1]
+			if docpipe.Ext(xlsxPath) != ".xlsx" {
+				return fmt.Errorf("expected .xlsx, got %s", docpipe.Ext(xlsxPath))
 			}
-			defer os.RemoveAll(dir)
-
-			var xlsxPath string
-			var srcLabel string
-			switch {
-			case template != "":
-				wb, err := xlspipe.BuildTemplate(template)
-				if err != nil {
-					return err
-				}
-				name := title
-				if name == "" {
-					name = "cutover-budget.xlsx"
-					if template == xlspipe.TemplateCutoverPortugal {
-						name = "2026-08-28-cutover-budget.xlsx"
-					}
-				}
-				if !strings.HasSuffix(strings.ToLower(name), ".xlsx") {
-					name += ".xlsx"
-				}
-				xlsxPath = filepath.Join(dir, name)
-				if err := xlspipe.Save(wb, xlsxPath); err != nil {
-					wb.Close()
-					return err
-				}
-				wb.Close()
-				srcLabel = "template:" + template
-			case len(args) == 2:
-				xlsxPath = args[1]
-				if docpipe.Ext(xlsxPath) != ".xlsx" {
-					return fmt.Errorf("expected .xlsx, got %s", docpipe.Ext(xlsxPath))
-				}
-				srcLabel = xlsxPath
-			default:
-				return fmt.Errorf("pass LOCAL_XLSX or --template")
-			}
+			srcLabel := xlsxPath
 
 			if keepLocal != "" {
 				b, err := os.ReadFile(xlsxPath)
@@ -903,9 +865,7 @@ formulas (SUM/AVG, cross-sheet refs, named inputs) via --template, or upload an 
 		},
 	}
 	cmd.Flags().StringVar(&folderID, "folder", "", "Documents folder id (default: project root)")
-	cmd.Flags().StringVar(&template, "template", "", "built-in workbook template (cutover-portugal)")
-	cmd.Flags().StringVar(&title, "title", "", "upload file name when using --template")
-	cmd.Flags().StringVar(&keepLocal, "keep-xlsx", "", "also write generated/uploaded bytes to this local path")
+	cmd.Flags().StringVar(&keepLocal, "keep-xlsx", "", "also copy the uploaded bytes to this local path")
 	cmd.Flags().BoolVar(&replace, "replace", true, "replace same stem|ext before upload (default); false = fail if name taken")
 	return cmd
 }

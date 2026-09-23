@@ -14,7 +14,7 @@ import (
 )
 
 // ProviderES is the composed Elasticsearch searcher. The SQL store owns
-// ProviderPG/ProviderMySQL (file_pg.go); the facade references ProviderPG in
+// ProviderPG/ProviderMySQL (filestore_pg.go); the facade references ProviderPG in
 // readOrder.
 const ProviderES = "elasticsearch"
 

@@ -801,26 +801,11 @@ with `c.SQLFileStore()`, or register a backend on the facade
 fallback rules, env names and how to add a backend:
 [`docs/unified-file-client.md`](docs/unified-file-client.md).
 
-### Bulk tools (`cmd/`)
+### Bulk tools
 
-Small single-purpose binaries for bulk Documents work. All of them pace
-requests through a process-wide token bucket (default ~4 req/s, `OO_RATE_LIMIT`/
-`OO_BURST`) and retry transient OnlyOffice answers (429/502/503/504) with a
-deterministic exponential backoff — no jitter, same waits on every run. A 429
-opens a shared cooldown gate and `Retry-After` is honoured (see `DoRetry` and
-[`docs/rate-limiting.md`](docs/rate-limiting.md)). Build with
-`go build ./cmd/<tool>`.
-
-```bash
-ooscan 659                             # recursive index → TSV: file_id, folder_id, path, title
-ooscan 659 666 > oo-index.tsv          # several roots into one index
-pdfamount 671                          # "Zu zahlender Betrag" per PDF → TSV: file_id, title, amount
-kontoblatt 1234 ./kontoblatt.xlsx      # summary (Gegenkonto/Monat) uploaded next to source
-kontolink IN.xlsx oo-index.tsv OUT.xlsx [FILE_ID] [AMOUNTS_TSV]
-# kontolink writes DocEditor links into the Link column: Beleg → supplier+month
-# → amount+date (5th arg = pdfamount output); with FILE_ID it updates the
-# source file in place, else uploads an "(links)" copy next to it.
-```
+Business / one-off bulk tools (`ooscan`, `pdfamount`, `kontoblatt`,
+`kontolink`) live in the private `oo-workspace` repo, not in this public
+library. They build on the public client and the same `DoRetry` pacing.
 
 | Subject | Verbs |
 |---|---|
@@ -934,8 +919,8 @@ Merge two known company ids (keeps `INTO`):
 oo contacts merge FROM_ID INTO_ID
 ```
 
-Company ↔ person ↔ deal ↔ project ↔ invoice ↔ mail rules and OO quirks:
-[docs/crm-associations.md](docs/crm-associations.md).
+Company ↔ person ↔ deal ↔ project ↔ invoice ↔ mail rules and OO quirks live
+with the private `oo-workspace` tooling.
 
 ### Invoices (`oo invoices`)
 
@@ -1125,24 +1110,20 @@ Live runs need credentials (`ONLYOFFICE_URL`, `ONLYOFFICE_USER`,
 
 ### rclone WebDAV mount
 
-`deploy/docker-compose.rclone-webdav.yml` mounts the Documents tree as a
-filesystem (compose, not systemd; container `rclone-webdav`) — read/write like
-a normal FS over the `oo-webdav` sidecar. Setup, smoke log and limitations:
-[`docs/rclone-webdav.md`](docs/rclone-webdav.md).
+The rclone WebDAV mount (compose + `oo-webdav` sidecar) is deployment
+tooling and lives in the private `oo-workspace` repo. Set
+`ONLYOFFICE_WEBDAV_URL` to point the client at it.
 
 ### CI / releases
-
-GitHub Actions (pattern from [`eSlider/go-config`](https://github.com/eSlider/go-config)):
 
 | Workflow | Trigger | Purpose |
 |---|---|---|
 | `test.yml` | push / PR | `go vet`, unit tests, build `oo` + `office` |
-| `release-please.yml` | push to `main` | semver PR from conventional commits |
 | `release.yml` | tag `v*` | GoReleaser cross-platform `oo` + `office` binaries |
 
-Repo setting required once: **Settings → Actions → General → Allow GitHub Actions to create and approve pull requests**.
-
-Merge the release-please PR to tag a version; GoReleaser publishes assets to [GitHub Releases](https://github.com/eSlider/go-onlyoffice/releases).
+Gitea is canonical; tags are created there per SemVer (`fix:` → patch,
+`feat:` → minor, `!` → major). GoReleaser publishes assets to
+[GitHub Releases](https://github.com/eSlider/go-onlyoffice/releases).
 
 ## Examples
 
