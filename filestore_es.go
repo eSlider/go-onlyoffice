@@ -23,7 +23,7 @@ import (
 )
 
 // The canonical model (Kind, Entry, SearchQuery, SearchHit, Searcher) lives in
-// file_core.go (F1 #35).
+// filestore_core.go (F1 #35).
 
 const (
 	defaultESIndex    = "files_file"
