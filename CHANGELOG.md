@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [0.21.0](https://git.produktor.io/eSlider/go-onlyoffice/compare/v0.20.0...v0.21.0) (2026-09-23)
 
 
 ### Features
@@ -12,7 +12,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 * **retry:** global token-bucket rate limit (`OO_RATE_LIMIT`/`OO_BURST`), typed
   `TransientError` with `Retry-After`, exponential backoff
   (`OO_RETRY_ATTEMPTS`/`_BASE`/`_MAX`) and a process-wide 429 cooldown gate.
-  All HTTP paths are paced via `pacedTransport`.
+  All HTTP paths are paced via `pacedTransport` (#70).
+* **oo:** native document conversion (`oo docs pdf`), deep links, sheet-aware
+  export (`oo docs csv`/`json`), `oo docs presigned`, plus project team and
+  user lifecycle, milestone-delete and file update/replace (#73, #75).
+* **catalog:** upstream generic workspace tooling (board-sync, CRM audit,
+  catalog names) (#76).
+
+
+### Chores
+
+* move business tooling (`ooscan`, `pdfamount`, `kontoblatt`, `kontolink`) out
+  of the public library into the private `oo-workspace` repo; tidy filestore
+  naming (#77).
+* keep host/client specifics out of the tree (#74).
 
 ## [0.18.0](https://github.com/eSlider/go-onlyoffice/compare/v0.17.0...v0.18.0) (2026-09-04)
 
