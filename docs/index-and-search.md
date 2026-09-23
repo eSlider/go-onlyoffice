@@ -17,21 +17,20 @@ related:
 | REST `@search` | только имена в БД | нет | — (живой запрос) | `oo search` (по умолчанию `--backend oo`) |
 | ES `files_file` | имя + текст Office | Elasticsearch портала | сервер, асинхронно | `oo search --content` |
 | ES `oo_docs_text` | PDF/сканы (свой) | Elasticsearch портала | `oo index` | `oo search --backend own` |
-| TSV `ooscan` | файлы папок | файл `*.tsv` | `ooscan <folder...>` | потребитель (не библиотека) |
 
 ## Карта кода
 
-- `file_core.go` — интерфейсы `Searcher`, модели `SearchQuery`/`SearchHit`.
-- `file_es.go` — `ESSearcher` (индекс OnlyOffice `files_file`).
-- `file_es_text.go` — `ESTextIndex` (`oo_docs_text`): `Ensure`, `Put`, `Delete`,
+- `filestore_core.go` — интерфейсы `Searcher`, модели `SearchQuery`/`SearchHit`.
+- `filestore_es.go` — `ESSearcher` (индекс OnlyOffice `files_file`).
+- `filestore_es_text.go` — `ESTextIndex` (`oo_docs_text`): `Ensure`, `Put`, `Delete`,
   `Search`.
-- `file_text_index.go` — `TextIndexer`: обход папок (`FileStore.List`), download
+- `filestore_text_index.go` — `TextIndexer`: обход папок (`FileStore.List`), download
   (`FileStore.Download`), извлечение текста (`internal/docpipe`), запись в
   `TextIndex`; пул воркеров.
-- `file_facade.go` — связка бэкендов (`Files().Search()`, порядок и fallback).
+- `filestore_facade.go` — связка бэкендов (`Files().Search()`, порядок и fallback).
 - CLI: `cmd/oo/search.go`, `cmd/oo/index.go`.
-- Разовые бинари для match: `cmd/ooscan/` (TSV-индекс папок),
-  `cmd/pdfamount/` (суммы по PDF в папке).
+- Разовые бинари для match (`ooscan`, `pdfamount`) живут в приватном
+  `oo-workspace`.
 - `internal/docpipe` — текст из PDF (pdftotext), для сканов OCR
   (ocrmypdf/tesseract), вложения PDF (pdfdetach).
 
@@ -81,24 +80,10 @@ oo index folder 649 --recursive --dry-run
   не индексируй корень целиком.
 - Индексация PDF в `files_file` не делается — только `oo_docs_text`.
 
-## Bulk-инструменты `ooscan` / `pdfamount`
+## Bulk-инструменты
 
-Плоский TSV без Elasticsearch, для внешних потребителей.
-
-```bash
-# рекурсивный индекс папок: file_id, folder_id, path, title
-ooscan <FOLDER_ID>... > index.tsv
-# суммы по PDF папки: file_id, title, amount
-pdfamount <FOLDER_ID> [TITLE_FILTER] > amounts.tsv
-```
-
-- `ooscan`: троттлинг 350 мс на папку, `DoRetry` на 429, глубина до 8, `path` —
-  путь внутри просканированного корня.
-- `pdfamount`: строка с `%`/`MwSt`/`USt`/`Prozent`/`Steuer` суммой не считается;
-  приоритет меток (`zu zahlender betrag` > `rechnungsbetrag` > … > `summe`).
-- Какие корни сканировать и как обновлять индекс — решает потребитель; это не
-  часть библиотеки. Сверка Excel — `office-assistant` (`cmd/match`,
-  `docs/reference/match-index.md`).
+Плоские TSV-инструменты (`ooscan`, `pdfamount`) и сверка Excel живут в
+приватном `oo-workspace`, не в публичной библиотеке.
 
 ## Грабли
 

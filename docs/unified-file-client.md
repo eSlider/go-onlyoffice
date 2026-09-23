@@ -3,8 +3,8 @@ type: reference
 status: current
 related:
   - README.md
-  - file_core.go
-  - file_facade.go
+  - filestore_core.go
+  - filestore_facade.go
   - docs/elasticsearch.md
   - docs/community-server-db.md
 ---
@@ -14,7 +14,7 @@ related:
 ## Что это
 
 Один файловый клиент на все бэкенды (эпик #34). Модель и интерфейсы —
-`file_core.go`. Фасад `FileClient` — `file_facade.go`. Бэкенды:
+`filestore_core.go`. Фасад `FileClient` — `filestore_facade.go`. Бэкенды:
 REST, WebDAV, SQL (PostgreSQL/MySQL), Elasticsearch. Правило одно:
 код зовёт `c.Files()` и не знает про транспорт.
 
@@ -56,18 +56,18 @@ type Searcher interface {
 }
 ```
 
-`TextIndex` (`file_es_text.go`) — свой индекс: `Put`, `Delete`, `Search`,
+`TextIndex` (`filestore_es_text.go`) — свой индекс: `Put`, `Delete`, `Search`,
 `Name`. `ESTextIndex` реализует и `Searcher`, и `TextIndex`.
 
 ## Бэкенды
 
 | бэкенд | провайдер | файл | что умеет |
 |--------|-----------|------|-----------|
-| REST | `rest` | `file_rest.go` | read + write, Documents API |
-| WebDAV | `dav` | `file_dav.go` | read + write, Documents fileops |
-| SQL | `postgres` / `mysql` | `file_pg.go` | **read-only** |
-| OnlyOffice ES | `elasticsearch` | `file_es.go` | поиск (имя + контент Office) |
-| свой ES-индекс | `es-text` | `file_es_text.go` | поиск + запись (PDF/сканы) |
+| REST | `rest` | `filestore_rest.go` | read + write, Documents API |
+| WebDAV | `dav` | `filestore_dav.go` | read + write, Documents fileops |
+| SQL | `postgres` / `mysql` | `filestore_pg.go` | **read-only** |
+| OnlyOffice ES | `elasticsearch` | `filestore_es.go` | поиск (имя + контент Office) |
+| свой ES-индекс | `es-text` | `filestore_es_text.go` | поиск + запись (PDF/сканы) |
 
 - REST: `Stat` знает только файлы; папки — через `List`.
 - WebDAV: `Move`/`Copy`/`Delete` сперва `Stat`-ят id (папка/файл), потом зовут
@@ -202,4 +202,3 @@ go test ./ -run 'FileStore|Facade|ESText|PG'
 - [README.md](README.md) — индекс справочников.
 - [elasticsearch.md](elasticsearch.md) — индекс OnlyOffice и свой `oo_docs_text`.
 - [community-server-db.md](community-server-db.md) — SQL-стор и схема БД.
-- [rclone-webdav.md](rclone-webdav.md) — монтирование Documents как ФС.

@@ -20,8 +20,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # Always clone default branch first. workflow_dispatch often races with
-      # release-please creating the tag; fetching refs/tags/X before it exists
-      # fails checkout. Retry fetch, then check out the tag.
+      # tag creation; fetching refs/tags/X before it exists fails checkout.
+      # Retry fetch, then check out the tag.
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0

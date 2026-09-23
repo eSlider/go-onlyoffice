@@ -115,7 +115,7 @@ type Searcher interface {
 // returned store surfaces that error on every operation instead of returning
 // nil. Use SQLFileStore when the open error itself is needed. Unknown or empty
 // names select the REST backend. The composed facade (backend
-// selection/fallback) lives on FileClient in file_facade.go.
+// selection/fallback) lives on FileClient in filestore_facade.go.
 func (c *Client) FileStore(backend string) FileStore {
 	switch strings.ToLower(strings.TrimSpace(backend)) {
 	case ProviderDAV, "webdav":

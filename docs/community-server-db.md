@@ -3,7 +3,7 @@ type: reference
 status: current
 related:
   - README.md
-  - file_pg.go
+  - filestore_pg.go
   - docs/elasticsearch.md
 ---
 
@@ -11,7 +11,7 @@ related:
 
 ## Что это
 
-Бэкенд `pgStore` (`file_pg.go`) читает файлы и папки **напрямую из БД
+Бэкенд `pgStore` (`filestore_pg.go`) читает файлы и папки **напрямую из БД
 Community Server**, без HTTP-слоя. Реализует `FileStore` (`List`/`Stat`/
 `Download`) и `Searcher` по имени. Запись запрещена: все write-методы
 возвращают `ErrReadOnly`.
