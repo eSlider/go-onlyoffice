@@ -741,6 +741,10 @@ surfaces such per-operation errors instead of a silent nil
 oo dav ls 659
 oo dav ls @root                       # virtual sections (Documents, Projects, …)
 oo dav mkdir 659 "2026 inbox"
+oo dav ensure-path "Banks/Caixa"      # resolve-or-create; idempotent, prints the folder id
+oo dav ensure-path "Banks/Caixa" --under 659   # start under an explicit folder id
+oo dav upload 659 ./historico.xlsx    # multipart upload, upsert by stem|ext
+oo dav upload 659 ./a.xlsx ./b.pdf --replace=false  # fail on name conflict instead of replacing
 oo dav move 659 22881 22882           # DEST_FOLDER_ID FILE_ID…
 oo dav move 659 22881 --folders 670   # move folders along with files
 oo dav copy 659 22881
@@ -749,6 +753,11 @@ oo dav rename-folder 671 o2-archive
 oo dav download 22881 --to ./copy.pdf # default path: ./<server title>
 oo dav fileops                        # active move/copy operations (status polling)
 ```
+
+`ensure-path` defaults to the concrete **My documents** section id (resolved
+from `@root`, `rootFolderType=5`); `--under FOLDER_ID` overrides it. `upload`
+reuses `UploadToFolderReplacing` (`--replace`, default) or `UploadToFolder`
+after an `AssertNoFileConflict` check (`--no-replace`), so no new HTTP paths.
 
 ### Search and index (`oo search`, `oo index`)
 
@@ -824,7 +833,7 @@ library. They build on the public client and the same `DoRetry` pacing.
 | `crm-tasks` | `list`, `create`, `delete`, `categories`, `reassign-self` |
 | `docs` | `tools`, `convert`, `pdf`, `presigned`, `csv`, `json`, `optimize`, `ocr`, `hocr`, `as-md`, `put-md`, `put-txt`, `put-xlsx` |
 | `catalog` | `match`, `merge`, `apply`, `scan-contacts`, `scan-projects`, `scan-thunderbird` |
-| `dav` | `ls`, `move`, `copy`, `mkdir`, `rename-file`, `rename-folder`, `download`, `fileops` |
+| `dav` | `ls`, `move`, `copy`, `mkdir`, `ensure-path`, `upload`, `rename-file`, `rename-folder`, `download`, `fileops` |
 | `search` | `QUERY` (`--content`, `--folder ID`, `--limit N`, `--backend oo\|own`, `--json`) |
 | `index` | `folder FOLDER_ID`, `files FILE_ID...` (`--recursive`, `--exts pdf`, `--limit N`, `--dry-run`) |
 
