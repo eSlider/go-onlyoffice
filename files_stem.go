@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -121,7 +122,9 @@ func (c *Client) DeleteFilesByStem(ctx context.Context, folderID, stem string) (
 	return ids, nil
 }
 
-// AssertNoFileConflict reports ErrFileExists when localPath stem|ext is already in folderID.
+// AssertNoFileConflict reports ErrFileExists when localPath logical name is
+// already in folderID. Matching is conversion-aware, so a .xls upload also
+// conflicts with an existing .xlsx and does not create a hidden duplicate.
 func (c *Client) AssertNoFileConflict(ctx context.Context, folderID, localPath string) error {
 	files, err := c.FolderFiles(ctx, folderID)
 	if err != nil {
@@ -129,7 +132,7 @@ func (c *Client) AssertNoFileConflict(ctx context.Context, folderID, localPath s
 	}
 	stem := UploadStemFromLocal(localPath)
 	ext := UploadExtFromLocal(localPath)
-	matches := FindFilesByDedupKey(files, stem, ext)
+	matches := FindFilesByStemExt(files, stem, ext)
 	if len(matches) == 0 {
 		return nil
 	}
@@ -153,14 +156,81 @@ func (c *Client) UploadProjectFileNoClobber(ctx context.Context, projectID, loca
 	return c.UploadProjectFile(ctx, projectID, localPath)
 }
 
-// UploadToFolderReplacing deletes same stem+ext files then uploads localPath.
+// uploadReplacementPlan is how a replacing upload reconciles with a folder.
+type uploadReplacementPlan struct {
+	// UpdateID is the existing file to overwrite in place; empty when no file
+	// matches the upload stem and (converted) extension.
+	UpdateID string
+	// DeleteIDs are redundant duplicate ids to remove after the update.
+	DeleteIDs []int
+}
+
+// planUploadReplacement matches an incoming local upload (stem + ext) against
+// the files already in a folder and decides between a fresh upload, an in-place
+// update and duplicate cleanup. Matching tolerates the legacy→OOXML conversion
+// OnlyOffice performs on upload, so a repeated upload of f.xls finds the saved
+// f.xlsx instead of creating a second file.
+func planUploadReplacement(files []*FileEntry, stem, ext string) uploadReplacementPlan {
+	matches := FindFilesByStemExt(files, stem, ext)
+	if len(matches) == 0 {
+		return uploadReplacementPlan{}
+	}
+	keep, remove := pickDuplicateKeeper(matches, false)
+	plan := uploadReplacementPlan{}
+	if id := FileEntryNumericID(keep); id != 0 {
+		plan.UpdateID = strconv.FormatInt(id, 10)
+	}
+	for _, f := range remove {
+		if id := int(FileEntryNumericID(f)); id != 0 {
+			plan.DeleteIDs = append(plan.DeleteIDs, id)
+		}
+	}
+	return plan
+}
+
+// UploadToFolderReplacing upserts localPath into folderID by logical name.
+// Matching is stem + extension with OnlyOffice's server-side conversion
+// accounted for: a local .xls is stored as .xlsx, so a repeated upload
+// overwrites the saved document instead of appending a duplicate. When a
+// counterpart exists it is updated in place (stable id, no window without the
+// file) and any extra duplicates are removed; portals that reject an in-place
+// update fall back to delete + fresh upload, which still leaves one file.
 func (c *Client) UploadToFolderReplacing(ctx context.Context, folderID, localPath string) (*FileEntry, []int, error) {
 	stem := UploadStemFromLocal(localPath)
 	ext := UploadExtFromLocal(localPath)
-	deleted, err := c.DeleteFilesByDedupKey(ctx, folderID, stem, ext)
+	files, err := c.FolderFiles(ctx, folderID)
 	if err != nil {
-		return nil, deleted, err
+		return nil, nil, err
 	}
-	ent, err := c.UploadToFolder(ctx, folderID, localPath)
-	return ent, deleted, err
+	plan := planUploadReplacement(files, stem, ext)
+	if plan.UpdateID == "" {
+		ent, err := c.UploadToFolder(ctx, folderID, localPath)
+		return ent, nil, err
+	}
+	ent, err := c.UpdateFile(ctx, plan.UpdateID, localPath)
+	if err != nil {
+		deleted, derr := c.DeleteFilesByStemExt(ctx, folderID, stem, ext)
+		if derr != nil {
+			return nil, deleted, derr
+		}
+		ent, uerr := c.UploadToFolder(ctx, folderID, localPath)
+		return ent, deleted, uerr
+	}
+	deleted, derr := c.deleteReplacementExtras(ctx, plan.DeleteIDs)
+	if derr != nil {
+		return ent, deleted, derr
+	}
+	return ent, deleted, nil
+}
+
+// deleteReplacementExtras removes redundant duplicate ids collected by
+// planUploadReplacement after the surviving file was updated in place.
+func (c *Client) deleteReplacementExtras(ctx context.Context, ids []int) ([]int, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	if err := c.DeleteFiles(ctx, ids); err != nil {
+		return ids, err
+	}
+	return ids, nil
 }

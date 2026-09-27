@@ -237,7 +237,8 @@ func (c *Client) UploadProjectFile(ctx context.Context, projectID, localPath str
 	return decodeResponseFileEntry(raw)
 }
 
-// UploadProjectFileReplacing upserts by stem|ext in the project Documents folder.
+// UploadProjectFileReplacing upserts by stem and (server-converted) extension
+// in the project Documents folder.
 func (c *Client) UploadProjectFileReplacing(ctx context.Context, projectID, localPath string) (*FileEntry, []int, error) {
 	folderID, err := c.projectFolderID(ctx, projectID)
 	if err != nil {
