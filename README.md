@@ -743,7 +743,7 @@ oo dav ls @root                       # virtual sections (Documents, Projects, �
 oo dav mkdir 659 "2026 inbox"
 oo dav ensure-path "Banks/Caixa"      # resolve-or-create; idempotent, prints the folder id
 oo dav ensure-path "Banks/Caixa" --under 659   # start under an explicit folder id
-oo dav upload 659 ./historico.xlsx    # multipart upload, upsert by stem|ext
+oo dav upload 659 ./historico.xlsx    # multipart upload, upsert by stem (legacy↔OOXML ext aware)
 oo dav upload 659 ./a.xlsx ./b.pdf --replace=false  # fail on name conflict instead of replacing
 oo dav move 659 22881 22882           # DEST_FOLDER_ID FILE_ID…
 oo dav move 659 22881 --folders 670   # move folders along with files

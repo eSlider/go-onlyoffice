@@ -113,9 +113,11 @@ func prjFilesUploadCmd() *cobra.Command {
 	var replace, allowDuplicate bool
 	cmd := &cobra.Command{
 		Use:   "upload PROJECT_ID LOCAL_PATH [LOCAL_PATH...]",
-		Short: "Upload file(s) into the project's Documents folder (upsert by stem|ext)",
-		Long: `Default: replace an existing file with the same logical name (stem|ext), like cp overwrite.
-Pass --no-replace to fail when the name is taken; --allow-duplicate to always create a new file id.`,
+		Short: "Upload file(s) into the project's Documents folder (upsert by stem, legacy↔OOXML ext)",
+		Long: `Default: replace an existing file with the same logical name (stem, treating
+legacy .xls/.doc/.ppt and their OOXML .xlsx/.docx/.pptx as one file), like cp
+overwrite. Pass --no-replace to fail when the name is taken; --allow-duplicate
+to always create a new file id.`,
 		Args: cobra.MinimumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			c, err := newOO(cmd)

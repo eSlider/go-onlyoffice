@@ -83,6 +83,85 @@ func UploadExtFromLocal(localPath string) string {
 	return strings.ToLower(ext)
 }
 
+// legacyToOOXMLExt maps the legacy binary Office extensions OnlyOffice accepts
+// on upload to the OOXML extension the server converts them into.
+var legacyToOOXMLExt = map[string]string{
+	".xls": ".xlsx",
+	".doc": ".docx",
+	".ppt": ".pptx",
+}
+
+// normalizeExt lowercases an extension and ensures a leading dot.
+func normalizeExt(ext string) string {
+	ext = strings.ToLower(strings.TrimSpace(ext))
+	if ext == "" {
+		return ""
+	}
+	if !strings.HasPrefix(ext, ".") {
+		ext = "." + ext
+	}
+	return ext
+}
+
+// EquivalentUploadExt reports whether two extensions designate the same
+// document once the server-side conversion is taken into account: equal
+// extensions, or a legacy binary Office format and its OOXML equivalent
+// (.xls/.xlsx, .doc/.docx, .ppt/.pptx). Empty extensions only match each other.
+func EquivalentUploadExt(a, b string) bool {
+	na, nb := normalizeExt(a), normalizeExt(b)
+	if na == nb {
+		return true
+	}
+	if na == "" || nb == "" {
+		return false
+	}
+	return legacyToOOXMLExt[na] == nb || legacyToOOXMLExt[nb] == na
+}
+
+// FindFilesByStemExt returns folder files matching stem and a same-or-converted
+// extension (see EquivalentUploadExt). Unlike FindFilesByDedupKey, foo.xls and
+// foo.xlsx are one logical file, so a replacing upload after OnlyOffice's
+// legacy→OOXML conversion finds the saved file instead of appending a copy.
+func FindFilesByStemExt(files []*FileEntry, stem, ext string) []*FileEntry {
+	stem = strings.TrimSpace(stem)
+	if stem == "" {
+		return nil
+	}
+	var out []*FileEntry
+	for _, f := range files {
+		if FileEntryStem(f) != stem {
+			continue
+		}
+		if EquivalentUploadExt(FileEntryExt(f), ext) {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// DeleteFilesByStemExt removes every folder file matching stem and a
+// same-or-converted extension (legacy ↔ OOXML).
+func (c *Client) DeleteFilesByStemExt(ctx context.Context, folderID, stem, ext string) ([]int, error) {
+	files, err := c.FolderFiles(ctx, folderID)
+	if err != nil {
+		return nil, err
+	}
+	matches := FindFilesByStemExt(files, stem, ext)
+	ids := make([]int, 0, len(matches))
+	for _, f := range matches {
+		if n := int(FileEntryNumericID(f)); n != 0 {
+			ids = append(ids, n)
+		}
+	}
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	if err := c.DeleteFiles(ctx, ids); err != nil {
+		return nil, err
+	}
+	return ids, nil
+}
+
 // IsTrashFolderTitle reports staging/trash folders (e.g. _trash-md).
 func IsTrashFolderTitle(title string) bool {
 	t := strings.ToLower(strings.TrimSpace(title))

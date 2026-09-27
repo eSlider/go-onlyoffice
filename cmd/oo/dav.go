@@ -253,7 +253,7 @@ func davUploadCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().BoolVar(&replace, "replace", true, "replace same stem|ext before upload (default); false = fail if name taken")
+	cmd.Flags().BoolVar(&replace, "replace", true, "replace the same logical file (stem, legacy↔OOXML ext) before upload (default); false = fail if name taken")
 	return cmd
 }
 
@@ -271,9 +271,10 @@ type uploader interface {
 	UploadToFolder(ctx context.Context, folderID, localPath string) (*onlyoffice.FileEntry, error)
 }
 
-// uploadLocal uploads each local file into folderID. With replace a same
-// stem|ext file is removed first (the UploadToFolderReplacing upsert); without
-// replace a name clash fails with ErrFileExists before anything is sent.
+// uploadLocal uploads each local file into folderID. With replace the existing
+// same logical file is overwritten in place (the UploadToFolderReplacing
+// upsert, which matches the server-converted extension too); without replace a
+// name clash fails with ErrFileExists before anything is sent.
 func uploadLocal(ctx context.Context, up uploader, folderID string, paths []string, replace bool) ([]uploadedFile, error) {
 	results := make([]uploadedFile, 0, len(paths))
 	for _, path := range paths {
