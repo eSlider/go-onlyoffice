@@ -133,6 +133,67 @@ func (c *Client) CreateDavFolder(ctx context.Context, parentID, title string) (*
 	return env.Response, nil
 }
 
+// CreateDavFile creates an empty file titled title inside parentID via
+// POST /api/2.0/files/{folderId}/file. When enableExternalExt is true the
+// extension is kept as-is instead of being coerced to .docx/.xlsx/.pptx,
+// which is what non-office WebDAV PUTs need. Mirrors ASC.WebDav createFile.
+func (c *Client) CreateDavFile(ctx context.Context, parentID, title string, enableExternalExt bool) (*DavFile, error) {
+	body := map[string]any{"title": title, "EnableExternalExt": enableExternalExt}
+	path := "/api/2.0/files/" + url.PathEscape(parentID) + "/file"
+	out, err := c.postJSONObject(ctx, path, body)
+	if err != nil {
+		out, err = c.postJSONObject(ctx, path+".json", body)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return davFileFromMap(out), nil
+}
+
+// CreateDavTextFile creates a new text file (POST /api/2.0/files/{folderId}/text).
+// The reference ASC.WebDav implementation sends a single space as content
+// because the portal rejects fully empty bodies; the same applies here.
+func (c *Client) CreateDavTextFile(ctx context.Context, parentID, title string) (*DavFile, error) {
+	return c.createDavContentFile(ctx, parentID, title, "/text")
+}
+
+// CreateDavHtmlFile creates a new HTML file (POST .../html).
+func (c *Client) CreateDavHtmlFile(ctx context.Context, parentID, title string) (*DavFile, error) {
+	return c.createDavContentFile(ctx, parentID, title, "/html")
+}
+
+func (c *Client) createDavContentFile(ctx context.Context, parentID, title, suffix string) (*DavFile, error) {
+	body := map[string]any{"title": title, "content": " "}
+	path := "/api/2.0/files/" + url.PathEscape(parentID) + suffix
+	out, err := c.postJSONObject(ctx, path, body)
+	if err != nil {
+		out, err = c.postJSONObject(ctx, path+".json", body)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return davFileFromMap(out), nil
+}
+
+// davFileFromMap renders a create-file response object as a DavFile. Only the
+// fields the portal reliably returns are mapped.
+func davFileFromMap(m map[string]any) *DavFile {
+	if m == nil {
+		return &DavFile{}
+	}
+	f := &DavFile{
+		ID:      stringField(m, "id"),
+		Title:   stringField(m, "title"),
+		Size:    flexInt(m["pureContentLength"]),
+		Updated: stringField(m, "updated"),
+		ViewURL: stringField(m, "viewUrl"),
+	}
+	if f.Size == 0 {
+		f.Size = flexInt(m["contentLength"])
+	}
+	return f
+}
+
 // RenameDavFolder renames a folder.
 //
 // Deprecated: use FileStore.Rename via Client.Files()/Client.FileStore.
@@ -268,7 +329,7 @@ func (c *Client) deleteDavItem(ctx context.Context, path string, body any) error
 //
 // Deprecated: use FileStore.Upload via Client.Files()/Client.FileStore.
 func (c *Client) UploadDavFile(ctx context.Context, folderID, fileName string, src io.Reader) (*DavFile, error) {
-	raw, err := c.uploadReader(ctx, "/api/2.0/files/"+url.PathEscape(folderID)+"/upload", "file", fileName, src)
+	raw, err := c.uploadReader(ctx, http.MethodPost, "/api/2.0/files/"+url.PathEscape(folderID)+"/upload", "file", fileName, src)
 	if err != nil {
 		return nil, err
 	}
@@ -331,7 +392,7 @@ func (c *Client) deleteJSON(ctx context.Context, path string, body any) (json.Ra
 }
 
 // uploadReader uploads a stream to path under the given form field name.
-func (c *Client) uploadReader(ctx context.Context, path, fieldName, fileName string, src io.Reader) (json.RawMessage, error) {
+func (c *Client) uploadReader(ctx context.Context, method, path, fieldName, fileName string, src io.Reader) (json.RawMessage, error) {
 	var buf bytes.Buffer
 	mw := multipart.NewWriter(&buf)
 	part, err := mw.CreateFormFile(fieldName, fileName)
@@ -348,7 +409,7 @@ func (c *Client) uploadReader(ctx context.Context, path, fieldName, fileName str
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL()+path, &buf)
+	req, err := http.NewRequestWithContext(ctx, method, c.baseURL()+path, &buf)
 	if err != nil {
 		return nil, err
 	}
@@ -368,6 +429,28 @@ func (c *Client) uploadReader(ctx context.Context, path, fieldName, fileName str
 		return nil, statusError(resp.StatusCode, retryAfterOf(resp), "upload %s: %d %s", path, resp.StatusCode, truncate(string(raw), 400))
 	}
 	return raw, nil
+}
+
+// UpdateDavFile uploads src as a new version of the existing file fileID
+// (PUT /api/2.0/files/{id}/update). Unlike UploadDavFile, it replaces the
+// existing file instead of creating a second file with the same title — the
+// ONLYOFFICE /upload endpoint duplicates on a title clash.
+func (c *Client) UpdateDavFile(ctx context.Context, fileID, fileName string, src io.Reader) (*DavFile, error) {
+	path := "/api/2.0/files/" + url.PathEscape(fileID) + "/update"
+	raw, err := c.uploadReader(ctx, http.MethodPut, path, "file", fileName, src)
+	if err != nil {
+		return nil, err
+	}
+	var env struct {
+		Response *DavFile `json:"response"`
+	}
+	if err := json.Unmarshal(raw, &env); err != nil {
+		return nil, err
+	}
+	if env.Response == nil {
+		return nil, fmt.Errorf("onlyoffice: empty update response")
+	}
+	return env.Response, nil
 }
 
 func nums(ids []string) []json.Number {
